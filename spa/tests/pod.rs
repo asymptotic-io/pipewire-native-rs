@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
+#![allow(clippy::unit_cmp)]
 
 use std::ffi::c_void;
 
@@ -99,7 +100,7 @@ fn test_pod_builder() {
     }
     unsafe {
         sbuilder
-            .add_array(4, spa_sys::SPA_TYPE_Bool, 0, [].as_ptr() as *const c_void)
+            .add_array(4, spa_sys::SPA_TYPE_Bool, 0, [].as_ptr())
             .unwrap();
     }
     unsafe {
@@ -151,14 +152,12 @@ fn test_pod_builder() {
     assert_eq!(res, sbuf.as_slice());
 }
 
-fn test_a_pod<T: Clone + Pod>(pod: &T)
+fn test_a_pod<'a, T: Clone + Pod + 'a>(pod: &T, buf: &'a mut [u8])
 where
-    <T as Pod>::DecodesTo: From<T> + std::cmp::PartialEq + std::fmt::Debug,
+    <T as Pod>::DecodesTo<'a>: From<T> + std::cmp::PartialEq + std::fmt::Debug,
 {
-    let mut buf = [0u8; 1024];
-
-    let size = pod.encode(&mut buf).unwrap();
-    let (rv, rsize) = T::decode(&buf).unwrap();
+    let size = pod.encode(buf).unwrap();
+    let (rv, rsize) = T::decode(buf).unwrap();
 
     assert_eq!(size, rsize);
     assert_eq!(<T as Pod>::DecodesTo::from(pod.clone()), rv);
@@ -166,42 +165,62 @@ where
 
 #[test]
 fn test_pod_decode() {
-    test_a_pod(&());
-    test_a_pod(&true);
-    test_a_pod(&(-123 as i32));
-    test_a_pod(&(i64::MIN));
-    test_a_pod(&"hello");
-    test_a_pod(&vec![1u8, 2, 3, 4].as_slice());
-    test_a_pod(&Pointer {
-        type_: Type::Int,
-        ptr: 0xdeadbeef as *const c_void,
-    });
-    test_a_pod(&Fd(-1));
-    test_a_pod(&Rectangle {
-        width: 1920,
-        height: 1080,
-    });
-    test_a_pod(&Fraction {
-        num: 30001,
-        denom: 1,
-    });
-    test_a_pod(&vec![11.0f32, 12.0, 13.0].as_slice());
-    test_a_pod(&Choice::None(14i64));
-    test_a_pod(&Choice::Range {
-        default: 1i32,
-        min: 0,
-        max: 10,
-    });
-    test_a_pod(&Choice::Step {
-        default: 1.5f32,
-        min: 0.0,
-        max: 10.0,
-        step: 0.25,
-    });
-    test_a_pod(&Choice::Enum {
-        default: Id(2u32),
-        alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
-    });
+    let mut buf = [0u8; 1024];
+
+    test_a_pod(&(), &mut buf);
+    test_a_pod(&true, &mut buf);
+    test_a_pod(&(-123_i32), &mut buf);
+    test_a_pod(&i64::MIN, &mut buf);
+    test_a_pod(
+        &Pointer {
+            type_: Type::Int,
+            ptr: 0xdeadbeef as *const c_void,
+        },
+        &mut buf,
+    );
+    test_a_pod(&Fd(-1), &mut buf);
+    test_a_pod(
+        &Rectangle {
+            width: 1920,
+            height: 1080,
+        },
+        &mut buf,
+    );
+    test_a_pod(
+        &Fraction {
+            num: 30001,
+            denom: 1,
+        },
+        &mut buf,
+    );
+    test_a_pod(&Choice::None(14i64), &mut buf);
+    test_a_pod(
+        &Choice::Range {
+            default: 1i32,
+            min: 0,
+            max: 10,
+        },
+        &mut buf,
+    );
+    test_a_pod(
+        &Choice::Step {
+            default: 1.5f32,
+            min: 0.0,
+            max: 10.0,
+            step: 0.25,
+        },
+        &mut buf,
+    );
+    test_a_pod(
+        &Choice::Enum {
+            default: Id(2u32),
+            alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
+        },
+        &mut buf,
+    );
+    test_a_pod(&"hello", &mut buf);
+    test_a_pod(&vec![1u8, 2, 3, 4].as_slice(), &mut buf);
+    test_a_pod(&vec![11.0f32, 12.0, 13.0].as_slice(), &mut buf);
 }
 
 #[test]
@@ -242,9 +261,9 @@ fn test_pod_parser() {
         .build()
         .unwrap();
 
-    let mut parser = Parser::new(&res);
+    let mut parser = Parser::new(res);
     assert_eq!(parser.pop_none().unwrap(), ());
-    assert_eq!(parser.pop_bool().unwrap(), true);
+    assert!(parser.pop_bool().unwrap());
     assert_eq!(parser.pop_id().unwrap(), Id(1u32));
     assert_eq!(parser.pop_int().unwrap(), 2);
     assert_eq!(parser.pop_long().unwrap(), 3);
@@ -474,7 +493,7 @@ fn test_pod_builder_object() {
                     Property {
                         key: PropInfo::Description,
                         flags: PropertyFlags::empty(),
-                        value: "test".to_string()
+                        value: "test"
                     }
                 );
                 Ok(())

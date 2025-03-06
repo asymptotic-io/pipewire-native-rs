@@ -15,10 +15,12 @@ use types::{Choice, Fd, Fraction, Id, Pointer, Property, PropertyFlags, Rectangl
 
 pub trait Pod {
     // Default to Self once that is stable, or try to generate references to owned data
-    type DecodesTo;
+    type DecodesTo<'pod>
+    where
+        Self: 'pod;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error>;
-    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error>;
+    fn decode<'a>(data: &'a [u8]) -> Result<(Self::DecodesTo<'a>, usize), Error>;
 }
 
 pub trait Primitive {
@@ -43,7 +45,10 @@ impl<T> Pod for T
 where
     T: Primitive,
 {
-    type DecodesTo = Self;
+    type DecodesTo<'b>
+        = T
+    where
+        T: 'b;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = Self::pod_size();
@@ -65,7 +70,7 @@ where
         Ok(8 + size + padding)
     }
 
-    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+    fn decode(data: &[u8]) -> Result<(T, usize), Error> {
         if data.len() < 16 {
             return Err(Error::Invalid);
         }
@@ -298,7 +303,10 @@ impl Primitive for Fraction {
 }
 
 impl Pod for &str {
-    type DecodesTo = String;
+    type DecodesTo<'a>
+        = &'a str
+    where
+        Self: 'a;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let len = self.len() + 1;
@@ -319,7 +327,7 @@ impl Pod for &str {
         Ok(8 + len + padding)
     }
 
-    fn decode(data: &[u8]) -> Result<(String, usize), Error> {
+    fn decode(data: &[u8]) -> Result<(&str, usize), Error> {
         let len = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         let padding = pad_8(len);
 
@@ -331,7 +339,7 @@ impl Pod for &str {
             return Err(Error::Invalid);
         }
 
-        let s = String::from_utf8_lossy(&data[8..8 + len - 1]).to_string();
+        let s = std::str::from_utf8(&data[8..8 + len - 1]).unwrap();
         // Null terminator
         if data[8 + len - 1] != 0 {
             return Err(Error::Invalid);
@@ -342,7 +350,10 @@ impl Pod for &str {
 }
 
 impl Pod for &[u8] {
-    type DecodesTo = Vec<u8>;
+    type DecodesTo<'a>
+        = &'a [u8]
+    where
+        Self: 'a;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let len = self.len();
@@ -361,7 +372,7 @@ impl Pod for &[u8] {
         Ok(8 + len + padding)
     }
 
-    fn decode(data: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+    fn decode(data: &[u8]) -> Result<(&[u8], usize), Error> {
         let len = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         let padding = pad_8(len);
 
@@ -373,7 +384,7 @@ impl Pod for &[u8] {
             return Err(Error::Invalid);
         }
 
-        Ok((data[8..8 + len].to_vec(), 8 + len + padding))
+        Ok((&data[8..8 + len], 8 + len + padding))
     }
 }
 
@@ -394,7 +405,10 @@ impl Pod for &[u8] {
 // +--------------+
 //
 impl Pod for Pointer {
-    type DecodesTo = Pointer;
+    type DecodesTo<'a>
+        = Pointer
+    where
+        Self: 'a;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let ptr_size = std::mem::size_of::<*const c_void>();
@@ -419,7 +433,7 @@ impl Pod for Pointer {
         Ok(24)
     }
 
-    fn decode(data: &[u8]) -> Result<(Pointer, usize), Error> {
+    fn decode<'a>(data: &'_ [u8]) -> Result<(Pointer, usize), Error> {
         let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         let ptr_size = std::mem::size_of::<*const c_void>();
         let padding = 8 - ptr_size;
@@ -467,7 +481,10 @@ impl<T> Pod for &[T]
 where
     T: Primitive + Pod,
 {
-    type DecodesTo = Vec<T>;
+    type DecodesTo<'a>
+        = Vec<T>
+    where
+        Self: 'a;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let child_size = T::pod_size();
@@ -548,7 +565,10 @@ impl<T> Pod for Choice<T>
 where
     T: Pod + Primitive,
 {
-    type DecodesTo = Choice<T>;
+    type DecodesTo<'a>
+        = Choice<T>
+    where
+        Self: 'a;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let child_size = T::pod_size();
@@ -719,7 +739,11 @@ where
     T: Copy + Into<u32> + TryFrom<u32>,
     U: Pod,
 {
-    type DecodesTo = Property<T, U::DecodesTo>;
+    type DecodesTo<'a>
+        = Property<T, U::DecodesTo<'a>>
+    where
+        U: 'a,
+        T: 'a;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         if data.len() < 8 {
@@ -734,7 +758,9 @@ where
         Ok(8 + value_size)
     }
 
-    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+    fn decode<'b>(
+        data: &'b [u8],
+    ) -> Result<(Property<T, <U as Pod>::DecodesTo<'b>>, usize), Error> {
         if data.len() < 8 {
             return Err(Error::Invalid);
         }

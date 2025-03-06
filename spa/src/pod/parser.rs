@@ -18,7 +18,7 @@ impl<'a> Parser<'a> {
         Parser { data, pos: 0 }
     }
 
-    pub fn pop_pod<U: Pod>(&mut self) -> Result<<U as Pod>::DecodesTo, Error> {
+    pub fn pop_pod<U: Pod>(&mut self) -> Result<<U as Pod>::DecodesTo<'_>, Error> {
         let (res, size) = U::decode(&self.data[self.pos..])?;
 
         self.pos += size;
@@ -57,11 +57,11 @@ impl<'a> Parser<'a> {
         self.pop_pod::<f64>()
     }
 
-    pub fn pop_string(&mut self) -> Result<String, Error> {
+    pub fn pop_string(&mut self) -> Result<&str, Error> {
         self.pop_pod::<&str>()
     }
 
-    pub fn pop_bytes(&mut self) -> Result<Vec<u8>, Error> {
+    pub fn pop_bytes(&mut self) -> Result<&[u8], Error> {
         self.pop_pod::<&[u8]>()
     }
 
@@ -174,7 +174,7 @@ impl<'a> ObjectParser<'a> {
         ObjectParser { parser }
     }
 
-    pub fn pop_property<K, V>(&mut self) -> Result<Property<K, <V as Pod>::DecodesTo>, Error>
+    pub fn pop_property<K, V>(&mut self) -> Result<Property<K, <V as Pod>::DecodesTo<'_>>, Error>
     where
         K: Copy + Into<u32> + TryFrom<u32>,
         V: Pod,
