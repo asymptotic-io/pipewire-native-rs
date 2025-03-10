@@ -22,7 +22,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn pop_pod<U: Pod>(&self) -> Result<<U as Pod>::DecodesTo, Error> {
+    pub fn pop_pod<U: Pod<'a>>(&'a self) -> Result<<U as Pod<'a>>::DecodesTo, Error> {
         let pos = *self.pos.borrow();
 
         let (res, size) = U::decode(&self.data[pos..])?;
@@ -63,11 +63,11 @@ impl<'a> Parser<'a> {
         self.pop_pod::<f64>()
     }
 
-    pub fn pop_string(&self) -> Result<String, Error> {
+    pub fn pop_string(&self) -> Result<&str, Error> {
         self.pop_pod::<&str>()
     }
 
-    pub fn pop_bytes(&self) -> Result<Vec<u8>, Error> {
+    pub fn pop_bytes(&self) -> Result<&[u8], Error> {
         self.pop_pod::<&[u8]>()
     }
 
@@ -87,16 +87,16 @@ impl<'a> Parser<'a> {
         self.pop_pod::<Fraction>()
     }
 
-    pub fn pop_array<T>(&self) -> Result<Vec<T>, Error>
+    pub fn pop_array<T>(&'a self) -> Result<Vec<T>, Error>
     where
-        T: Pod + Primitive,
+        T: Pod<'a> + Primitive,
     {
         self.pop_pod::<&[T]>()
     }
 
-    pub fn pop_choice<T>(&self) -> Result<Choice<T>, Error>
+    pub fn pop_choice<T>(&'a self) -> Result<Choice<T>, Error>
     where
-        T: Pod + Primitive,
+        T: Pod<'a> + Primitive,
     {
         self.pop_pod::<Choice<T>>()
     }
@@ -183,10 +183,10 @@ impl<'a> ObjectParser<'a> {
         ObjectParser { parser }
     }
 
-    pub fn pop_property<K, V>(&self) -> Result<Property<K, <V as Pod>::DecodesTo>, Error>
+    pub fn pop_property<K, V>(&'a self) -> Result<Property<K, <V as Pod<'a>>::DecodesTo>, Error>
     where
         K: Copy + Into<u32> + TryFrom<u32>,
-        V: Pod,
+        V: Pod<'a>,
     {
         if self.parser.data.len() < 8 {
             return Err(Error::Invalid);

@@ -34,7 +34,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn push_pod<U: Pod>(mut self, value: U) -> Self {
+    pub fn push_pod<U: Pod<'a>>(mut self, value: U) -> Self {
         if self.error.is_none() {
             match value.encode(&mut self.data[self.pos..]) {
                 Ok(size) => self.pos += size,
@@ -88,11 +88,11 @@ impl<'a> Builder<'a> {
         self.push_pod(Fraction { num, denom })
     }
 
-    pub fn push_string(self, value: &str) -> Self {
+    pub fn push_string(self, value: &'a str) -> Self {
         self.push_pod(value)
     }
 
-    pub fn push_bytes(self, value: &[u8]) -> Self {
+    pub fn push_bytes(self, value: &'a [u8]) -> Self {
         self.push_pod(value)
     }
 
@@ -105,14 +105,14 @@ impl<'a> Builder<'a> {
 
     pub fn push_array<T>(self, values: &[T]) -> Self
     where
-        T: Pod + Primitive,
+        T: Pod<'a> + Primitive,
     {
         self.push_pod(values)
     }
 
     pub fn push_choice<T>(self, value: Choice<T>) -> Self
     where
-        T: Pod + Primitive,
+        T: Pod<'a> + Primitive,
     {
         self.push_pod(value)
     }
@@ -239,7 +239,7 @@ impl<'a> StructBuilder<'a> {
         self.builder
     }
 
-    pub fn push_pod<U: Pod>(self, value: U) -> Self {
+    pub fn push_pod<U: Pod<'a>>(self, value: U) -> Self {
         StructBuilder::new(self.builder.push_pod(value))
     }
 
@@ -286,11 +286,11 @@ impl<'a> StructBuilder<'a> {
         StructBuilder::new(self.builder.push_fraction(num, denom))
     }
 
-    pub fn push_string(self, value: &str) -> Self {
+    pub fn push_string(self, value: &'a str) -> Self {
         StructBuilder::new(self.builder.push_string(value))
     }
 
-    pub fn push_bytes(self, value: &[u8]) -> Self {
+    pub fn push_bytes(self, value: &'a [u8]) -> Self {
         StructBuilder::new(self.builder.push_bytes(value))
     }
 
@@ -300,14 +300,14 @@ impl<'a> StructBuilder<'a> {
 
     pub fn push_array<T>(self, values: &[T]) -> Self
     where
-        T: Pod + Primitive,
+        T: Pod<'a> + Primitive,
     {
         StructBuilder::new(self.builder.push_array(values))
     }
 
     pub fn push_choice<T>(self, value: Choice<T>) -> Self
     where
-        T: Pod + Primitive,
+        T: Pod<'a> + Primitive,
     {
         StructBuilder::new(self.builder.push_choice(value))
     }
@@ -343,8 +343,8 @@ impl<'a> ObjectBuilder<'a> {
 
     pub fn push_property<K, V>(mut self, key: K, flags: PropertyFlags, value: V) -> Self
     where
-        K: Copy + Into<u32> + TryFrom<u32>,
-        V: Pod,
+        K: Copy + Into<u32> + TryFrom<u32> + 'a,
+        V: Pod<'a>,
     {
         self.builder = self.builder.push_pod(Property { key, flags, value });
         self
