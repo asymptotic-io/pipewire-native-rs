@@ -242,7 +242,7 @@ fn test_pod_parser() {
         .build()
         .unwrap();
 
-    let mut parser = Parser::new(&res);
+    let parser = Parser::new(res);
     assert_eq!(parser.pop_none().unwrap(), ());
     assert_eq!(parser.pop_bool().unwrap(), true);
     assert_eq!(parser.pop_id().unwrap(), Id(1u32));
@@ -322,7 +322,7 @@ fn test_pod_builder_struct_empty() {
     };
     assert_eq!(res, sbuf.as_slice());
 
-    let mut parser = Parser::new(&buf);
+    let parser = Parser::new(&buf);
     assert_eq!(parser.pop_struct(|_| Ok(())).unwrap(), ());
 }
 
@@ -360,7 +360,7 @@ fn test_pod_builder_struct() {
     };
     assert_eq!(res, sbuf.as_slice());
 
-    let mut parser = Parser::new(&buf);
+    let parser = Parser::new(&buf);
     assert_eq!(
         parser
             .pop_struct(|p| {
@@ -407,7 +407,7 @@ fn test_pod_builder_object_empty() {
     };
     assert_eq!(res, sbuf.as_slice());
 
-    let mut parser = Parser::new(&buf);
+    let parser = Parser::new(&buf);
     assert_eq!(
         parser
             .pop_object(|_p, type_, id: ParamType| {
@@ -455,7 +455,7 @@ fn test_pod_builder_object() {
     };
     assert_eq!(res, sbuf.as_slice());
 
-    let mut parser = Parser::new(&buf);
+    let parser = Parser::new(&buf);
     assert_eq!(
         parser
             .pop_object(|p, type_, id: ParamType| {
