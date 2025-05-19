@@ -16,6 +16,12 @@ pub struct Plugin {}
 
 pub struct PluginHandle {}
 
+impl Default for Plugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Plugin {
     pub fn new() -> Self {
         Self {}

@@ -181,12 +181,12 @@ impl System {
         let mut buf = 0u64;
         let res = unsafe { libc::read(fd, &mut buf as *mut u64 as *mut libc::c_void, 8) };
         if res < 0 {
-            return Err(Error::last_os_error());
+            Err(Error::last_os_error())
         } else if res != 8 {
-            return Err(Error::new(
+            Err(Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "read timerfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(buf)
         }
@@ -201,12 +201,12 @@ impl System {
         let mut buf = 0u64;
         let res = unsafe { libc::read(fd, &mut buf as *mut u64 as *mut libc::c_void, 8) };
         if res < 0 {
-            return Err(Error::last_os_error());
+            Err(Error::last_os_error())
         } else if res != 8 {
-            return Err(Error::new(
+            Err(Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "read eventfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(buf)
         }
@@ -215,12 +215,12 @@ impl System {
     pub fn eventfd_write(_this: &SystemImpl, fd: RawFd, value: u64) -> std::io::Result<i32> {
         let res = unsafe { libc::write(fd, &value as *const u64 as *const libc::c_void, 8) };
         if res < 0 {
-            return Err(Error::last_os_error());
+            Err(Error::last_os_error())
         } else if res != 8 {
-            return Err(Error::new(
+            Err(Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "write eventfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(0)
         }
@@ -248,12 +248,12 @@ impl System {
             )
         };
         if res < 0 {
-            return Err(Error::last_os_error());
+            Err(Error::last_os_error())
         } else if res != std::mem::size_of::<libc::signalfd_siginfo>() as isize {
-            return Err(Error::new(
+            Err(Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "read signalfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(siginfo.ssi_signo)
         }

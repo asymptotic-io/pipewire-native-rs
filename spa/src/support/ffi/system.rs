@@ -344,12 +344,12 @@ impl CSystemImpl {
         };
 
         if res < 0 {
-            return Err(std::io::Error::last_os_error());
+            Err(std::io::Error::last_os_error())
         } else if res != 8 {
-            return Err(std::io::Error::new(
+            Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "read timerfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(expirations)
         }
@@ -374,12 +374,12 @@ impl CSystemImpl {
         };
 
         if res < 0 {
-            return Err(std::io::Error::last_os_error());
+            Err(std::io::Error::last_os_error())
         } else if res != 8 {
-            return Err(std::io::Error::new(
+            Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "read eventfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(buf)
         }
@@ -394,12 +394,12 @@ impl CSystemImpl {
         };
 
         if res < 0 {
-            return Err(std::io::Error::last_os_error());
+            Err(std::io::Error::last_os_error())
         } else if res != 8 {
-            return Err(std::io::Error::new(
+            Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "write eventfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(0)
         }
@@ -433,12 +433,12 @@ impl CSystemImpl {
         };
 
         if res < 0 {
-            return Err(std::io::Error::last_os_error());
+            Err(std::io::Error::last_os_error())
         } else if res != 8 {
-            return Err(std::io::Error::new(
+            Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "read signalfd returned unexpected size",
-            ));
+            ))
         } else {
             Ok(signal)
         }

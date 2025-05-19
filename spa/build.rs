@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use cc;
-
 fn main() {
     cc::Build::new()
         .file("src/support/ffi/log.c")

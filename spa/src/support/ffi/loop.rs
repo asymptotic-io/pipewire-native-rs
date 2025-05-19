@@ -209,7 +209,7 @@ impl CLoopImpl {
         //pub invoke: fn(&mut LoopImpl, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32>,
         //pub type InvokeFn = dyn FnMut(LoopImpl, bool, u32, &[u8]) -> i32 + 'static;
         let func = unsafe { (user_data as *mut Box<InvokeFn>).as_mut().unwrap() };
-        let data = unsafe { std::slice::from_raw_parts(data as *const u8, size as usize) };
+        let data = unsafe { std::slice::from_raw_parts(data as *const u8, size) };
 
         (func)(async_, seq, data)
     }
@@ -278,7 +278,7 @@ impl LoopImplIface {
 
     extern "C" fn add_source(object: *mut c_void, source: *mut CSource) -> c_int {
         let loop_impl = Self::c_to_loop_impl(object);
-        let c_source = unsafe { (source as *mut CSource).as_mut().unwrap() };
+        let c_source = unsafe { source.as_mut().unwrap() };
         let impl_source = Source {
             fd: c_source.fd,
             mask: c_source.mask,
@@ -295,7 +295,7 @@ impl LoopImplIface {
 
     extern "C" fn update_source(object: *mut c_void, source: *mut CSource) -> c_int {
         let loop_impl = Self::c_to_loop_impl(object);
-        let c_source = unsafe { (source as *mut CSource).as_mut().unwrap() };
+        let c_source = unsafe { source.as_mut().unwrap() };
         let impl_source = Source {
             fd: c_source.fd,
             mask: c_source.mask,
@@ -312,7 +312,7 @@ impl LoopImplIface {
 
     extern "C" fn remove_source(object: *mut c_void, source: *mut CSource) -> c_int {
         let loop_impl = Self::c_to_loop_impl(object);
-        let c_source = unsafe { (source as *mut CSource).as_mut().unwrap() };
+        let c_source = unsafe { source.as_mut().unwrap() };
 
         let res = loop_impl.remove_source(c_source.fd);
 
@@ -335,7 +335,7 @@ impl LoopImplIface {
 
         let res = loop_impl.invoke(
             seq,
-            unsafe { std::slice::from_raw_parts(data as *const u8, size as usize) },
+            unsafe { std::slice::from_raw_parts(data as *const u8, size) },
             block,
             Box::new(move |async_, seq, data| {
                 func(

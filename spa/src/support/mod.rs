@@ -11,8 +11,8 @@ pub mod r#loop;
 pub mod plugin;
 pub mod system;
 
-static PLUGIN: LazyLock<Plugin> = LazyLock::new(|| Plugin::new());
+static PLUGIN: LazyLock<Plugin> = LazyLock::new(Plugin::new);
 
 fn plugin() -> &'static Plugin {
-    &*PLUGIN
+    &PLUGIN
 }

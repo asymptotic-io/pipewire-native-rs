@@ -89,7 +89,7 @@ extern "C" fn rust_logt(
     let func = unsafe { CStr::from_ptr(func).to_str().unwrap() };
     let log = unsafe { CStr::from_ptr(log).to_str().unwrap() };
 
-    if topic == std::ptr::null() {
+    if topic.is_null() {
         log_impl.log(level, file, line, func, format_args!("{}", log));
     } else {
         let topic = unsafe {
@@ -166,7 +166,7 @@ impl CLogImpl {
         };
         let log_line = args
             .as_str()
-            .map(|s| c_string(s))
+            .map(c_string)
             .unwrap_or(CString::new(args.to_string()).unwrap());
 
         unsafe {

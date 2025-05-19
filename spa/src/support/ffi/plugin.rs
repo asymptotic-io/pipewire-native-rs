@@ -50,9 +50,16 @@ pub struct CInterfaceInfo {
 
 impl Clone for CInterfaceInfo {
     fn clone(&self) -> Self {
-        CInterfaceInfo {
-            type_: unsafe { libc::strdup(self.type_) },
-        }
+        /*
+         * Making the implementation be like below, would be a non-canonical
+         * implementation of Clone since Copy is already implemented.
+         * See https://rust-lang.github.io/rust-clippy/master/index.html#non_canonical_clone_impl
+
+           CInterfaceInfo {
+               type_: unsafe { libc::strdup(self.type_) },
+           }
+        */
+        *self
     }
 }
 
@@ -124,7 +131,7 @@ impl HandleFactory for CHandleFactoryImpl {
 
             match ret {
                 0 => Ok(CHandleImpl { handle }),
-                err => Err(std::io::Error::from_raw_os_error(err as i32)),
+                err => Err(std::io::Error::from_raw_os_error(err)),
             }
         }
     }
@@ -189,10 +196,10 @@ impl Handle for CHandleImpl {
         };
 
         match type_ {
-            interface::CPU => return Some(Box::new(cpu::new_impl(iface))),
-            interface::LOG => return Some(Box::new(log::new_impl(iface))),
-            interface::SYSTEM => return Some(Box::new(system::new_impl(iface))),
-            _ => return None,
+            interface::CPU => Some(Box::new(cpu::new_impl(iface))),
+            interface::LOG => Some(Box::new(log::new_impl(iface))),
+            interface::SYSTEM => Some(Box::new(system::new_impl(iface))),
+            _ => None,
         }
     }
 }

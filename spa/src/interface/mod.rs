@@ -38,8 +38,8 @@ pub struct Support {
     all: Vec<CSupport>,
 }
 
-impl Support {
-    pub fn new() -> Support {
+impl Default for Support {
+    fn default() -> Self {
         Support {
             cpu: None,
             log: None,
@@ -48,6 +48,12 @@ impl Support {
             /* Reserve enough space so the array is always valid */
             all: Vec::with_capacity(16),
         }
+    }
+}
+
+impl Support {
+    pub fn new() -> Support {
+        Support::default()
     }
 
     pub fn all(&self) -> &Vec<CSupport> {

@@ -19,7 +19,7 @@ pub struct Dict {
 
 impl Dict {
     pub fn new(mut map: Vec<(String, String)>) -> Dict {
-        if map.len() == 0 {
+        if map.is_empty() {
             return Dict {
                 flags: 0,
                 n_items: 0,
@@ -62,7 +62,7 @@ impl Dict {
         // Unbox so we don't deallocate on drop
         let _ = Box::into_raw(boxed);
 
-        return ret;
+        ret
     }
 
     pub fn lookup(&self, key: &str) -> Option<&str> {
@@ -84,7 +84,7 @@ impl Dict {
         // Unbox so we don't deallocate on drop
         let _ = Box::into_raw(boxed);
 
-        return ret;
+        ret
     }
 
     pub fn as_raw(&self) -> *const Dict {

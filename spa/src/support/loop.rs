@@ -63,7 +63,7 @@ impl Loop {
         let fd = source.fd;
         let events =
             PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
-        let mut source_ = Box::pin(source.clone());
+        let mut source_ = Box::pin(*source);
         let data = Pin::into_inner(source_.as_mut()) as *mut Source as u64;
 
         source_.rmask = 0;
