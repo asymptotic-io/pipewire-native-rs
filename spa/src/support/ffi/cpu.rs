@@ -5,7 +5,7 @@
 use std::ffi::{c_int, c_uint, c_void, CString};
 
 use crate::interface;
-use crate::interface::cpu::CpuImpl;
+use crate::interface::cpu::{CpuFlags, CpuImpl, CpuVm};
 use crate::interface::ffi::CInterface;
 
 use super::c_string;
@@ -55,21 +55,21 @@ impl CCpuImpl {
         }
     }
 
-    fn get_flags(this: &CpuImpl) -> u32 {
+    fn get_flags(this: &CpuImpl) -> CpuFlags {
         unsafe {
             let cpu = Self::from_cpu(this);
             let funcs = cpu.iface.cb.funcs as *const CCpuMethods;
 
-            ((*funcs).get_flags)(cpu.iface.cb.data)
+            CpuFlags::try_from(((*funcs).get_flags)(cpu.iface.cb.data)).unwrap()
         }
     }
 
-    fn force_flags(this: &CpuImpl, flags: u32) -> i32 {
+    fn force_flags(this: &CpuImpl, flags: CpuFlags) -> i32 {
         unsafe {
             let cpu = Self::from_cpu(this);
             let funcs = cpu.iface.cb.funcs as *const CCpuMethods;
 
-            ((*funcs).force_flags)(cpu.iface.cb.data, flags)
+            ((*funcs).force_flags)(cpu.iface.cb.data, flags as u32)
         }
     }
 
@@ -91,12 +91,13 @@ impl CCpuImpl {
         }
     }
 
-    fn get_vm_type(this: &CpuImpl) -> u32 {
+    fn get_vm_type(this: &CpuImpl) -> CpuVm {
         unsafe {
             let cpu = Self::from_cpu(this);
             let funcs = cpu.iface.cb.funcs as *const CCpuMethods;
 
-            ((*funcs).get_vm_type)(cpu.iface.cb.data)
+            CpuVm::try_from(((*funcs).get_vm_type)(cpu.iface.cb.data))
+                .expect("Expected valid VM type")
         }
     }
 
@@ -120,13 +121,14 @@ impl CpuImplIface {
     extern "C" fn get_flags(object: *mut c_void) -> c_uint {
         let cpu_impl = Self::c_to_cpu_impl(object);
 
-        cpu_impl.get_flags()
+        cpu_impl.get_flags() as u32
     }
 
     extern "C" fn force_flags(object: *mut c_void, flags: c_uint) -> c_int {
         let cpu_impl = Self::c_to_cpu_impl(object);
+        let f = CpuFlags::try_from(flags).expect("Expected valid CPU flags");
 
-        cpu_impl.force_flags(flags)
+        cpu_impl.force_flags(f)
     }
 
     extern "C" fn get_count(object: *mut c_void) -> c_uint {
@@ -144,7 +146,7 @@ impl CpuImplIface {
     extern "C" fn get_vm_type(object: *mut c_void) -> c_uint {
         let cpu_impl = Self::c_to_cpu_impl(object);
 
-        cpu_impl.get_vm_type()
+        cpu_impl.get_vm_type() as u32
     }
 
     extern "C" fn zero_denormals(object: *mut c_void, flags: bool) -> c_int {
