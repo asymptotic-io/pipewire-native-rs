@@ -13,6 +13,7 @@ use crate::interface::plugin::{Handle, HandleFactory, Interface, InterfaceInfo};
 use crate::interface::{self, Support};
 
 use super::c_string;
+use super::cpu;
 use super::log;
 use super::system;
 
@@ -188,6 +189,7 @@ impl Handle for CHandleImpl {
         };
 
         match type_ {
+            interface::CPU => return Some(Box::new(cpu::new_impl(iface))),
             interface::LOG => return Some(Box::new(log::new_impl(iface))),
             interface::SYSTEM => return Some(Box::new(system::new_impl(iface))),
             _ => return None,

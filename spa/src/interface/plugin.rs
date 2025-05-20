@@ -8,6 +8,7 @@ use crate::dict::Dict;
 
 pub const LOG_FACTORY: &str = "support.log";
 pub const SYSTEM_FACTORY: &str = "support.system";
+pub const CPU_FACTORY: &str = "support.cpu";
 
 pub trait Interface: Any {}
 

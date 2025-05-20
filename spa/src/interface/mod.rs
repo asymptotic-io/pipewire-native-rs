@@ -7,6 +7,7 @@ use std::{
     pin::Pin,
 };
 
+use cpu::CpuImpl;
 use ffi::{CInterface, CSupport};
 use log::LogImpl;
 use r#loop::LoopImpl;
@@ -14,6 +15,7 @@ use system::SystemImpl;
 
 use crate::support;
 
+pub mod cpu;
 pub mod ffi;
 pub mod log;
 pub mod r#loop;
@@ -24,8 +26,10 @@ pub mod system;
 pub const LOG: &str = "Spa:Pointer:Interface:Log";
 pub const LOOP: &str = "Spa:Pointer:Interface:Loop";
 pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
+pub const CPU: &str = "Spa:Pointer:Interface:Cpu";
 
 pub struct Support {
+    cpu: Option<Pin<Box<CpuImpl>>>,
     log: Option<Pin<Box<LogImpl>>>,
     system: Option<Pin<Box<SystemImpl>>>,
     loop_: Option<Pin<Box<LoopImpl>>>,
@@ -37,6 +41,7 @@ pub struct Support {
 impl Support {
     pub fn new() -> Support {
         Support {
+            cpu: None,
             log: None,
             system: None,
             loop_: None,
@@ -87,6 +92,14 @@ impl Support {
             support::ffi::r#loop::make_native(self.loop_.as_ref().unwrap()),
         );
     }
+
+    pub fn set_cpu(&mut self, cpu: Box<CpuImpl>) {
+        self.cpu = Some(Pin::new(cpu));
+        self.add_or_update(
+            CPU,
+            support::ffi::cpu::make_native(self.cpu.as_ref().unwrap()),
+        );
+    }
 }
 
 impl Drop for Support {
@@ -94,6 +107,7 @@ impl Drop for Support {
         for s in self.all.iter_mut() {
             let type_ = unsafe { CString::from_raw(s.type_) };
             match type_.to_str().unwrap() {
+                CPU => support::ffi::cpu::free_native(s.data as *mut CInterface),
                 LOG => support::ffi::log::free_native(s.data as *mut CInterface),
                 SYSTEM => support::ffi::system::free_native(s.data as *mut CInterface),
                 LOOP => support::ffi::r#loop::free_native(s.data as *mut CInterface),

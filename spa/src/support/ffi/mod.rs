@@ -4,6 +4,7 @@
 
 use std::ffi::CString;
 
+pub mod cpu;
 pub mod log;
 pub mod r#loop;
 pub mod plugin;

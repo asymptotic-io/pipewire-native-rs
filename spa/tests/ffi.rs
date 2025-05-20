@@ -4,6 +4,7 @@
 
 use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
+use pipewire_native_spa::interface::cpu::CpuImpl;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
 use pipewire_native_spa::interface::plugin::{Handle, HandleFactory};
 use pipewire_native_spa::interface::system::SystemImpl;
@@ -75,4 +76,25 @@ fn test_load_support() {
         .expect("System interface should be a SystemImpl");
 
     support.set_system(system);
+
+    let cpu_factory = plugin
+        .find_factory(interface::plugin::CPU_FACTORY)
+        .expect("Should find cpu factory");
+
+    let interfaces = cpu_factory.enum_interface_info();
+    assert_eq!(interfaces.len(), 1);
+
+    let cpu_handle = cpu_factory
+        .init(None, &support)
+        .expect("CPU factory loading should succeed");
+
+    let cpu_iface = cpu_handle
+        .get_interface(interface::CPU)
+        .expect("CPU factory should produce an interface");
+
+    let cpu = (cpu_iface as Box<dyn std::any::Any>)
+        .downcast::<CpuImpl>()
+        .expect("CPU interface should be a CpuImpl");
+
+    support.set_cpu(cpu);
 }
