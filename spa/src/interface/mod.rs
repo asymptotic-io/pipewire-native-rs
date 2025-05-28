@@ -12,7 +12,7 @@ use std::{
 use cpu::CpuImpl;
 use ffi::{CInterface, CSupport};
 use log::LogImpl;
-use r#loop::{ControlMethodsImpl, LoopImpl, LoopUtilsImpl};
+use r#loop::{LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use system::SystemImpl;
 
 use crate::support;
@@ -99,7 +99,7 @@ impl Drop for Support {
                 match type_.to_str().unwrap() {
                     CPU => <CpuImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
                     LOOP => <LoopImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
-                    LOOP_CONTROL => <ControlMethodsImpl as plugin::Interface>::free_native(
+                    LOOP_CONTROL => <LoopControlMethodsImpl as plugin::Interface>::free_native(
                         s.data as *mut CInterface,
                     ),
                     LOOP_UTILS => {

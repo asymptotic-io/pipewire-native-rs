@@ -30,8 +30,8 @@ struct CControlMethods {
 
 struct CControlMethodsImpl {}
 
-pub fn new_impl(interface: *mut CInterface) -> ControlMethodsImpl {
-    ControlMethodsImpl {
+pub fn new_impl(interface: *mut CInterface) -> LoopControlMethodsImpl {
+    LoopControlMethodsImpl {
         inner: Box::pin(interface as *mut CControlMethods),
 
         get_fd: CControlMethodsImpl::get_fd,
@@ -44,7 +44,7 @@ pub fn new_impl(interface: *mut CInterface) -> ControlMethodsImpl {
 }
 
 impl CControlMethodsImpl {
-    fn from_control_methods(this: &ControlMethodsImpl) -> &CControlMethods {
+    fn from_control_methods(this: &LoopControlMethodsImpl) -> &CControlMethods {
         unsafe {
             this.inner
                 .as_ref()
@@ -55,7 +55,7 @@ impl CControlMethodsImpl {
         }
     }
 
-    fn get_fd(this: &ControlMethodsImpl) -> u32 {
+    fn get_fd(this: &LoopControlMethodsImpl) -> u32 {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
@@ -64,7 +64,7 @@ impl CControlMethodsImpl {
         }
     }
 
-    fn add_hook(this: &ControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64) {
+    fn add_hook(this: &LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64) {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
@@ -73,7 +73,7 @@ impl CControlMethodsImpl {
         }
     }
 
-    fn enter(this: &ControlMethodsImpl) {
+    fn enter(this: &LoopControlMethodsImpl) {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
@@ -82,7 +82,7 @@ impl CControlMethodsImpl {
         }
     }
 
-    fn leave(this: &ControlMethodsImpl) {
+    fn leave(this: &LoopControlMethodsImpl) {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
@@ -91,7 +91,7 @@ impl CControlMethodsImpl {
         }
     }
 
-    fn iterate(this: &ControlMethodsImpl) -> i32 {
+    fn iterate(this: &LoopControlMethodsImpl) -> i32 {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
@@ -100,7 +100,7 @@ impl CControlMethodsImpl {
         }
     }
 
-    fn check(this: &ControlMethodsImpl) -> i32 {
+    fn check(this: &LoopControlMethodsImpl) -> i32 {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
@@ -124,8 +124,8 @@ static LOOP_CONTROL_METHODS: CControlMethodsMethods = CControlMethodsMethods {
 struct ControlMethodsIface {}
 
 impl ControlMethodsIface {
-    fn c_to_control_methods_impl(object: *mut c_void) -> &'static ControlMethodsImpl {
-        unsafe { &*(object as *mut ControlMethodsImpl) }
+    fn c_to_control_methods_impl(object: *mut c_void) -> &'static LoopControlMethodsImpl {
+        unsafe { &*(object as *mut LoopControlMethodsImpl) }
     }
 
     extern "C" fn get_fd(object: *mut c_void) -> c_uint {
@@ -170,7 +170,7 @@ impl ControlMethodsIface {
     }
 }
 
-pub(crate) unsafe fn make_native(loop_ctrl: &ControlMethodsImpl) -> *mut CInterface {
+pub(crate) unsafe fn make_native(loop_ctrl: &LoopControlMethodsImpl) -> *mut CInterface {
     let c_ctrl_methods: *mut CControlMethods = unsafe {
         libc::calloc(1, std::mem::size_of::<CControlMethods>() as libc::size_t)
             as *mut CControlMethods
@@ -181,7 +181,7 @@ pub(crate) unsafe fn make_native(loop_ctrl: &ControlMethodsImpl) -> *mut CInterf
     c_ctrl_methods.iface.type_ = c_string(interface::CPU).into_raw();
     c_ctrl_methods.iface.cb.funcs =
         &LOOP_CONTROL_METHODS as *const CControlMethodsMethods as *mut c_void;
-    c_ctrl_methods.iface.cb.data = loop_ctrl as *const ControlMethodsImpl as *mut c_void;
+    c_ctrl_methods.iface.cb.data = loop_ctrl as *const LoopControlMethodsImpl as *mut c_void;
 
     c_ctrl_methods as *mut CControlMethods as *mut CInterface
 }

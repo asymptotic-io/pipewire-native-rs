@@ -67,18 +67,18 @@ impl Interface for LoopImpl {
     }
 }
 
-pub struct ControlMethodsImpl {
+pub struct LoopControlMethodsImpl {
     pub inner: Pin<Box<dyn Any>>,
 
-    pub get_fd: fn(&ControlMethodsImpl) -> u32,
-    pub add_hook: fn(&ControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
-    pub enter: fn(&ControlMethodsImpl),
-    pub leave: fn(&ControlMethodsImpl),
-    pub iterate: fn(&ControlMethodsImpl) -> i32,
-    pub check: fn(&ControlMethodsImpl) -> i32,
+    pub get_fd: fn(&LoopControlMethodsImpl) -> u32,
+    pub add_hook: fn(&LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
+    pub enter: fn(&LoopControlMethodsImpl),
+    pub leave: fn(&LoopControlMethodsImpl),
+    pub iterate: fn(&LoopControlMethodsImpl) -> i32,
+    pub check: fn(&LoopControlMethodsImpl) -> i32,
 }
 
-impl ControlMethodsImpl {
+impl LoopControlMethodsImpl {
     pub fn get_fd(&self) -> u32 {
         (self.get_fd)(self)
     }
@@ -104,7 +104,7 @@ impl ControlMethodsImpl {
     }
 }
 
-impl Interface for ControlMethodsImpl {
+impl Interface for LoopControlMethodsImpl {
     unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
         crate::support::ffi::r#loop::control::make_native(self)
     }

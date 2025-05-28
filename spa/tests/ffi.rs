@@ -8,7 +8,7 @@ use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::cpu::CpuImpl;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
-use pipewire_native_spa::interface::r#loop::{ControlMethodsImpl, LoopImpl, LoopUtilsImpl};
+use pipewire_native_spa::interface::r#loop::{LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
 
@@ -135,8 +135,8 @@ fn test_load_support() {
         .expect("Loop factory should produce control interface");
 
     let loop_ctrl = loop_ctrl_iface
-        .downcast_box::<ControlMethodsImpl>()
-        .expect("Loop control interface should be ControlMethodsImpl");
+        .downcast_box::<LoopControlMethodsImpl>()
+        .expect("Loop control interface should be LoopControlMethodsImpl");
 
     support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
 
