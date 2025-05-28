@@ -8,6 +8,7 @@ use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::cpu::CpuImpl;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
+use pipewire_native_spa::interface::r#loop::{ControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
 
@@ -107,4 +108,45 @@ fn test_load_support() {
         .expect("CPU interface should be a CpuImpl");
 
     support.add_interface(interface::CPU, cpu);
+
+    let loop_factory = plugin
+        .find_factory(interface::plugin::LOOP_FACTORY)
+        .expect("Should find loop factory");
+
+    let interfaces = loop_factory.enum_interface_info();
+    assert_eq!(interfaces.len(), 3);
+
+    let loop_handle = loop_factory
+        .init(None, &support)
+        .expect("Loop factory loading should succeed");
+
+    let loop_iface = loop_handle
+        .get_interface(interface::LOOP)
+        .expect("Loop factory should produce an interface");
+
+    let r#loop = loop_iface
+        .downcast_box::<LoopImpl>()
+        .expect("Loop interface should be a LoopImpl");
+
+    support.add_interface(interface::LOOP, r#loop);
+
+    let loop_ctrl_iface = loop_handle
+        .get_interface(interface::LOOP_CONTROL)
+        .expect("Loop factory should produce control interface");
+
+    let loop_ctrl = loop_ctrl_iface
+        .downcast_box::<ControlMethodsImpl>()
+        .expect("Loop control interface should be ControlMethodsImpl");
+
+    support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
+
+    let loop_utils_iface = loop_handle
+        .get_interface(interface::LOOP_UTILS)
+        .expect("Loop factory should produce utils interface");
+
+    let loop_utils = loop_utils_iface
+        .downcast_box::<LoopUtilsImpl>()
+        .expect("Loop utils interface should be LoopUtilsImpl");
+
+    support.add_interface(interface::LOOP_UTILS, loop_utils);
 }

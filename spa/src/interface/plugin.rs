@@ -11,6 +11,7 @@ use super::ffi::CInterface;
 pub const LOG_FACTORY: &str = "support.log";
 pub const SYSTEM_FACTORY: &str = "support.system";
 pub const CPU_FACTORY: &str = "support.cpu";
+pub const LOOP_FACTORY: &str = "support.loop";
 
 pub trait Interface {
     /// Return a C-compatible spa_interface pointer
