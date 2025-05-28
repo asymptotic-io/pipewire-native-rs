@@ -12,7 +12,7 @@ use std::{
 use cpu::CpuImpl;
 use ffi::{CInterface, CSupport};
 use log::LogImpl;
-use r#loop::LoopImpl;
+use r#loop::{ControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use system::SystemImpl;
 
 use crate::support;
@@ -27,6 +27,8 @@ pub mod system;
 /* Well-known interface names */
 pub const LOG: &str = "Spa:Pointer:Interface:Log";
 pub const LOOP: &str = "Spa:Pointer:Interface:Loop";
+pub const LOOP_CONTROL: &str = "Spa:Pointer:Interface:LoopControl";
+pub const LOOP_UTILS: &str = "Spa:Pointer:Interface:LoopUtils";
 pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
 pub const CPU: &str = "Spa:Pointer:Interface:CPU";
 
@@ -97,6 +99,12 @@ impl Drop for Support {
                 match type_.to_str().unwrap() {
                     CPU => <CpuImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
                     LOOP => <LoopImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
+                    LOOP_CONTROL => <ControlMethodsImpl as plugin::Interface>::free_native(
+                        s.data as *mut CInterface,
+                    ),
+                    LOOP_UTILS => {
+                        <LoopUtilsImpl as plugin::Interface>::free_native(s.data as *mut CInterface)
+                    }
                     LOG => <LogImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
                     SYSTEM => {
                         <SystemImpl as plugin::Interface>::free_native(s.data as *mut CInterface)

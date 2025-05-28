@@ -199,6 +199,8 @@ impl Handle for CHandleImpl {
             interface::CPU => Some(Box::new(cpu::new_impl(iface))),
             interface::LOG => Some(Box::new(log::new_impl(iface))),
             interface::LOOP => Some(Box::new(r#loop::new_impl(iface))),
+            interface::LOOP_CONTROL => Some(Box::new(r#loop::control::new_impl(iface))),
+            interface::LOOP_UTILS => Some(Box::new(r#loop::utils::new_impl(iface))),
             interface::SYSTEM => Some(Box::new(system::new_impl(iface))),
             _ => None,
         }
