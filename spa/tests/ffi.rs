@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::ffi::CStr;
 use std::path::PathBuf;
 
 use pipewire_native_spa::dict::Dict;
@@ -51,7 +50,7 @@ fn test_load_support() {
         .expect("Log interface should be a LogImpl");
 
     let log_topic = interface::log::LogTopic {
-        topic: CStr::from_bytes_with_nul(b"test.topic\0").unwrap(),
+        topic: c"test.topic",
         level: LogLevel::Debug,
         has_custom_level: true,
     };
@@ -59,9 +58,9 @@ fn test_load_support() {
     log.logt(
         LogLevel::Error,
         &log_topic,
-        CStr::from_bytes_with_nul(b"file_name.rs\0").unwrap(),
+        c"file_name.rs",
         123,
-        CStr::from_bytes_with_nul(b"function_name\0").unwrap(),
+        c"function_name",
         format_args!("log test: {}", "some format"),
     );
 
