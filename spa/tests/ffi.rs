@@ -11,6 +11,9 @@ use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
 use pipewire_native_spa::interface::r#loop::{LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
+use std::time::Duration;
+
+const LOOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 fn init_support() -> (interface::Support, ffi::plugin::Plugin) {
     let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH")
@@ -201,4 +204,82 @@ fn test_load_support() {
 
     setup_loop_ctrl(&mut support, &loop_handle);
     setup_loop_utils(&mut support, &loop_handle);
+}
+
+#[test]
+fn test_loop_support() {
+    let (mut support, plugin) = init_support();
+
+    let _log_handle = setup_log(&mut support, &plugin);
+    let _system_handle = setup_system(&mut support, &plugin);
+    let _cpu_handle = setup_cpu(&mut support, &plugin);
+    let loop_handle = setup_loop(&mut support, &plugin);
+
+    setup_loop_ctrl(&mut support, &loop_handle);
+    setup_loop_utils(&mut support, &loop_handle);
+
+    let eloop = support.get_interface::<interface::r#loop::LoopImpl>(interface::LOOP);
+    let lutils = support.get_interface::<interface::r#loop::LoopUtilsImpl>(interface::LOOP_UTILS);
+    let lctrl =
+        support.get_interface::<interface::r#loop::LoopControlMethodsImpl>(interface::LOOP_CONTROL);
+
+    if let (Some(_eloop), Some(utils), Some(ctrl)) = (eloop, lutils, lctrl) {
+        let fd = ctrl.get_fd();
+        assert!(fd != 0);
+
+        let event_src = utils.add_event(Box::new(event_callback));
+        assert!(event_src.is_some());
+        let mut event_src = event_src.unwrap();
+
+        let res = utils.signal_event(&mut event_src);
+        assert!(res.is_ok());
+
+        let timer_src = utils.add_timer(Box::new(timer_callback));
+        assert!(timer_src.is_some());
+        let mut timer_src = timer_src.unwrap();
+
+        let timeout = libc::timespec {
+            tv_sec: 1,
+            tv_nsec: 0,
+        };
+        let res = utils.update_timer(&mut timer_src, &timeout, None, true);
+        assert!(res.is_ok());
+
+        let idle_src = utils.add_idle(false, Box::new(idle_callback));
+        assert!(idle_src.is_some());
+        let mut idle_src = idle_src.unwrap();
+
+        let res = utils.enable_idle(&mut idle_src, true);
+        assert!(res.is_ok());
+
+        ctrl.enter();
+        assert_eq!(ctrl.check(), 1);
+        let methods_dispatched = ctrl.iterate(Some(LOOP_TIMEOUT));
+        /*
+         * Three methods should have been dispatched as per above
+         * - Signal
+         * - Timer
+         * - Idle
+         */
+        assert_eq!(methods_dispatched, 3);
+        ctrl.leave();
+
+        utils.destroy_source(event_src);
+        utils.destroy_source(timer_src);
+        utils.destroy_source(idle_src);
+    } else {
+        panic!("Failed to get loop control or utils");
+    }
+}
+
+fn idle_callback() {
+    println!("Idle callback");
+}
+
+fn event_callback(count: u64) {
+    println!("Event callback, count: {count}");
+}
+
+fn timer_callback(expirations: u64) {
+    println!("Timer callback, expirations: {expirations}");
 }
