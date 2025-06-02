@@ -116,7 +116,7 @@ impl CLoopUtilsImpl {
     fn add_io(
         this: &LoopUtilsImpl,
         fd: RawFd,
-        mask: u32,
+        mask: SpaIo,
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
@@ -132,7 +132,7 @@ impl CLoopUtilsImpl {
             ((*funcs).add_io)(
                 loop_utils.iface.cb.data,
                 fd,
-                mask,
+                u32::try_from(mask).unwrap(),
                 close,
                 Self::source_io_trampoline,
                 &mut *source as *mut LoopUtilsSource as *mut c_void,
@@ -150,13 +150,19 @@ impl CLoopUtilsImpl {
     fn update_io(
         this: &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: u32,
+        mask: SpaIo,
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
-        result_from(unsafe { ((*funcs).update_io)(loop_utils.iface.cb.data, source, mask) })
+        result_from(unsafe {
+            ((*funcs).update_io)(
+                loop_utils.iface.cb.data,
+                source,
+                u32::try_from(mask).unwrap(),
+            )
+        })
     }
 
     #[no_mangle]
@@ -399,9 +405,13 @@ impl LoopUtilsCIface {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
+        let Ok(io_mask) = SpaIo::try_from(mask) else {
+            return std::ptr::null_mut();
+        };
+
         let source = match loop_utils.add_io(
             fd,
-            mask,
+            io_mask,
             close,
             Box::new(move |fd, mask| func(data, fd, mask)),
         ) {
@@ -420,7 +430,11 @@ impl LoopUtilsCIface {
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
         let source = iface.sources.get_mut(&c_source).unwrap();
 
-        let res = loop_utils.update_io(source, mask);
+        let Ok(io_mask) = SpaIo::try_from(mask) else {
+            return -1;
+        };
+
+        let res = loop_utils.update_io(source, io_mask);
 
         match res {
             Ok(_) => 0,

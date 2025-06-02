@@ -2,10 +2,100 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use super::plugin::Interface;
 use crate::interface::ffi::{CControlHooks, CHook};
+use bitflags::bitflags;
 use std::{any::Any, os::fd::RawFd, pin::Pin, time::Duration};
 
-use super::plugin::Interface;
+bitflags! {
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct SpaIo: u32 {
+        const IN  = (1 << 0);
+        const OUT = (1 << 2);
+        const ERR = (1 << 3);
+        const HUP = (1 << 4);
+    }
+}
+
+bitflags! {
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct SpaFd: u32 {
+        const CLOEXEC             = (1 << 0);
+        const NONBLOCK            = (1 << 1);
+        const EVENT_SEMAPHORE     = (1 << 2);
+        const TIMER_ABSTIME       = (1 << 3);
+        const TIMER_CANCEL_ON_SET = (1 << 4);
+    }
+}
+
+impl TryFrom<SpaIo> for u32 {
+    type Error = ();
+
+    fn try_from(value: SpaIo) -> Result<Self, Self::Error> {
+        match value {
+            SpaIo::IN => Ok(SpaIo::IN.bits()),
+            SpaIo::OUT => Ok(SpaIo::OUT.bits()),
+            SpaIo::ERR => Ok(SpaIo::ERR.bits()),
+            SpaIo::HUP => Ok(SpaIo::HUP.bits()),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<u32> for SpaIo {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        if value == SpaIo::IN.bits() {
+            Ok(SpaIo::IN)
+        } else if value == SpaIo::OUT.bits() {
+            Ok(SpaIo::OUT)
+        } else if value == SpaIo::ERR.bits() {
+            Ok(SpaIo::ERR)
+        } else if value == SpaIo::HUP.bits() {
+            Ok(SpaIo::HUP)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<SpaFd> for u32 {
+    type Error = ();
+
+    fn try_from(value: SpaFd) -> Result<Self, Self::Error> {
+        match value {
+            SpaFd::CLOEXEC => Ok(SpaFd::CLOEXEC.bits()),
+            SpaFd::NONBLOCK => Ok(SpaFd::NONBLOCK.bits()),
+            SpaFd::EVENT_SEMAPHORE => Ok(SpaFd::EVENT_SEMAPHORE.bits()),
+            SpaFd::TIMER_ABSTIME => Ok(SpaFd::TIMER_ABSTIME.bits()),
+            SpaFd::TIMER_CANCEL_ON_SET => Ok(SpaFd::TIMER_CANCEL_ON_SET.bits()),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<u32> for SpaFd {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        if value == SpaFd::CLOEXEC.bits() {
+            Ok(SpaFd::CLOEXEC)
+        } else if value == SpaFd::NONBLOCK.bits() {
+            Ok(SpaFd::NONBLOCK)
+        } else if value == SpaFd::EVENT_SEMAPHORE.bits() {
+            Ok(SpaFd::EVENT_SEMAPHORE)
+        } else if value == SpaFd::TIMER_ABSTIME.bits() {
+            Ok(SpaFd::TIMER_ABSTIME)
+        } else if value == SpaFd::TIMER_CANCEL_ON_SET.bits() {
+            Ok(SpaFd::TIMER_CANCEL_ON_SET)
+        } else {
+            Err(())
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Source {
@@ -140,14 +230,14 @@ pub struct LoopUtilsImpl {
     pub add_io: fn(
         &LoopUtilsImpl,
         fd: RawFd,
-        mask: u32,
+        mask: SpaIo,
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>>,
     pub update_io: fn(
         &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: u32,
+        mask: SpaIo,
     ) -> std::io::Result<i32>,
     pub add_idle: fn(
         &LoopUtilsImpl,
@@ -184,7 +274,7 @@ impl LoopUtilsImpl {
     pub fn add_io(
         &self,
         fd: RawFd,
-        mask: u32,
+        mask: SpaIo,
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
@@ -194,7 +284,7 @@ impl LoopUtilsImpl {
     pub fn update_io(
         &self,
         source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: u32,
+        mask: SpaIo,
     ) -> std::io::Result<i32> {
         (self.update_io)(self, source, mask)
     }
