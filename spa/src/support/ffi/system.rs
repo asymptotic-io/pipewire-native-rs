@@ -350,11 +350,6 @@ impl CSystemImpl {
 
         if res < 0 {
             Err(std::io::Error::last_os_error())
-        } else if res != 8 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "read timerfd returned unexpected size",
-            ))
         } else {
             Ok(expirations)
         }
