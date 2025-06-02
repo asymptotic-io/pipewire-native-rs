@@ -53,8 +53,8 @@ struct CLoopUtilsMethods {
     update_timer: extern "C" fn(
         object: *mut c_void,
         source: *mut CSource,
-        value: &libc::timespec,
-        interval: &libc::timespec,
+        value: *const libc::timespec,
+        interval: *const libc::timespec,
         absolute: bool,
     ) -> c_int,
     add_signal: extern "C" fn(
@@ -308,12 +308,17 @@ impl CLoopUtilsImpl {
         this: &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
         value: &libc::timespec,
-        interval: &libc::timespec,
+        interval: Option<&libc::timespec>,
         absolute: bool,
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
+
+        let interval = match interval {
+            Some(i) => i as &libc::timespec,
+            None => std::ptr::null(),
+        };
 
         result_from(unsafe {
             ((*funcs).update_timer)(loop_utils.iface.cb.data, source, value, interval, absolute)
@@ -512,8 +517,8 @@ impl LoopUtilsCIface {
     extern "C" fn update_timer(
         object: *mut c_void,
         c_source: *mut CSource,
-        value: &libc::timespec,
-        interval: &libc::timespec,
+        value: *const libc::timespec,
+        interval: *const libc::timespec,
         absolute: bool,
     ) -> c_int {
         let iface = Self::c_to_loop_utils_impl(object);
@@ -521,7 +526,13 @@ impl LoopUtilsCIface {
 
         let source = iface.sources.get_mut(&c_source).unwrap();
 
-        let res = loop_utils.update_timer(source, value, interval, absolute);
+        let interval = if interval.is_null() {
+            None
+        } else {
+            unsafe { Some(&*interval) }
+        };
+
+        let res = loop_utils.update_timer(source, unsafe { &*value }, interval, absolute);
 
         match res {
             Ok(_) => 0,

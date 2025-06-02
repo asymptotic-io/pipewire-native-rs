@@ -169,7 +169,7 @@ pub struct LoopUtilsImpl {
         &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
         value: &libc::timespec,
-        interval: &libc::timespec,
+        interval: Option<&libc::timespec>,
         absolute: bool,
     ) -> std::io::Result<i32>,
     pub add_signal: fn(
@@ -231,7 +231,7 @@ impl LoopUtilsImpl {
         &self,
         source: &mut Pin<Box<LoopUtilsSource>>,
         value: &libc::timespec,
-        interval: &libc::timespec,
+        interval: Option<&libc::timespec>,
         absolute: bool,
     ) -> std::io::Result<i32> {
         (self.update_timer)(self, source, value, interval, absolute)
