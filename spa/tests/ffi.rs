@@ -277,7 +277,7 @@ fn test_loop_support() {
         assert!(res.is_ok());
 
         ctrl.enter();
-        assert_eq!(ctrl.check(), 1);
+        assert_eq!(ctrl.check().ok().unwrap(), 1);
         let methods_dispatched = ctrl.iterate(Some(LOOP_TIMEOUT));
         /*
          * Four methods should have been dispatched as per above
@@ -286,7 +286,7 @@ fn test_loop_support() {
          * - Timer
          * - Idle
          */
-        assert_eq!(methods_dispatched, 4);
+        assert_eq!(methods_dispatched.ok().unwrap(), 4);
         ctrl.leave();
 
         // Validate that our callbacks were called

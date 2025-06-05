@@ -8,8 +8,9 @@ use std::time::Duration;
 use crate::interface::ffi::{CControlHooks, CHook};
 use crate::interface::r#loop::*;
 use crate::interface::{self, ffi::CInterface};
-
 use crate::support::ffi::c_string;
+use crate::support::ffi::r#loop::common::{from_result, result_from};
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct CControlMethodsMethods {
@@ -101,7 +102,7 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn iterate(this: &LoopControlMethodsImpl, timeout: Option<Duration>) -> i32 {
+    fn iterate(this: &LoopControlMethodsImpl, timeout: Option<Duration>) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
@@ -116,28 +117,28 @@ impl CLoopControlMethodsImpl {
             None => 0,
         };
 
-        unsafe { ((*funcs).iterate)(control_impl.iface.cb.data, timeout) }
+        result_from(unsafe { ((*funcs).iterate)(control_impl.iface.cb.data, timeout) })
     }
 
-    fn check(this: &LoopControlMethodsImpl) -> i32 {
+    fn check(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        unsafe { ((*funcs).check)(control_impl.iface.cb.data) }
+        result_from(unsafe { ((*funcs).check)(control_impl.iface.cb.data) })
     }
 
-    fn lock(this: &LoopControlMethodsImpl) -> i32 {
+    fn lock(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        unsafe { ((*funcs).lock)(control_impl.iface.cb.data) }
+        result_from(unsafe { ((*funcs).lock)(control_impl.iface.cb.data) })
     }
 
-    fn unlock(this: &LoopControlMethodsImpl) -> i32 {
+    fn unlock(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        unsafe { ((*funcs).lock)(control_impl.iface.cb.data) }
+        result_from(unsafe { ((*funcs).lock)(control_impl.iface.cb.data) })
     }
 
     fn get_time(
@@ -166,25 +167,27 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn wait(this: &LoopControlMethodsImpl, abstime: &libc::timespec) -> i32 {
+    fn wait(this: &LoopControlMethodsImpl, abstime: &libc::timespec) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        unsafe { ((*funcs).wait)(control_impl.iface.cb.data, abstime as *const libc::timespec) }
+        result_from(unsafe {
+            ((*funcs).wait)(control_impl.iface.cb.data, abstime as *const libc::timespec)
+        })
     }
 
-    fn signal(this: &LoopControlMethodsImpl, wait_for_accept: bool) -> i32 {
+    fn signal(this: &LoopControlMethodsImpl, wait_for_accept: bool) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        unsafe { ((*funcs).signal)(control_impl.iface.cb.data, wait_for_accept) }
+        result_from(unsafe { ((*funcs).signal)(control_impl.iface.cb.data, wait_for_accept) })
     }
 
-    fn accept(this: &LoopControlMethodsImpl) -> i32 {
+    fn accept(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        unsafe { ((*funcs).accept)(control_impl.iface.cb.data) }
+        result_from(unsafe { ((*funcs).accept)(control_impl.iface.cb.data) })
     }
 }
 
@@ -252,25 +255,25 @@ impl ControlMethodsIface {
             Duration::from_millis(timeout as u64)
         };
 
-        control_methods_impl.iterate(Some(t))
+        from_result(control_methods_impl.iterate(Some(t)))
     }
 
     extern "C" fn check(object: *mut c_void) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.check()
+        from_result(control_methods_impl.check())
     }
 
     extern "C" fn lock(object: *mut c_void) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.lock()
+        from_result(control_methods_impl.lock())
     }
 
     extern "C" fn unlock(object: *mut c_void) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.unlock()
+        from_result(control_methods_impl.unlock())
     }
 
     extern "C" fn get_time(
@@ -294,19 +297,19 @@ impl ControlMethodsIface {
     extern "C" fn wait(object: *mut c_void, abstime: *const libc::timespec) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.wait(unsafe { abstime.as_ref().unwrap() })
+        from_result(control_methods_impl.wait(unsafe { abstime.as_ref().unwrap() }))
     }
 
     extern "C" fn signal(object: *mut c_void, wait_for_accept: bool) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.signal(wait_for_accept)
+        from_result(control_methods_impl.signal(wait_for_accept))
     }
 
     extern "C" fn accept(object: *mut c_void) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.accept()
+        from_result(control_methods_impl.accept())
     }
 }
 

@@ -17,7 +17,9 @@ use crate::interface::{
 };
 
 use crate::support::ffi::c_string;
+use crate::support::ffi::r#loop::common::result_from;
 
+pub mod common;
 pub mod control;
 pub mod utils;
 
@@ -70,14 +72,6 @@ pub fn new_impl(interface: *mut CInterface) -> LoopImpl {
 struct CSourceImpl {
     c_source: CSource,
     func: Box<SourceFn>,
-}
-
-fn result_from(res: i32) -> std::io::Result<i32> {
-    if res >= 0 {
-        Ok(0)
-    } else {
-        Err(std::io::Error::from_raw_os_error(-res))
-    }
 }
 
 impl CLoopImpl {

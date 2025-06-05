@@ -76,14 +76,14 @@ pub struct LoopControlMethodsImpl {
     pub add_hook: fn(&LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
     pub enter: fn(&LoopControlMethodsImpl),
     pub leave: fn(&LoopControlMethodsImpl),
-    pub iterate: fn(&LoopControlMethodsImpl, timeout: Option<Duration>) -> i32,
-    pub check: fn(&LoopControlMethodsImpl) -> i32,
-    pub lock: fn(&LoopControlMethodsImpl) -> i32,
-    pub unlock: fn(&LoopControlMethodsImpl) -> i32,
+    pub iterate: fn(&LoopControlMethodsImpl, timeout: Option<Duration>) -> std::io::Result<i32>,
+    pub check: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
+    pub lock: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
+    pub unlock: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
     pub get_time: fn(&LoopControlMethodsImpl, timeout: Duration) -> std::io::Result<libc::timespec>,
-    pub wait: fn(&LoopControlMethodsImpl, abstime: &libc::timespec) -> i32,
-    pub signal: fn(&LoopControlMethodsImpl, wait_for_accept: bool) -> i32,
-    pub accept: fn(&LoopControlMethodsImpl) -> i32,
+    pub wait: fn(&LoopControlMethodsImpl, abstime: &libc::timespec) -> std::io::Result<i32>,
+    pub signal: fn(&LoopControlMethodsImpl, wait_for_accept: bool) -> std::io::Result<i32>,
+    pub accept: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
 }
 
 impl LoopControlMethodsImpl {
@@ -103,19 +103,19 @@ impl LoopControlMethodsImpl {
         (self.leave)(self)
     }
 
-    pub fn iterate(&self, timeout: Option<Duration>) -> i32 {
+    pub fn iterate(&self, timeout: Option<Duration>) -> std::io::Result<i32> {
         (self.iterate)(self, timeout)
     }
 
-    pub fn check(&self) -> i32 {
+    pub fn check(&self) -> std::io::Result<i32> {
         (self.check)(self)
     }
 
-    pub fn lock(&self) -> i32 {
+    pub fn lock(&self) -> std::io::Result<i32> {
         (self.lock)(self)
     }
 
-    pub fn unlock(&self) -> i32 {
+    pub fn unlock(&self) -> std::io::Result<i32> {
         (self.unlock)(self)
     }
 
@@ -123,15 +123,15 @@ impl LoopControlMethodsImpl {
         (self.get_time)(self, timeout)
     }
 
-    pub fn wait(&self, abstime: &libc::timespec) -> i32 {
+    pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<i32> {
         (self.wait)(self, abstime)
     }
 
-    pub fn signal(&self, wait_for_accept: bool) -> i32 {
+    pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<i32> {
         (self.signal)(self, wait_for_accept)
     }
 
-    pub fn accept(&self) -> i32 {
+    pub fn accept(&self) -> std::io::Result<i32> {
         (self.accept)(self)
     }
 }
