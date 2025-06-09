@@ -35,6 +35,9 @@ pub struct LoopImpl {
     ) -> std::io::Result<i32>,
 }
 
+unsafe impl Send for LoopImpl {}
+unsafe impl Sync for LoopImpl {}
+
 impl LoopImpl {
     pub fn add_source(&mut self, source: &Source, func: Box<SourceFn>) -> std::io::Result<i32> {
         (self.add_source)(self, source, func)
@@ -85,6 +88,9 @@ pub struct LoopControlMethodsImpl {
     pub signal: fn(&LoopControlMethodsImpl, wait_for_accept: bool) -> std::io::Result<i32>,
     pub accept: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
 }
+
+unsafe impl Send for LoopControlMethodsImpl {}
+unsafe impl Sync for LoopControlMethodsImpl {}
 
 impl LoopControlMethodsImpl {
     pub fn get_fd(&self) -> u32 {
@@ -211,6 +217,9 @@ pub struct LoopUtilsImpl {
     ) -> Option<Pin<Box<LoopUtilsSource>>>,
     pub destroy_source: fn(&LoopUtilsImpl, source: Pin<Box<LoopUtilsSource>>),
 }
+
+unsafe impl Send for LoopUtilsImpl {}
+unsafe impl Sync for LoopUtilsImpl {}
 
 impl LoopUtilsImpl {
     pub fn add_io(

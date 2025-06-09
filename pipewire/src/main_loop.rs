@@ -13,11 +13,9 @@ use spa::interface::system::SystemImpl;
 use spa::support::ffi;
 use spa::{emit_hook, hook::HookList};
 
-use std::cell::RefCell;
 use std::os::fd::RawFd;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex, OnceLock,
@@ -39,19 +37,22 @@ pub struct MainLoopEvents {
     destroy: Box<dyn FnMut()>,
 }
 
+unsafe impl Send for MainLoopEvents {}
+unsafe impl Sync for MainLoopEvents {}
+
 struct Loop {
     #[allow(dead_code)]
-    system: Rc<Pin<Box<SystemImpl>>>,
-    r#loop: Rc<Pin<Box<LoopImpl>>>,
-    control: Rc<Pin<Box<LoopControlMethodsImpl>>>,
-    utils: Rc<Pin<Box<LoopUtilsImpl>>>,
+    system: Arc<Pin<Box<SystemImpl>>>,
+    r#loop: Arc<Pin<Box<LoopImpl>>>,
+    control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
+    utils: Arc<Pin<Box<LoopUtilsImpl>>>,
     name: String,
 }
 
 #[allow(dead_code)]
 pub struct MainLoop {
     pw_loop: Loop,
-    hooks: Rc<RefCell<HookList<MainLoopEvents>>>,
+    hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
     running: Arc<AtomicBool>,
 }
 
@@ -127,7 +128,7 @@ impl MainLoop {
     }
 
     pub fn add_listener(&self, events: MainLoopEvents) {
-        self.hooks.borrow_mut().append(events);
+        self.hooks.lock().unwrap().append(events);
     }
 
     pub fn run(&self) {

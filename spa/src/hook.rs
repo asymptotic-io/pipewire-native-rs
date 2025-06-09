@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, collections::LinkedList, rc::Rc};
+use std::{
+    collections::LinkedList,
+    sync::{Arc, Mutex},
+};
 
 pub type HookId = u32;
 
@@ -34,8 +37,8 @@ impl<T> HookList<T> {
     // We might want to explore alternatives that let us push the RefCell<> all the way into the
     // callbacks structure itself, so each callback can individually be mutably borrowed, so that
     // one callback can call another callback if needed.
-    pub fn new() -> Rc<RefCell<HookList<T>>> {
-        Rc::new(RefCell::new(HookList {
+    pub fn new() -> Arc<Mutex<HookList<T>>> {
+        Arc::new(Mutex::new(HookList {
             hooks: LinkedList::new(),
             next_id: 0,
         }))
@@ -80,8 +83,11 @@ impl<T> HookList<T> {
 macro_rules! emit_hook {
     ($hook_list:expr, $method:ident, $($args:tt)*) => {
         {
-            let _hooks = $hook_list.clone();
-            for h in _hooks.borrow_mut().iter_mut() {
+            let _h = $hook_list.clone();
+            let mut _h = _h.lock();
+            let _hooks = _h.as_deref_mut().unwrap();
+
+            for h in _hooks.iter_mut() {
                 (h.callbacks().$method)($($args)*);
             }
         }

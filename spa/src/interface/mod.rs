@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
     ffi::{c_void, CStr, CString},
     pin::Pin,
-    rc::Rc,
+    sync::Arc,
 };
 
 use cpu::CpuImpl;
@@ -36,11 +36,14 @@ pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
 pub const THREAD_UTILS: &str = "Spa:Pointer:Interface:ThreadUtils";
 
 pub struct Support {
-    supports: HashMap<&'static str, Rc<Pin<Box<dyn plugin::Interface>>>>,
+    supports: HashMap<&'static str, Arc<Pin<Box<dyn plugin::Interface>>>>,
     /* We keep a C-compatible array that won't get moved around, so we can reliably pass it on to
      * plugins */
     c_supports: Vec<CSupport>,
 }
+
+unsafe impl Send for Support {}
+unsafe impl Sync for Support {}
 
 impl Default for Support {
     fn default() -> Self {
@@ -80,17 +83,17 @@ impl Support {
         let pin = Box::into_pin(iface);
         let data = unsafe { pin.make_native() };
 
-        self.supports.insert(name, Rc::new(pin));
+        self.supports.insert(name, Arc::new(pin));
         self.add_or_update_c(name, data);
     }
 
-    pub fn get_interface<T>(&self, name: &str) -> Option<Rc<Pin<Box<T>>>>
+    pub fn get_interface<T>(&self, name: &str) -> Option<Arc<Pin<Box<T>>>>
     where
         T: plugin::Interface + 'static,
     {
         let iface = self.supports.get(name).cloned();
 
-        iface.and_then(|iface| iface.downcast_rc_pin_box::<T>().ok())
+        iface.and_then(|iface| iface.downcast_arc_pin_box::<T>().ok())
     }
 }
 

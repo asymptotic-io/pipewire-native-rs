@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, rc::Rc, sync::Mutex};
+use std::{
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 use pipewire_native_spa::{emit_hook, hook::HookList};
 
@@ -15,7 +18,7 @@ struct TestEvents {
 struct TestStruct {
     value: i32,
     name: String,
-    hooks: Rc<RefCell<HookList<TestEvents>>>,
+    hooks: Arc<Mutex<HookList<TestEvents>>>,
 }
 
 #[test]
@@ -46,7 +49,7 @@ fn test_hooks() {
         hooks: HookList::new(),
     };
 
-    let id = this.hooks.borrow_mut().append(events);
+    let id = this.hooks.lock().unwrap().append(events);
 
     emit_hook!(this.hooks, constie, 1);
     assert_eq!(*accum.lock().unwrap(), 1);
@@ -58,7 +61,7 @@ fn test_hooks() {
     assert_eq!(this.value, 4);
     assert_eq!(this.name, "Second");
 
-    this.hooks.borrow_mut().remove(id);
+    this.hooks.lock().unwrap().remove(id);
 
     emit_hook!(this.hooks, constie, 1);
     assert_eq!(*accum.lock().unwrap(), 3);

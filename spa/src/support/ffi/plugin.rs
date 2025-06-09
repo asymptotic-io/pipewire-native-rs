@@ -25,6 +25,9 @@ pub struct Plugin {
     factories: Vec<*mut CHandleFactory>,
 }
 
+unsafe impl Send for Plugin {}
+unsafe impl Sync for Plugin {}
+
 impl Plugin {
     pub fn find_factory(&self, name: &str) -> Option<Box<dyn HandleFactory>> {
         for f in &self.factories {
@@ -105,7 +108,11 @@ impl HandleFactory for CHandleFactoryImpl {
         unsafe { self.factory.as_ref().unwrap().info.as_ref() }
     }
 
-    fn init(&self, info: Option<Dict>, support: &Support) -> std::io::Result<Box<dyn Handle + Send + Sync>> {
+    fn init(
+        &self,
+        info: Option<Dict>,
+        support: &Support,
+    ) -> std::io::Result<Box<dyn Handle + Send + Sync>> {
         unsafe {
             let info_ptr = match &info {
                 Some(i) => i.as_raw(),

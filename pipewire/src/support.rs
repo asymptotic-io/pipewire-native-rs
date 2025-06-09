@@ -5,8 +5,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use pipewire_native_spa as spa;
 
@@ -23,7 +22,7 @@ pub(crate) struct Support {
     support_lib: String,
 
     inner: Mutex<Inner>,
-    log: Option<Rc<Pin<Box<spa::interface::log::LogImpl>>>>,
+    log: Option<Arc<Pin<Box<spa::interface::log::LogImpl>>>>,
 }
 
 struct Inner {
@@ -71,13 +70,13 @@ impl Support {
             .get_interface::<spa::interface::log::LogImpl>(spa::interface::LOG);
     }
 
-    pub fn log(&self) -> &Rc<Pin<Box<spa::interface::log::LogImpl>>> {
+    pub fn log(&self) -> &Arc<Pin<Box<spa::interface::log::LogImpl>>> {
         self.log
             .as_ref()
             .expect("Log interface should be initialized")
     }
 
-    pub fn cpu(&self) -> Rc<Pin<Box<spa::interface::cpu::CpuImpl>>> {
+    pub fn cpu(&self) -> Arc<Pin<Box<spa::interface::cpu::CpuImpl>>> {
         let inner = self.inner.lock().unwrap();
 
         inner
