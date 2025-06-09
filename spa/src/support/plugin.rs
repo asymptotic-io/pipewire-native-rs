@@ -41,7 +41,11 @@ impl HandleFactory for Plugin {
         None
     }
 
-    fn init(&self, _: Option<Dict>, _: &interface::Support) -> std::io::Result<Box<dyn Handle>> {
+    fn init(
+        &self,
+        _: Option<Dict>,
+        _: &interface::Support,
+    ) -> std::io::Result<Box<dyn Handle + Send + Sync>> {
         Ok(Box::new(PluginHandle {}))
     }
 

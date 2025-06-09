@@ -105,7 +105,7 @@ impl HandleFactory for CHandleFactoryImpl {
         unsafe { self.factory.as_ref().unwrap().info.as_ref() }
     }
 
-    fn init(&self, info: Option<Dict>, support: &Support) -> std::io::Result<Box<dyn Handle>> {
+    fn init(&self, info: Option<Dict>, support: &Support) -> std::io::Result<Box<dyn Handle + Send + Sync>> {
         unsafe {
             let info_ptr = match &info {
                 Some(i) => i.as_raw(),
@@ -165,6 +165,9 @@ pub struct CHandle {
 struct CHandleImpl {
     handle: *mut CHandle,
 }
+
+unsafe impl Send for CHandleImpl {}
+unsafe impl Sync for CHandleImpl {}
 
 impl Drop for CHandleImpl {
     fn drop(&mut self) {

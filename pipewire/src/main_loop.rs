@@ -20,8 +20,20 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, Mutex, OnceLock,
 };
+
+#[allow(dead_code)]
+struct Handles {
+    log_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
+    system_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
+    cpu_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
+    loop_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
+    support: interface::Support,
+    plugin: ffi::plugin::Plugin,
+}
+
+static HANDLES: OnceLock<Mutex<Handles>> = OnceLock::new();
 
 pub struct MainLoopEvents {
     destroy: Box<dyn FnMut()>,
@@ -37,19 +49,7 @@ struct Loop {
 }
 
 #[allow(dead_code)]
-struct Handles {
-    log_handle: Box<dyn interface::plugin::Handle>,
-    system_handle: Box<dyn interface::plugin::Handle>,
-    cpu_handle: Box<dyn interface::plugin::Handle>,
-    loop_handle: Box<dyn interface::plugin::Handle>,
-}
-
-#[allow(dead_code)]
 pub struct MainLoop {
-    handles: Handles,
-    support: interface::Support,
-    plugin: ffi::plugin::Plugin,
-
     pw_loop: Loop,
     hooks: Rc<RefCell<HookList<MainLoopEvents>>>,
     running: Arc<AtomicBool>,
@@ -96,15 +96,20 @@ impl MainLoop {
             "main.loop".to_string()
         };
 
-        Some(MainLoop {
-            handles: Handles {
-                log_handle,
-                system_handle,
-                cpu_handle,
-                loop_handle,
-            },
+        let handles = Handles {
+            log_handle,
+            system_handle,
+            cpu_handle,
+            loop_handle,
             support,
             plugin,
+        };
+
+        if let Err(_) = HANDLES.set(Mutex::new(handles)) {
+            return None;
+        }
+
+        Some(MainLoop {
             pw_loop: Loop {
                 system,
                 r#loop: lloop,
@@ -291,7 +296,7 @@ fn get_support() -> (interface::Support, ffi::plugin::Plugin) {
 fn setup_log(
     support: &mut interface::Support,
     plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle> {
+) -> Box<dyn interface::plugin::Handle + Send + Sync> {
     let log_factory = plugin
         .find_factory(interface::plugin::LOG_FACTORY)
         .expect("Should find log factory");
@@ -343,7 +348,7 @@ fn setup_log(
 fn setup_system(
     support: &mut interface::Support,
     plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle> {
+) -> Box<dyn interface::plugin::Handle + Send + Sync> {
     let system_factory = plugin
         .find_factory(interface::plugin::SYSTEM_FACTORY)
         .expect("Should find system factory");
@@ -371,7 +376,7 @@ fn setup_system(
 fn setup_cpu(
     support: &mut interface::Support,
     plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle> {
+) -> Box<dyn interface::plugin::Handle + Send + Sync> {
     let cpu_factory = plugin
         .find_factory(interface::plugin::CPU_FACTORY)
         .expect("Should find cpu factory");
@@ -399,7 +404,7 @@ fn setup_cpu(
 fn setup_loop(
     support: &mut interface::Support,
     plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle> {
+) -> Box<dyn interface::plugin::Handle + Send + Sync> {
     let loop_factory = plugin
         .find_factory(interface::plugin::LOOP_FACTORY)
         .expect("Should find loop factory");
@@ -426,7 +431,7 @@ fn setup_loop(
 
 fn setup_loop_ctrl(
     support: &mut interface::Support,
-    loop_handle: &Box<dyn interface::plugin::Handle>,
+    loop_handle: &Box<dyn interface::plugin::Handle + Send + Sync>,
 ) {
     let loop_ctrl_iface = loop_handle
         .get_interface(interface::LOOP_CONTROL)
@@ -441,7 +446,7 @@ fn setup_loop_ctrl(
 
 fn setup_loop_utils(
     support: &mut interface::Support,
-    loop_handle: &Box<dyn interface::plugin::Handle>,
+    loop_handle: &Box<dyn interface::plugin::Handle + Send + Sync>,
 ) {
     let loop_utils_iface = loop_handle
         .get_interface(interface::LOOP_UTILS)

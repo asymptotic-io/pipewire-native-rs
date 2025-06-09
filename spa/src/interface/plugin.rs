@@ -94,7 +94,7 @@ pub trait HandleFactory {
         &self,
         info: Option<Dict>,
         support: &super::Support,
-    ) -> std::io::Result<Box<dyn Handle>>;
+    ) -> std::io::Result<Box<dyn Handle + Send + Sync>>;
     fn enum_interface_info(&self) -> Vec<InterfaceInfo>;
 }
 
