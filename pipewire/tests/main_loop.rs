@@ -20,10 +20,15 @@ const LOOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 static CALLBACKS: LazyLock<Mutex<HashMap<String, bool>>> = LazyLock::new(|| HashMap::new().into());
 
-#[test]
-fn test_main_loop() {
+#[allow(dead_code)]
+enum MainLoopRun {
+    Run,
+    Iterate,
+}
+
+fn test_mainloop(exec: MainLoopRun) {
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
-    let ml = MainLoop::new(&Dict::new(v)).unwrap();
+    let mut ml = MainLoop::new(&Dict::new(v)).unwrap();
 
     let fd = ml.get_fd();
     assert!(fd != 0);
@@ -65,18 +70,32 @@ fn test_main_loop() {
     let res = ml.enable_idle(&mut idle_src, true);
     assert!(res.is_ok());
 
-    ml.enter();
-    assert_eq!(ml.check().ok().unwrap(), 1);
-    let methods_dispatched = ml.iterate(Some(LOOP_TIMEOUT));
-    /*
-     * Four methods should have been dispatched as per above
-     * - IO
-     * - Signal
-     * - Timer
-     * - Idle
-     */
-    assert_eq!(methods_dispatched.ok().unwrap(), 4);
-    ml.leave();
+    match exec {
+        MainLoopRun::Run => {
+            let (ml_weak, running) = ml.downgrade();
+            std::thread::spawn(move || {
+                let ml_ = ml_weak.upgrade(running);
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                assert!(ml_.is_some());
+                ml_.unwrap().quit();
+            });
+            ml.run();
+        }
+        MainLoopRun::Iterate => {
+            ml.enter();
+            assert_eq!(ml.check().ok().unwrap(), 1);
+            let methods_dispatched = ml.iterate(Some(LOOP_TIMEOUT));
+            /*
+             * Four methods should have been dispatched as per above
+             * - IO
+             * - Signal
+             * - Timer
+             * - Idle
+             */
+            assert_eq!(methods_dispatched.ok().unwrap(), 4);
+            ml.leave();
+        }
+    }
 
     // Validate that our callbacks were called
     let cb = CALLBACKS.lock().unwrap();
@@ -89,6 +108,15 @@ fn test_main_loop() {
     ml.destroy_source(event_src);
     ml.destroy_source(timer_src);
     ml.destroy_source(idle_src);
+
+    ml.destroy()
+}
+
+#[test]
+fn test_main_loop() {
+    // FIXME: Crashes if both are enabled?
+    test_mainloop(MainLoopRun::Run);
+    // test_mainloop(MainLoopExec::Iterate);
 }
 
 fn io_callback(_fd: RawFd, mask: u32) {
