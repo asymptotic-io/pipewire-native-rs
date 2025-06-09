@@ -13,12 +13,13 @@ use spa::interface::system::SystemImpl;
 use spa::support::ffi;
 use spa::{emit_hook, hook::HookList};
 
+use std::ops::Deref;
 use std::os::fd::RawFd;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, Mutex, OnceLock,
+    Arc, Mutex, OnceLock, Weak,
 };
 
 #[allow(dead_code)]
@@ -40,8 +41,9 @@ pub struct MainLoopEvents {
 unsafe impl Send for MainLoopEvents {}
 unsafe impl Sync for MainLoopEvents {}
 
+#[allow(dead_code)]
+#[derive(Clone)]
 struct Loop {
-    #[allow(dead_code)]
     system: Arc<Pin<Box<SystemImpl>>>,
     r#loop: Arc<Pin<Box<LoopImpl>>>,
     control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
@@ -49,15 +51,70 @@ struct Loop {
     name: String,
 }
 
-#[allow(dead_code)]
 pub struct MainLoop {
-    pw_loop: Loop,
-    hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
+    inner: Arc<InnerMainLoop>,
     running: Arc<AtomicBool>,
+}
+pub struct WeakMainLoop(Weak<InnerMainLoop>);
+
+impl Deref for MainLoop {
+    type Target = InnerMainLoop;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
+    }
+}
+
+impl WeakMainLoop {
+    pub fn upgrade(&self, running: Arc<AtomicBool>) -> Option<MainLoop> {
+        self.0.upgrade().map(|l| MainLoop { inner: l, running })
+    }
 }
 
 impl MainLoop {
+    pub fn downgrade(&self) -> (WeakMainLoop, Arc<AtomicBool>) {
+        (
+            WeakMainLoop(Arc::downgrade(&self.inner)),
+            self.running.clone(),
+        )
+    }
+
     pub fn new(props: &Dict) -> Option<MainLoop> {
+        let Some(l) = InnerMainLoop::new(props) else {
+            return None;
+        };
+
+        Some(MainLoop {
+            inner: Arc::new(l),
+            running: Arc::new(AtomicBool::new(false)),
+        })
+    }
+
+    pub fn run(&mut self) {
+        let running = self.running.clone();
+        self.inner.run(running);
+    }
+
+    pub fn quit(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
+        self.inner.quit();
+    }
+
+    // TODO: Should this just move to Drop?
+    pub fn destroy(self) {
+        <InnerMainLoop as Clone>::clone(&self.inner).destroy();
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+pub struct InnerMainLoop {
+    pw_loop: Loop,
+    hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
+}
+
+impl InnerMainLoop {
+    pub fn new(props: &Dict) -> Option<InnerMainLoop> {
         let (mut support, plugin) = get_support();
 
         let log_handle = setup_log(&mut support, &plugin);
@@ -110,7 +167,7 @@ impl MainLoop {
             return None;
         }
 
-        Some(MainLoop {
+        Some(InnerMainLoop {
             pw_loop: Loop {
                 system,
                 r#loop: lloop,
@@ -119,11 +176,10 @@ impl MainLoop {
                 name,
             },
             hooks: HookList::new(),
-            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    pub fn destroy(self) {
+     fn destroy(self) {
         emit_hook!(self.hooks, destroy,);
     }
 
@@ -131,16 +187,15 @@ impl MainLoop {
         self.hooks.lock().unwrap().append(events);
     }
 
-    pub fn run(&self) {
+    fn run(&self, running: Arc<AtomicBool>) {
         assert_eq!(
-            self.running
-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed),
+            running.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed),
             Ok(false)
         );
 
         self.pw_loop.control.enter();
 
-        while self.running.load(Ordering::Relaxed) {
+        while running.load(Ordering::Relaxed) {
             if let Err(res) = self.pw_loop.control.iterate(Some(std::time::Duration::MAX)) {
                 if res.kind() == std::io::ErrorKind::Interrupted {
                     continue;
@@ -151,10 +206,9 @@ impl MainLoop {
         self.pw_loop.control.leave();
     }
 
-    pub fn quit(&self) {
-        self.running.store(false, Ordering::Relaxed);
-        let stop = move |_block: bool, _seq: u32, _data: &[u8]| 0;
-        let _ = self.pw_loop.r#loop.invoke(1, &[], false, Box::new(stop));
+    fn quit(&self) {
+        // let stop = move |_block: bool, _seq: u32, _data: &[u8]| 0;
+        // let _ = self.pw_loop.r#loop.invoke(1, &[], false, Box::new(stop));
     }
 
     // Loop control methods
