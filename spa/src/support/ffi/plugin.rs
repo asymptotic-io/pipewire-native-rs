@@ -119,7 +119,7 @@ impl HandleFactory for CHandleFactoryImpl {
                 None => std::ptr::null(),
             };
             let size = (self.factory.as_ref().unwrap().get_size)(self.factory, info_ptr);
-            let handle = libc::malloc(size) as *mut CHandle;
+            let handle = libc::calloc(1, size) as *mut CHandle;
             let (support, n_support) = {
                 let c_support = support.c_support();
                 (c_support.as_ptr(), c_support.len())
