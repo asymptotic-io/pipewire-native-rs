@@ -74,6 +74,22 @@ impl Context {
             }
         }
 
+        // TODO: create/use default settings
+        // TODO: start data loops
+
+        // TODO: create a mempool
+        // TODO: create a work queue
+
+        // TODO: Load support plugins: system, loop, loop utils, plugin loader
+
+        // TODO: D-Bus...
+
+        // TODO: Create core and register
+
+        // TODO: Start data loops
+
+        // TODO: Expose settings
+
         Ok(this)
     }
 
