@@ -80,7 +80,7 @@ fn test_mainloop(exec: MainLoopRun) {
             let (ml_weak, running) = ml.downgrade();
             std::thread::spawn(move || {
                 let ml_ = ml_weak.upgrade(running);
-                std::thread::sleep(std::time::Duration::from_secs(5));
+                std::thread::sleep(std::time::Duration::from_secs(1));
                 assert!(ml_.is_some());
                 ml_.unwrap().quit();
             });
