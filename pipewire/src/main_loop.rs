@@ -50,9 +50,9 @@ impl MainLoopEvents {
 unsafe impl Send for MainLoopEvents {}
 unsafe impl Sync for MainLoopEvents {}
 
-#[allow(dead_code)]
 #[derive(Clone)]
 struct Loop {
+    #[allow(dead_code)]
     system: Arc<Pin<Box<SystemImpl>>>,
     loop_: Arc<Pin<Box<LoopImpl>>>,
     control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
@@ -241,10 +241,10 @@ impl MainLoop {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 struct InnerMainLoop {
     pw_loop: Loop,
+    #[allow(dead_code)]
     handles: Arc<Handles>,
     hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
 }
