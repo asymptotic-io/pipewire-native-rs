@@ -46,10 +46,10 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 impl Context {
     pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
         // TODO: plugin loader interface
-        let pw_loop = main_loop.get_loop();
-        let system = pw_loop.system.clone();
-        let loop_ = pw_loop.loop_.clone();
-        let loop_utils = pw_loop.loop_utils.clone();
+        let support = main_loop.get_support();
+        let system = support.system.clone();
+        let loop_ = support.loop_.clone();
+        let loop_utils = support.loop_utils.clone();
 
         let mut this = Context {
             main_loop,

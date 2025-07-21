@@ -219,7 +219,7 @@ impl MainLoop {
         self.inner.destroy();
     }
 
-    pub(crate) fn get_loop(&self) -> LoopSupport {
+    pub(crate) fn get_support(&self) -> LoopSupport {
         self.inner.support.clone()
     }
 }
