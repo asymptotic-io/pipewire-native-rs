@@ -186,7 +186,7 @@ impl CLoopImpl {
     ) -> i32 {
         //pub invoke: fn(&mut LoopImpl, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32>,
         //pub type InvokeFn = dyn FnMut(LoopImpl, bool, u32, &[u8]) -> i32 + 'static;
-        let func = unsafe { (user_data as *mut Box<InvokeFn>).as_mut().unwrap() };
+        let mut func = unsafe { Box::from_raw(user_data as *mut Box<InvokeFn>) };
         let data = unsafe { std::slice::from_raw_parts(data as *const u8, size) };
 
         (func)(async_, seq, data)
@@ -205,7 +205,8 @@ impl CLoopImpl {
                 .as_ref()
                 .unwrap()
         };
-        let mut invoke_func = Box::pin(func);
+        // Double box to get a thin pointer to a Box<dyn ...>
+        let invoke_func = Box::new(func);
 
         result_from((funcs.invoke)(
             c_loop.iface.cb.data,
@@ -214,7 +215,7 @@ impl CLoopImpl {
             data.as_ptr() as *const c_void,
             data.len() as libc::size_t,
             block,
-            Pin::into_inner(invoke_func.as_mut()) as *mut InvokeFn as *mut c_void,
+            Box::into_raw(invoke_func) as *mut c_void,
         ))
     }
 }
