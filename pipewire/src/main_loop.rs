@@ -10,7 +10,7 @@ use spa::interface::cpu::CpuImpl;
 use spa::interface::ffi::{CControlHooks, CHook};
 use spa::interface::log::{LogImpl, LogLevel};
 use spa::interface::r#loop::{
-    LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl, LoopUtilsSource, SourceEventFn, SourceIdleFn,
+    LoopControlImpl, LoopImpl, LoopUtilsImpl, LoopUtilsSource, SourceEventFn, SourceIdleFn,
     SourceIoFn, SourceSignalFn, SourceTimerFn,
 };
 use spa::interface::system::SystemImpl;
@@ -55,7 +55,7 @@ unsafe impl Sync for MainLoopEvents {}
 pub(crate) struct LoopSupport {
     pub(crate) system: Arc<Pin<Box<SystemImpl>>>,
     pub(crate) loop_: Arc<Pin<Box<LoopImpl>>>,
-    loop_control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
+    loop_control: Arc<Pin<Box<LoopControlImpl>>>,
     pub(crate) loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
 }
 
@@ -266,7 +266,7 @@ impl InnerMainLoop {
         };
 
         let Some(loop_control) = support
-            .get_interface::<interface::r#loop::LoopControlMethodsImpl>(interface::LOOP_CONTROL)
+            .get_interface::<interface::r#loop::LoopControlImpl>(interface::LOOP_CONTROL)
         else {
             return None;
         };
@@ -491,8 +491,8 @@ fn setup_loop_ctrl(
         .expect("Loop factory should produce control interface");
 
     let loop_ctrl = loop_ctrl_iface
-        .downcast_box::<LoopControlMethodsImpl>()
-        .expect("Loop control interface should be LoopControlMethodsImpl");
+        .downcast_box::<LoopControlImpl>()
+        .expect("Loop control interface should be LoopControlImpl");
 
     support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
 }

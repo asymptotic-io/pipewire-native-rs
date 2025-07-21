@@ -39,8 +39,8 @@ struct CLoopControlMethods {
 
 struct CLoopControlMethodsImpl {}
 
-pub fn new_impl(interface: *mut CInterface) -> LoopControlMethodsImpl {
-    LoopControlMethodsImpl {
+pub fn new_impl(interface: *mut CInterface) -> LoopControlImpl {
+    LoopControlImpl {
         inner: Box::pin(interface as *mut CLoopControlMethods),
 
         get_fd: CLoopControlMethodsImpl::get_fd,
@@ -59,7 +59,7 @@ pub fn new_impl(interface: *mut CInterface) -> LoopControlMethodsImpl {
 }
 
 impl CLoopControlMethodsImpl {
-    fn from_control_methods(this: &LoopControlMethodsImpl) -> &CLoopControlMethods {
+    fn from_control_methods(this: &LoopControlImpl) -> &CLoopControlMethods {
         unsafe {
             this.inner
                 .as_ref()
@@ -70,14 +70,14 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn get_fd(this: &LoopControlMethodsImpl) -> u32 {
+    fn get_fd(this: &LoopControlImpl) -> u32 {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         unsafe { ((*funcs).get_fd)(control_impl.iface.cb.data) }
     }
 
-    fn add_hook(this: &LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64) {
+    fn add_hook(this: &LoopControlImpl, hook: &CHook, hooks: &CControlHooks, data: u64) {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
@@ -86,14 +86,14 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn enter(this: &LoopControlMethodsImpl) {
+    fn enter(this: &LoopControlImpl) {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         unsafe { ((*funcs).enter)(control_impl.iface.cb.data) }
     }
 
-    fn leave(this: &LoopControlMethodsImpl) {
+    fn leave(this: &LoopControlImpl) {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
@@ -102,7 +102,7 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn iterate(this: &LoopControlMethodsImpl, timeout: Option<Duration>) -> std::io::Result<i32> {
+    fn iterate(this: &LoopControlImpl, timeout: Option<Duration>) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
@@ -120,31 +120,28 @@ impl CLoopControlMethodsImpl {
         result_from(unsafe { ((*funcs).iterate)(control_impl.iface.cb.data, timeout) })
     }
 
-    fn check(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
+    fn check(this: &LoopControlImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         result_from(unsafe { ((*funcs).check)(control_impl.iface.cb.data) })
     }
 
-    fn lock(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
+    fn lock(this: &LoopControlImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         result_from(unsafe { ((*funcs).lock)(control_impl.iface.cb.data) })
     }
 
-    fn unlock(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
+    fn unlock(this: &LoopControlImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         result_from(unsafe { ((*funcs).lock)(control_impl.iface.cb.data) })
     }
 
-    fn get_time(
-        this: &LoopControlMethodsImpl,
-        timeout: Duration,
-    ) -> std::io::Result<libc::timespec> {
+    fn get_time(this: &LoopControlImpl, timeout: Duration) -> std::io::Result<libc::timespec> {
         let mut abstime = libc::timespec {
             tv_sec: 0,
             tv_nsec: 0,
@@ -167,7 +164,7 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn wait(this: &LoopControlMethodsImpl, abstime: &libc::timespec) -> std::io::Result<i32> {
+    fn wait(this: &LoopControlImpl, abstime: &libc::timespec) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
@@ -176,14 +173,14 @@ impl CLoopControlMethodsImpl {
         })
     }
 
-    fn signal(this: &LoopControlMethodsImpl, wait_for_accept: bool) -> std::io::Result<i32> {
+    fn signal(this: &LoopControlImpl, wait_for_accept: bool) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         result_from(unsafe { ((*funcs).signal)(control_impl.iface.cb.data, wait_for_accept) })
     }
 
-    fn accept(this: &LoopControlMethodsImpl) -> std::io::Result<i32> {
+    fn accept(this: &LoopControlImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
@@ -211,8 +208,8 @@ static LOOP_CONTROL_METHODS: CControlMethodsMethods = CControlMethodsMethods {
 struct ControlMethodsIface {}
 
 impl ControlMethodsIface {
-    fn c_to_control_methods_impl(object: *mut c_void) -> &'static LoopControlMethodsImpl {
-        unsafe { &*(object as *mut LoopControlMethodsImpl) }
+    fn c_to_control_methods_impl(object: *mut c_void) -> &'static LoopControlImpl {
+        unsafe { &*(object as *mut LoopControlImpl) }
     }
 
     extern "C" fn get_fd(object: *mut c_void) -> c_uint {
@@ -313,7 +310,7 @@ impl ControlMethodsIface {
     }
 }
 
-pub(crate) unsafe fn make_native(loop_ctrl: &LoopControlMethodsImpl) -> *mut CInterface {
+pub(crate) unsafe fn make_native(loop_ctrl: &LoopControlImpl) -> *mut CInterface {
     let c_ctrl_methods: *mut CLoopControlMethods = unsafe {
         libc::calloc(
             1,
@@ -326,7 +323,7 @@ pub(crate) unsafe fn make_native(loop_ctrl: &LoopControlMethodsImpl) -> *mut CIn
     c_ctrl_methods.iface.type_ = c_string(interface::CPU).into_raw();
     c_ctrl_methods.iface.cb.funcs =
         &LOOP_CONTROL_METHODS as *const CControlMethodsMethods as *mut c_void;
-    c_ctrl_methods.iface.cb.data = loop_ctrl as *const LoopControlMethodsImpl as *mut c_void;
+    c_ctrl_methods.iface.cb.data = loop_ctrl as *const LoopControlImpl as *mut c_void;
 
     c_ctrl_methods as *mut CLoopControlMethods as *mut CInterface
 }

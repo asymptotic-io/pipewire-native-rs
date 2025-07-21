@@ -11,7 +11,7 @@ use pipewire_native_spa::flags;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::cpu::CpuImpl;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
-use pipewire_native_spa::interface::r#loop::{LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl};
+use pipewire_native_spa::interface::r#loop::{LoopControlImpl, LoopImpl, LoopUtilsImpl};
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
 
@@ -184,7 +184,7 @@ fn setup_loop_ctrl(
         .expect("Loop factory should produce control interface");
 
     let loop_ctrl = loop_ctrl_iface
-        .downcast_box::<LoopControlMethodsImpl>()
+        .downcast_box::<LoopControlImpl>()
         .expect("Loop control interface should be LoopControlMethodsImpl");
 
     support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
@@ -233,7 +233,7 @@ fn test_loop_support() {
     let eloop = support.get_interface::<interface::r#loop::LoopImpl>(interface::LOOP);
     let lutils = support.get_interface::<interface::r#loop::LoopUtilsImpl>(interface::LOOP_UTILS);
     let lctrl =
-        support.get_interface::<interface::r#loop::LoopControlMethodsImpl>(interface::LOOP_CONTROL);
+        support.get_interface::<interface::r#loop::LoopControlImpl>(interface::LOOP_CONTROL);
 
     if let (Some(_eloop), Some(utils), Some(ctrl)) = (eloop, lutils, lctrl) {
         let fd = ctrl.get_fd();

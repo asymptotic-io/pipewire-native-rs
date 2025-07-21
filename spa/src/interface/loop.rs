@@ -72,27 +72,27 @@ impl Interface for LoopImpl {
     }
 }
 
-pub struct LoopControlMethodsImpl {
+pub struct LoopControlImpl {
     pub inner: Pin<Box<dyn Any>>,
 
-    pub get_fd: fn(&LoopControlMethodsImpl) -> u32,
-    pub add_hook: fn(&LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
-    pub enter: fn(&LoopControlMethodsImpl),
-    pub leave: fn(&LoopControlMethodsImpl),
-    pub iterate: fn(&LoopControlMethodsImpl, timeout: Option<Duration>) -> std::io::Result<i32>,
-    pub check: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
-    pub lock: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
-    pub unlock: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
-    pub get_time: fn(&LoopControlMethodsImpl, timeout: Duration) -> std::io::Result<libc::timespec>,
-    pub wait: fn(&LoopControlMethodsImpl, abstime: &libc::timespec) -> std::io::Result<i32>,
-    pub signal: fn(&LoopControlMethodsImpl, wait_for_accept: bool) -> std::io::Result<i32>,
-    pub accept: fn(&LoopControlMethodsImpl) -> std::io::Result<i32>,
+    pub get_fd: fn(&LoopControlImpl) -> u32,
+    pub add_hook: fn(&LoopControlImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
+    pub enter: fn(&LoopControlImpl),
+    pub leave: fn(&LoopControlImpl),
+    pub iterate: fn(&LoopControlImpl, timeout: Option<Duration>) -> std::io::Result<i32>,
+    pub check: fn(&LoopControlImpl) -> std::io::Result<i32>,
+    pub lock: fn(&LoopControlImpl) -> std::io::Result<i32>,
+    pub unlock: fn(&LoopControlImpl) -> std::io::Result<i32>,
+    pub get_time: fn(&LoopControlImpl, timeout: Duration) -> std::io::Result<libc::timespec>,
+    pub wait: fn(&LoopControlImpl, abstime: &libc::timespec) -> std::io::Result<i32>,
+    pub signal: fn(&LoopControlImpl, wait_for_accept: bool) -> std::io::Result<i32>,
+    pub accept: fn(&LoopControlImpl) -> std::io::Result<i32>,
 }
 
-unsafe impl Send for LoopControlMethodsImpl {}
-unsafe impl Sync for LoopControlMethodsImpl {}
+unsafe impl Send for LoopControlImpl {}
+unsafe impl Sync for LoopControlImpl {}
 
-impl LoopControlMethodsImpl {
+impl LoopControlImpl {
     pub fn get_fd(&self) -> u32 {
         (self.get_fd)(self)
     }
@@ -142,7 +142,7 @@ impl LoopControlMethodsImpl {
     }
 }
 
-impl Interface for LoopControlMethodsImpl {
+impl Interface for LoopControlImpl {
     unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
         crate::support::ffi::r#loop::control::make_native(self)
     }
