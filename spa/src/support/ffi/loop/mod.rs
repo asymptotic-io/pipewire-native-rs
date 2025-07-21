@@ -3,10 +3,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
     ffi::{c_int, c_void, CString},
     os::fd::RawFd,
     pin::Pin,
+    rc::Rc,
 };
 
 use crate::interface::ffi::{CLoop, CSource};
@@ -56,10 +58,11 @@ struct CLoopImpl {
 
 pub fn new_impl(interface: *mut CInterface) -> LoopImpl {
     LoopImpl {
-        inner: Box::pin(CLoopImpl {
+        // Rc so we can take a reference out of the pinned box, and RefCell so we can mutate it
+        inner: Box::pin(Rc::new(RefCell::new(CLoopImpl {
             iface: interface as *mut CLoop,
             sources: HashMap::new(),
-        }),
+        }))),
 
         add_source: CLoopImpl::add_source,
         update_source: CLoopImpl::update_source,
@@ -75,16 +78,14 @@ struct CSourceImpl {
 }
 
 impl CLoopImpl {
-    fn from_loop(this: &LoopImpl) -> (&mut CLoopImpl, &mut CLoop) {
-        let c_loopimpl = unsafe {
-            this.inner
-                .as_ref()
-                .downcast_ref::<*mut CLoopImpl>()
-                .unwrap()
-                .as_mut()
-                .unwrap()
-        };
-        let c_loop = unsafe { c_loopimpl.iface.as_mut().unwrap() };
+    fn from_loop(this: &LoopImpl) -> (Rc<RefCell<CLoopImpl>>, &mut CLoop) {
+        let c_loopimpl = this
+            .inner
+            .as_ref()
+            .downcast_ref::<Rc<RefCell<CLoopImpl>>>()
+            .unwrap()
+            .clone();
+        let c_loop = unsafe { c_loopimpl.borrow().iface.as_mut().unwrap() };
 
         (c_loopimpl, c_loop)
     }
@@ -115,7 +116,7 @@ impl CLoopImpl {
 
         let mut source_impl = Box::pin(CSourceImpl {
             c_source: CSource {
-                loop_: loop_.inner.downcast_ref::<CLoop>().unwrap() as *const CLoop,
+                loop_: c_loop,
                 func: Self::source_trampoline,
                 data: std::ptr::null_mut(), /* see below */
                 fd: source.fd,
@@ -129,6 +130,7 @@ impl CLoopImpl {
         let c_source = &mut source_impl.c_source as *mut CSource;
 
         c_loopimpl
+            .borrow_mut()
             .sources
             .insert(source_impl.c_source.fd, source_impl);
 
@@ -143,7 +145,8 @@ impl CLoopImpl {
                 .unwrap()
         };
 
-        let source_impl = c_loopimpl
+        let mut loopimpl = c_loopimpl.borrow_mut();
+        let source_impl = loopimpl
             .sources
             .get_mut(&source.fd)
             .ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?;
@@ -165,6 +168,7 @@ impl CLoopImpl {
         };
 
         let mut source_impl = c_loopimpl
+            .borrow_mut()
             .sources
             .remove(&fd)
             .ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?;
