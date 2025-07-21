@@ -101,7 +101,7 @@ impl Loop {
     }
 
     fn invoke(
-        _this: &mut LoopImpl,
+        _this: &LoopImpl,
         _seq: u32,
         _data: &[u8],
         _block: bool,

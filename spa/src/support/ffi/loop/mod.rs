@@ -24,7 +24,7 @@ pub mod control;
 pub mod utils;
 
 type CInvokeFunc = extern "C" fn(
-    loop_: *mut CLoop,
+    loop_: *const CLoop,
     async_: bool,
     seq: u32,
     data: *const c_void,
@@ -39,7 +39,7 @@ struct CLoopMethods {
     update_source: extern "C" fn(object: *mut c_void, source: *mut CSource) -> c_int,
     remove_source: extern "C" fn(object: *mut c_void, source: *mut CSource) -> c_int,
     invoke: extern "C" fn(
-        object: *mut c_void,
+        object: *const c_void,
         func: CInvokeFunc,
         seq: u32,
         data: *const c_void,
@@ -177,7 +177,7 @@ impl CLoopImpl {
 
     #[no_mangle]
     extern "C" fn invoke_trampoline(
-        _loop: *mut CLoop,
+        _loop: *const CLoop,
         async_: bool,
         seq: u32,
         data: *const c_void,
@@ -193,7 +193,7 @@ impl CLoopImpl {
     }
 
     fn invoke(
-        loop_: &mut LoopImpl,
+        loop_: &LoopImpl,
         seq: u32,
         data: &[u8],
         block: bool,
@@ -250,12 +250,16 @@ pub(crate) unsafe fn free_native(c_loop: *mut CInterface) {
 struct LoopImplIface {}
 
 impl LoopImplIface {
-    fn c_to_loop_impl(object: *mut c_void) -> &'static mut LoopImpl {
+    fn c_to_loop_impl(object: *const c_void) -> &'static LoopImpl {
+        unsafe { (object as *const LoopImpl).as_ref().unwrap() }
+    }
+
+    fn c_to_loop_impl_mut(object: *mut c_void) -> &'static mut LoopImpl {
         unsafe { (object as *mut LoopImpl).as_mut().unwrap() }
     }
 
     extern "C" fn add_source(object: *mut c_void, source: *mut CSource) -> c_int {
-        let loop_impl = Self::c_to_loop_impl(object);
+        let loop_impl = Self::c_to_loop_impl_mut(object);
         let c_source = unsafe { source.as_mut().unwrap() };
         let impl_source = Source {
             fd: c_source.fd,
@@ -272,7 +276,7 @@ impl LoopImplIface {
     }
 
     extern "C" fn update_source(object: *mut c_void, source: *mut CSource) -> c_int {
-        let loop_impl = Self::c_to_loop_impl(object);
+        let loop_impl = Self::c_to_loop_impl_mut(object);
         let c_source = unsafe { source.as_mut().unwrap() };
         let impl_source = Source {
             fd: c_source.fd,
@@ -289,7 +293,7 @@ impl LoopImplIface {
     }
 
     extern "C" fn remove_source(object: *mut c_void, source: *mut CSource) -> c_int {
-        let loop_impl = Self::c_to_loop_impl(object);
+        let loop_impl = Self::c_to_loop_impl_mut(object);
         let c_source = unsafe { source.as_mut().unwrap() };
 
         let res = loop_impl.remove_source(c_source.fd);
@@ -301,7 +305,7 @@ impl LoopImplIface {
     }
 
     extern "C" fn invoke(
-        object: *mut c_void,
+        object: *const c_void,
         func: CInvokeFunc,
         seq: u32,
         data: *const c_void,
