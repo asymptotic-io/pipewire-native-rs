@@ -4,19 +4,30 @@
 
 use std::{
     ffi::CStr,
+    pin::Pin,
     sync::{Arc, LazyLock},
 };
 
 use crate::{conf, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties};
 
-use pipewire_native_spa as spa;
+use pipewire_native_spa::{
+    self as spa,
+    interface::{
+        r#loop::{LoopImpl, LoopUtilsImpl},
+        system::SystemImpl,
+    },
+};
 
 default_topic!(log::topic::CONTEXT);
 
+#[allow(dead_code)]
 pub struct Context {
     main_loop: Arc<MainLoop>,
     properties: Properties,
     conf: Properties,
+    system: Arc<Pin<Box<SystemImpl>>>,
+    loop_: Arc<Pin<Box<LoopImpl>>>,
+    loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
 }
 
 static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
@@ -34,10 +45,19 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 
 impl Context {
     pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
+        // TODO: plugin loader interface
+        let pw_loop = main_loop.get_loop();
+        let system = pw_loop.system.clone();
+        let loop_ = pw_loop.loop_.clone();
+        let loop_utils = pw_loop.loop_utils.clone();
+
         let mut this = Context {
             main_loop,
             properties,
             conf: Properties::new(),
+            system,
+            loop_,
+            loop_utils,
         };
 
         debug!("Creating context");
@@ -79,8 +99,6 @@ impl Context {
 
         // TODO: create a mempool
         // TODO: create a work queue
-
-        // TODO: Load support plugins: system, loop, loop utils, plugin loader
 
         // TODO: D-Bus...
 

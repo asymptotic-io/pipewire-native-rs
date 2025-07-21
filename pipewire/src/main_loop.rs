@@ -218,6 +218,10 @@ impl MainLoop {
     pub fn destroy(&self) {
         self.inner.destroy();
     }
+
+    pub(crate) fn get_loop(&self) -> LoopSupport {
+        self.inner.support.clone()
+    }
 }
 
 struct InnerMainLoop {
