@@ -20,9 +20,10 @@ use spa::{emit_hook, hook::HookList};
 use std::os::fd::RawFd;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex, Weak,
+    Arc, Mutex,
 };
 
 #[allow(dead_code)]
@@ -51,36 +52,19 @@ unsafe impl Send for MainLoopEvents {}
 unsafe impl Sync for MainLoopEvents {}
 
 #[derive(Clone)]
-struct Loop {
-    #[allow(dead_code)]
-    system: Arc<Pin<Box<SystemImpl>>>,
-    loop_: Arc<Pin<Box<LoopImpl>>>,
-    control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
-    utils: Arc<Pin<Box<LoopUtilsImpl>>>,
-    name: String,
+pub(crate) struct LoopSupport {
+    pub(crate) system: Arc<Pin<Box<SystemImpl>>>,
+    pub(crate) loop_: Arc<Pin<Box<LoopImpl>>>,
+    loop_control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
+    pub(crate) loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
 }
 
+#[derive(Clone)]
 pub struct MainLoop {
     inner: Arc<InnerMainLoop>,
-    running: Arc<AtomicBool>,
-}
-
-pub struct WeakMainLoop(Weak<InnerMainLoop>);
-
-impl WeakMainLoop {
-    pub fn upgrade(&self, running: Arc<AtomicBool>) -> Option<MainLoop> {
-        self.0.upgrade().map(|l| MainLoop { inner: l, running })
-    }
 }
 
 impl MainLoop {
-    pub fn downgrade(&self) -> (WeakMainLoop, Arc<AtomicBool>) {
-        (
-            WeakMainLoop(Arc::downgrade(&self.inner)),
-            self.running.clone(),
-        )
-    }
-
     pub fn new(props: &Dict) -> Option<MainLoop> {
         let Some(l) = InnerMainLoop::new(props) else {
             return None;
@@ -88,20 +72,15 @@ impl MainLoop {
 
         Some(MainLoop {
             inner: Arc::new(l),
-            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    pub fn run(&mut self) {
-        let running = self.running.clone();
-        self.inner.run(running);
+    pub fn run(&self) {
+        InnerMainLoop::run(&self.inner);
     }
 
-    pub fn quit(&mut self) {
-        self.running.store(false, Ordering::Relaxed);
-        if let Some(inner) = Arc::get_mut(&mut self.inner) {
-            inner.quit();
-        }
+    pub fn quit(&self) {
+        InnerMainLoop::quit(&self.inner);
     }
 
     pub fn add_listener(&self, events: MainLoopEvents) {
@@ -110,51 +89,51 @@ impl MainLoop {
 
     // Loop control methods
     pub fn get_fd(&self) -> u32 {
-        self.inner.pw_loop.control.get_fd()
+        self.inner.support.loop_control.get_fd()
     }
 
     pub fn add_hook(&self, hook: &CHook, hooks: &CControlHooks, data: u64) {
-        self.inner.pw_loop.control.add_hook(hook, hooks, data)
+        self.inner.support.loop_control.add_hook(hook, hooks, data)
     }
 
     pub fn enter(&self) {
-        self.inner.pw_loop.control.enter()
+        self.inner.support.loop_control.enter()
     }
 
     pub fn leave(&self) {
-        self.inner.pw_loop.control.leave()
+        self.inner.support.loop_control.leave()
     }
 
     pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.iterate(timeout)
+        self.inner.support.loop_control.iterate(timeout)
     }
 
     pub fn check(&self) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.check()
+        self.inner.support.loop_control.check()
     }
 
     pub fn lock(&self) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.lock()
+        self.inner.support.loop_control.lock()
     }
 
     pub fn unlock(&self) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.unlock()
+        self.inner.support.loop_control.unlock()
     }
 
     pub fn get_time(&self, timeout: std::time::Duration) -> std::io::Result<libc::timespec> {
-        self.inner.pw_loop.control.get_time(timeout)
+        self.inner.support.loop_control.get_time(timeout)
     }
 
     pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.wait(abstime)
+        self.inner.support.loop_control.wait(abstime)
     }
 
     pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.signal(wait_for_accept)
+        self.inner.support.loop_control.signal(wait_for_accept)
     }
 
     pub fn accept(&self) -> std::io::Result<i32> {
-        self.inner.pw_loop.control.accept()
+        self.inner.support.loop_control.accept()
     }
 
     // Loop utils
@@ -165,7 +144,7 @@ impl MainLoop {
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.pw_loop.utils.add_io(fd, mask, close, func)
+        self.inner.support.loop_utils.add_io(fd, mask, close, func)
     }
 
     pub fn update_io(
@@ -173,7 +152,7 @@ impl MainLoop {
         source: &mut Pin<Box<LoopUtilsSource>>,
         mask: flags::Io,
     ) -> std::io::Result<i32> {
-        self.inner.pw_loop.utils.update_io(source, mask)
+        self.inner.support.loop_utils.update_io(source, mask)
     }
 
     pub fn add_idle(
@@ -181,7 +160,7 @@ impl MainLoop {
         enabled: bool,
         func: Box<SourceIdleFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.pw_loop.utils.add_idle(enabled, func)
+        self.inner.support.loop_utils.add_idle(enabled, func)
     }
 
     pub fn enable_idle(
@@ -189,19 +168,19 @@ impl MainLoop {
         source: &mut Pin<Box<LoopUtilsSource>>,
         enabled: bool,
     ) -> std::io::Result<i32> {
-        self.inner.pw_loop.utils.enable_idle(source, enabled)
+        self.inner.support.loop_utils.enable_idle(source, enabled)
     }
 
     pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.pw_loop.utils.add_event(func)
+        self.inner.support.loop_utils.add_event(func)
     }
 
     pub fn signal_event(&self, source: &mut Pin<Box<LoopUtilsSource>>) -> std::io::Result<i32> {
-        self.inner.pw_loop.utils.signal_event(source)
+        self.inner.support.loop_utils.signal_event(source)
     }
 
     pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.pw_loop.utils.add_timer(func)
+        self.inner.support.loop_utils.add_timer(func)
     }
 
     pub fn update_timer(
@@ -212,8 +191,8 @@ impl MainLoop {
         absolute: bool,
     ) -> std::io::Result<i32> {
         self.inner
-            .pw_loop
-            .utils
+            .support
+            .loop_utils
             .update_timer(source, value, interval, absolute)
     }
 
@@ -222,30 +201,33 @@ impl MainLoop {
         signal_number: i32,
         func: Box<SourceSignalFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.pw_loop.utils.add_signal(signal_number, func)
+        self.inner.support.loop_utils.add_signal(signal_number, func)
     }
 
     pub fn destroy_source(&self, source: Pin<Box<LoopUtilsSource>>) {
-        self.inner.pw_loop.utils.destroy_source(source)
+        self.inner.support.loop_utils.destroy_source(source)
     }
 
     pub fn set_name(&mut self, name: &str) {
-        if let Some(i) = Arc::get_mut(&mut self.inner) {
-            i.pw_loop.name = name.to_string()
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.name = name.to_string()
         }
     }
 
     // TODO: Should this just move to Drop?
-    pub fn destroy(self) {
-        <InnerMainLoop as Clone>::clone(&self.inner).destroy();
+    pub fn destroy(&self) {
+        self.inner.destroy();
     }
 }
 
-#[derive(Clone)]
 struct InnerMainLoop {
-    pw_loop: Loop,
+    support: LoopSupport,
+    // This is an atomic because it is hard to convince Rust that this will only be mutated on one
+    // thread (i.e. the one on which run() is called
+    running: AtomicBool,
+    name: String,
     #[allow(dead_code)]
-    handles: Arc<Handles>,
+    handles: Handles,
     hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
 }
 
@@ -267,18 +249,18 @@ impl InnerMainLoop {
             return None;
         };
 
-        let Some(lloop) = support.get_interface::<interface::r#loop::LoopImpl>(interface::LOOP)
+        let Some(loop_) = support.get_interface::<interface::r#loop::LoopImpl>(interface::LOOP)
         else {
             return None;
         };
 
-        let Some(lutils) =
+        let Some(loop_utils) =
             support.get_interface::<interface::r#loop::LoopUtilsImpl>(interface::LOOP_UTILS)
         else {
             return None;
         };
 
-        let Some(lctrl) = support
+        let Some(loop_control) = support
             .get_interface::<interface::r#loop::LoopControlMethodsImpl>(interface::LOOP_CONTROL)
         else {
             return None;
@@ -300,46 +282,50 @@ impl InnerMainLoop {
         };
 
         Some(InnerMainLoop {
-            pw_loop: Loop {
+            support: LoopSupport {
                 system,
-                loop_: lloop,
-                control: lctrl,
-                utils: lutils,
-                name,
+                loop_,
+                loop_control,
+                loop_utils,
             },
-            handles: Arc::new(handles),
+            running: AtomicBool::new(false),
+            name,
+            handles,
             hooks: HookList::new(),
         })
     }
 
-    fn destroy(self) {
+    fn destroy(&self) {
         emit_hook!(self.hooks, destroy,);
     }
 
-    fn run(&self, running: Arc<AtomicBool>) {
-        assert_eq!(
-            running.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed),
-            Ok(false)
-        );
+    fn run(this: &Arc<Self>) {
+        if this.running.compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed).is_err() {
+            return;
+        }
 
-        self.pw_loop.control.enter();
+        this.support.loop_control.enter();
 
-        while running.load(Ordering::Relaxed) {
-            if let Err(res) = self.pw_loop.control.iterate(Some(std::time::Duration::MAX)) {
+        while this.running.load(Ordering::Relaxed) {
+            if let Err(res) = this.support.loop_control.iterate(Some(std::time::Duration::MAX)) {
                 if res.kind() == std::io::ErrorKind::Interrupted {
                     continue;
                 }
             }
         }
 
-        self.pw_loop.control.leave();
+        this.support.loop_control.leave();
     }
 
-    fn quit(&mut self) {
-        if let Some(l) = Arc::get_mut(&mut self.pw_loop.loop_) {
-            let stop = move |_block: bool, _seq: u32, _data: &[u8]| 0;
-            let _ = l.invoke(1, &[], false, Box::new(stop));
-        }
+    fn quit(this: &Arc<Self>) {
+        let this_ = this.clone();
+
+        let stop = move |_block: bool, _seq: u32, _data: &[u8]| {
+            this_.running.store(false, Ordering::Relaxed);
+            0
+        };
+
+        let _ = this.support.loop_.invoke(1, &[], false, Box::new(stop));
     }
 }
 

@@ -30,7 +30,7 @@ enum MainLoopRun {
 
 fn test_mainloop(exec: MainLoopRun) {
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
-    let mut ml = MainLoop::new(&Dict::new(v)).unwrap();
+    let ml = MainLoop::new(&Dict::new(v)).unwrap();
 
     let fd = ml.get_fd();
     assert!(fd != 0);
@@ -77,12 +77,10 @@ fn test_mainloop(exec: MainLoopRun) {
 
     match exec {
         MainLoopRun::Run => {
-            let (ml_weak, running) = ml.downgrade();
+            let ml_ = ml.clone();
             std::thread::spawn(move || {
-                let ml_ = ml_weak.upgrade(running);
                 std::thread::sleep(std::time::Duration::from_secs(1));
-                assert!(ml_.is_some());
-                ml_.unwrap().quit();
+                ml_.quit();
             });
             ml.run();
         }
