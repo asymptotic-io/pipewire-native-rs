@@ -75,6 +75,15 @@ fn test_mainloop(exec: MainLoopRun) {
     let mle = MainLoopEvents::new(Box::new(listener_callback));
     ml.add_listener(mle);
 
+    // Validate that our callbacks have not been called yet (should only happen on run())
+    let cb = CALLBACKS.lock().unwrap();
+    assert_eq!(cb.get(IO_CB), None);
+    assert_eq!(cb.get(EVENT_CB), None);
+    assert_eq!(cb.get(TIMER_CB), None);
+    assert_eq!(cb.get(IDLE_CB), None);
+    assert_eq!(cb.get(LISTENER_CB), None);
+    drop(cb);
+
     match exec {
         MainLoopRun::Run => {
             let ml_ = ml.clone();
