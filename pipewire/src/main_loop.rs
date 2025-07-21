@@ -214,11 +214,6 @@ impl MainLoop {
         }
     }
 
-    // TODO: Should this just move to Drop?
-    pub fn destroy(&self) {
-        self.inner.destroy();
-    }
-
     pub(crate) fn get_support(&self) -> LoopSupport {
         self.inner.support.clone()
     }
@@ -233,6 +228,12 @@ struct InnerMainLoop {
     #[allow(dead_code)]
     handles: Handles,
     hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
+}
+
+impl Drop for InnerMainLoop {
+    fn drop(&mut self) {
+        self.destroy();
+    }
 }
 
 impl InnerMainLoop {

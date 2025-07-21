@@ -122,8 +122,7 @@ fn test_mainloop(exec: MainLoopRun) {
     ml.destroy_source(event_src);
     ml.destroy_source(timer_src);
     ml.destroy_source(idle_src);
-
-    ml.destroy();
+    drop(ml);
 
     let mut cb = CALLBACKS.lock().unwrap();
     assert_eq!(cb.get(LISTENER_CB).unwrap(), &true);
