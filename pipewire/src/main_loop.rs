@@ -19,6 +19,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::support::LoopSupport;
 use crate::GLOBAL_SUPPORT;
+use crate::{debug, default_topic, log, trace};
+
+default_topic!(log::topic::MAIN_LOOP);
 
 pub struct MainLoopEvents {
     destroy: Box<dyn FnMut()>,
@@ -46,14 +49,18 @@ impl MainLoop {
             return None;
         };
 
+        debug!("Creating main loop");
+
         Some(MainLoop { inner: Arc::new(l) })
     }
 
     pub fn run(&self) {
+        debug!("run");
         InnerMainLoop::run(&self.inner);
     }
 
     pub fn quit(&self) {
+        debug!("quit");
         InnerMainLoop::quit(&self.inner);
     }
 
@@ -71,14 +78,17 @@ impl MainLoop {
     }
 
     pub fn enter(&self) {
+        trace!("enter");
         self.inner.support.loop_control.enter()
     }
 
     pub fn leave(&self) {
+        trace!("leave");
         self.inner.support.loop_control.leave()
     }
 
     pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<i32> {
+        trace!("iterate");
         self.inner.support.loop_control.iterate(timeout)
     }
 
@@ -87,10 +97,12 @@ impl MainLoop {
     }
 
     pub fn lock(&self) -> std::io::Result<i32> {
+        trace!("lock");
         self.inner.support.loop_control.lock()
     }
 
     pub fn unlock(&self) -> std::io::Result<i32> {
+        trace!("unlock");
         self.inner.support.loop_control.unlock()
     }
 
@@ -99,14 +111,17 @@ impl MainLoop {
     }
 
     pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<i32> {
+        debug!("wait");
         self.inner.support.loop_control.wait(abstime)
     }
 
     pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<i32> {
+        debug!("signal");
         self.inner.support.loop_control.signal(wait_for_accept)
     }
 
     pub fn accept(&self) -> std::io::Result<i32> {
+        debug!("accept");
         self.inner.support.loop_control.accept()
     }
 
@@ -142,6 +157,7 @@ impl MainLoop {
         source: &mut Pin<Box<LoopUtilsSource>>,
         enabled: bool,
     ) -> std::io::Result<i32> {
+        debug!("idle {enabled}");
         self.inner.support.loop_utils.enable_idle(source, enabled)
     }
 
@@ -186,6 +202,7 @@ impl MainLoop {
     }
 
     pub fn set_name(&mut self, name: &str) {
+        debug!("main loop name {name}");
         if let Some(inner) = Arc::get_mut(&mut self.inner) {
             inner.name = name.to_string()
         }

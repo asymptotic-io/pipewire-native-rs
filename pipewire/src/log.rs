@@ -28,10 +28,11 @@ pub(crate) mod topic {
 
     define_topic!(CONF, "pw.conf");
     define_topic!(CONTEXT, "pw.context");
+    define_topic!(MAIN_LOOP, "pw.main-loop");
     define_topic!(SUPPORT, "pw.support");
 
     pub fn init(levels: &[(String, spa::interface::log::LogLevel)]) {
-        for topic in [&CONF, &CONTEXT, &SUPPORT] {
+        for topic in [&CONF, &CONTEXT, &MAIN_LOOP, &SUPPORT] {
             // TODO: implement glob matching
             let pattern = levels.iter().find(|v| {
                 let stripped = &topic.0[0..topic.0.len() - 1];
