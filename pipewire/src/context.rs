@@ -5,7 +5,7 @@
 use std::{
     ffi::CStr,
     pin::Pin,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Weak},
 };
 
 use crate::{
@@ -23,13 +23,25 @@ use pipewire_native_spa::{
 
 default_topic!(log::topic::CONTEXT);
 
-#[allow(dead_code)]
+#[derive(Clone)]
 pub struct Context {
+    inner: Arc<InnerContext>,
+}
+
+#[derive(Clone)]
+pub(crate) struct WeakContext {
+    inner: Weak<InnerContext>,
+}
+
+struct InnerContext {
     main_loop: Arc<MainLoop>,
     properties: Properties,
     conf: Properties,
+    #[allow(dead_code)]
     system: Arc<Pin<Box<SystemImpl>>>,
+    #[allow(dead_code)]
     loop_: Arc<Pin<Box<LoopImpl>>>,
+    #[allow(dead_code)]
     loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
 }
 
@@ -48,6 +60,30 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 
 impl Context {
     pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
+        InnerContext::new(main_loop, properties).map(|inner| Context {
+            inner: Arc::new(inner),
+        })
+    }
+
+    pub(crate) fn downgrade(&self) -> WeakContext {
+        WeakContext {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
+    pub fn main_loop(&self) -> Arc<MainLoop> {
+        self.inner.main_loop.clone()
+    }
+}
+
+impl WeakContext {
+    pub fn upgrade(&self) -> Option<Context> {
+        self.inner.upgrade().map(|inner| Context { inner })
+    }
+}
+
+impl InnerContext {
+    fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
         // TODO: plugin loader interface
         let support = main_loop.get_support();
         let system = GLOBAL_SUPPORT
@@ -58,7 +94,7 @@ impl Context {
         let loop_ = support.loop_.clone();
         let loop_utils = support.loop_utils.clone();
 
-        let mut this = Context {
+        let mut this = InnerContext {
             main_loop,
             properties,
             conf: Properties::new(),
@@ -116,10 +152,6 @@ impl Context {
         // TODO: Expose settings
 
         Ok(this)
-    }
-
-    pub fn main_loop(&self) -> Arc<MainLoop> {
-        self.main_loop.clone()
     }
 
     fn load_conf(&mut self) -> std::io::Result<()> {
