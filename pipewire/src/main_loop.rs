@@ -5,36 +5,20 @@
 use pipewire_native_spa as spa;
 use spa::dict::Dict;
 use spa::flags;
-use spa::interface;
-use spa::interface::cpu::CpuImpl;
 use spa::interface::ffi::{CControlHooks, CHook};
-use spa::interface::log::{LogImpl, LogLevel};
 use spa::interface::r#loop::{
-    LoopControlImpl, LoopImpl, LoopUtilsImpl, LoopUtilsSource, SourceEventFn, SourceIdleFn,
-    SourceIoFn, SourceSignalFn, SourceTimerFn,
+    LoopUtilsSource, SourceEventFn, SourceIdleFn, SourceIoFn, SourceSignalFn, SourceTimerFn,
 };
-use spa::interface::system::SystemImpl;
-use spa::support::ffi;
 use spa::{emit_hook, hook::HookList};
 
 use std::os::fd::RawFd;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::{
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex};
 
-#[allow(dead_code)]
-struct Handles {
-    log_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
-    system_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
-    cpu_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
-    loop_handle: Box<dyn interface::plugin::Handle + Send + Sync>,
-    support: interface::Support,
-    plugin: ffi::plugin::Plugin,
-}
+use crate::support::LoopSupport;
+use crate::GLOBAL_SUPPORT;
 
 pub struct MainLoopEvents {
     destroy: Box<dyn FnMut()>,
@@ -52,14 +36,6 @@ unsafe impl Send for MainLoopEvents {}
 unsafe impl Sync for MainLoopEvents {}
 
 #[derive(Clone)]
-pub(crate) struct LoopSupport {
-    pub(crate) system: Arc<Pin<Box<SystemImpl>>>,
-    pub(crate) loop_: Arc<Pin<Box<LoopImpl>>>,
-    loop_control: Arc<Pin<Box<LoopControlImpl>>>,
-    pub(crate) loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
-}
-
-#[derive(Clone)]
 pub struct MainLoop {
     inner: Arc<InnerMainLoop>,
 }
@@ -70,9 +46,7 @@ impl MainLoop {
             return None;
         };
 
-        Some(MainLoop {
-            inner: Arc::new(l),
-        })
+        Some(MainLoop { inner: Arc::new(l) })
     }
 
     pub fn run(&self) {
@@ -201,7 +175,10 @@ impl MainLoop {
         signal_number: i32,
         func: Box<SourceSignalFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.support.loop_utils.add_signal(signal_number, func)
+        self.inner
+            .support
+            .loop_utils
+            .add_signal(signal_number, func)
     }
 
     pub fn destroy_source(&self, source: Pin<Box<LoopUtilsSource>>) {
@@ -225,8 +202,6 @@ struct InnerMainLoop {
     // thread (i.e. the one on which run() is called
     running: AtomicBool,
     name: String,
-    #[allow(dead_code)]
-    handles: Handles,
     hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
 }
 
@@ -238,38 +213,9 @@ impl Drop for InnerMainLoop {
 
 impl InnerMainLoop {
     pub fn new(props: &Dict) -> Option<InnerMainLoop> {
-        let (mut support, plugin) = get_support();
-
-        let log_handle = setup_log(&mut support, &plugin);
-        let system_handle = setup_system(&mut support, &plugin);
-        let cpu_handle = setup_cpu(&mut support, &plugin);
-        let loop_handle = setup_loop(&mut support, &plugin);
-
-        setup_loop_ctrl(&mut support, &loop_handle);
-        setup_loop_utils(&mut support, &loop_handle);
-
-        let Some(system) =
-            support.get_interface::<interface::system::SystemImpl>(interface::SYSTEM)
-        else {
-            return None;
-        };
-
-        let Some(loop_) = support.get_interface::<interface::r#loop::LoopImpl>(interface::LOOP)
-        else {
-            return None;
-        };
-
-        let Some(loop_utils) =
-            support.get_interface::<interface::r#loop::LoopUtilsImpl>(interface::LOOP_UTILS)
-        else {
-            return None;
-        };
-
-        let Some(loop_control) = support
-            .get_interface::<interface::r#loop::LoopControlImpl>(interface::LOOP_CONTROL)
-        else {
-            return None;
-        };
+        let support = GLOBAL_SUPPORT
+            .get()
+            .expect("Global support should be initialised");
 
         let name = if let Some(n) = props.lookup("loop.name") {
             n.to_string()
@@ -277,25 +223,10 @@ impl InnerMainLoop {
             "main.loop".to_string()
         };
 
-        let handles = Handles {
-            log_handle,
-            system_handle,
-            cpu_handle,
-            loop_handle,
-            support,
-            plugin,
-        };
-
         Some(InnerMainLoop {
-            support: LoopSupport {
-                system,
-                loop_,
-                loop_control,
-                loop_utils,
-            },
+            support: support.loop_().clone(),
             running: AtomicBool::new(false),
             name,
-            handles,
             hooks: HookList::new(),
         })
     }
@@ -305,14 +236,22 @@ impl InnerMainLoop {
     }
 
     fn run(this: &Arc<Self>) {
-        if this.running.compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed).is_err() {
+        if this
+            .running
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+        {
             return;
         }
 
         this.support.loop_control.enter();
 
         while this.running.load(Ordering::Relaxed) {
-            if let Err(res) = this.support.loop_control.iterate(Some(std::time::Duration::MAX)) {
+            if let Err(res) = this
+                .support
+                .loop_control
+                .iterate(Some(std::time::Duration::MAX))
+            {
                 if res.kind() == std::io::ErrorKind::Interrupted {
                     continue;
                 }
@@ -332,182 +271,4 @@ impl InnerMainLoop {
 
         let _ = this.support.loop_.invoke(1, &[], false, Box::new(stop));
     }
-}
-
-fn get_support() -> (interface::Support, ffi::plugin::Plugin) {
-    let plugin_path = std::env::var("SPA_PLUGIN_PATH")
-        .unwrap_or("/usr/lib64/spa-0.2/support/libspa-support.so".to_string());
-
-    let plugin =
-        ffi::plugin::load(&PathBuf::from(plugin_path)).expect("Plugin loading should not fail");
-
-    let support = interface::Support::new();
-
-    (support, plugin)
-}
-
-fn setup_log(
-    support: &mut interface::Support,
-    plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle + Send + Sync> {
-    let log_factory = plugin
-        .find_factory(interface::plugin::LOG_FACTORY)
-        .expect("Should find log factory");
-
-    assert!(log_factory.info().is_none());
-
-    let interfaces = log_factory.enum_interface_info();
-    assert_eq!(interfaces.len(), 1);
-
-    let log_handle = log_factory
-        .init(
-            Some(Dict::new(vec![
-                ("log.timestamp".to_string(), "local".to_string()),
-                ("log.level".to_string(), "7".to_string()),
-                ("log.line".to_string(), true.to_string()),
-            ])),
-            support,
-        )
-        .expect("Log factory loading should succeed");
-
-    let log_iface = log_handle
-        .get_interface(interface::LOG)
-        .expect("Log factory should produce an interface");
-
-    let log = log_iface
-        .downcast_box::<LogImpl>()
-        .expect("Log interface should be a LogImpl");
-
-    let log_topic = interface::log::LogTopic {
-        topic: c"test.topic",
-        level: LogLevel::Debug,
-        has_custom_level: true,
-    };
-
-    log.logt(
-        LogLevel::Error,
-        &log_topic,
-        c"file_name.rs",
-        123,
-        c"function_name",
-        format_args!("log test: {}", "some format"),
-    );
-
-    support.add_interface(interface::LOG, log);
-
-    log_handle
-}
-
-fn setup_system(
-    support: &mut interface::Support,
-    plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle + Send + Sync> {
-    let system_factory = plugin
-        .find_factory(interface::plugin::SYSTEM_FACTORY)
-        .expect("Should find system factory");
-
-    let interfaces = system_factory.enum_interface_info();
-    assert_eq!(interfaces.len(), 1);
-
-    let system_handle = system_factory
-        .init(None, support)
-        .expect("System factory loading should succeed");
-
-    let system_iface = system_handle
-        .get_interface(interface::SYSTEM)
-        .expect("System factory should produce an interface");
-
-    let system = system_iface
-        .downcast_box::<SystemImpl>()
-        .expect("System interface should be a SystemImpl");
-
-    support.add_interface(interface::SYSTEM, system);
-
-    system_handle
-}
-
-fn setup_cpu(
-    support: &mut interface::Support,
-    plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle + Send + Sync> {
-    let cpu_factory = plugin
-        .find_factory(interface::plugin::CPU_FACTORY)
-        .expect("Should find cpu factory");
-
-    let interfaces = cpu_factory.enum_interface_info();
-    assert_eq!(interfaces.len(), 1);
-
-    let cpu_handle = cpu_factory
-        .init(None, support)
-        .expect("CPU factory loading should succeed");
-
-    let cpu_iface = cpu_handle
-        .get_interface(interface::CPU)
-        .expect("CPU factory should produce an interface");
-
-    let cpu = cpu_iface
-        .downcast_box::<CpuImpl>()
-        .expect("CPU interface should be a CpuImpl");
-
-    support.add_interface(interface::CPU, cpu);
-
-    cpu_handle
-}
-
-fn setup_loop(
-    support: &mut interface::Support,
-    plugin: &ffi::plugin::Plugin,
-) -> Box<dyn interface::plugin::Handle + Send + Sync> {
-    let loop_factory = plugin
-        .find_factory(interface::plugin::LOOP_FACTORY)
-        .expect("Should find loop factory");
-
-    let interfaces = loop_factory.enum_interface_info();
-    assert_eq!(interfaces.len(), 3);
-
-    let loop_handle = loop_factory
-        .init(None, support)
-        .expect("Loop factory loading should succeed");
-
-    let loop_iface = loop_handle
-        .get_interface(interface::LOOP)
-        .expect("Loop factory should produce an interface");
-
-    let r#loop = loop_iface
-        .downcast_box::<LoopImpl>()
-        .expect("Loop interface should be a LoopImpl");
-
-    support.add_interface(interface::LOOP, r#loop);
-
-    loop_handle
-}
-
-fn setup_loop_ctrl(
-    support: &mut interface::Support,
-    loop_handle: &Box<dyn interface::plugin::Handle + Send + Sync>,
-) {
-    let loop_ctrl_iface = loop_handle
-        .get_interface(interface::LOOP_CONTROL)
-        .expect("Loop factory should produce control interface");
-
-    let loop_ctrl = loop_ctrl_iface
-        .downcast_box::<LoopControlImpl>()
-        .expect("Loop control interface should be LoopControlImpl");
-
-    support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
-}
-
-fn setup_loop_utils(
-    support: &mut interface::Support,
-    loop_handle: &Box<dyn interface::plugin::Handle + Send + Sync>,
-) {
-    let loop_utils_iface = loop_handle
-        .get_interface(interface::LOOP_UTILS)
-        .expect("Loop factory should produce utils interface");
-
-    let loop_utils = loop_utils_iface
-        .downcast_box::<LoopUtilsImpl>()
-        .expect("Loop utils interface should be LoopUtilsImpl");
-
-    support.add_interface(interface::LOOP_UTILS, loop_utils);
 }

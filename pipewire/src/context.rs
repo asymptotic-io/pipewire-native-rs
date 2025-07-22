@@ -8,7 +8,10 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use crate::{conf, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties};
+use crate::{
+    conf, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties,
+    GLOBAL_SUPPORT,
+};
 
 use pipewire_native_spa::{
     self as spa,
@@ -47,7 +50,11 @@ impl Context {
     pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
         // TODO: plugin loader interface
         let support = main_loop.get_support();
-        let system = support.system.clone();
+        let system = GLOBAL_SUPPORT
+            .get()
+            .expect("Global support should be initialised")
+            .system()
+            .clone();
         let loop_ = support.loop_.clone();
         let loop_utils = support.loop_utils.clone();
 

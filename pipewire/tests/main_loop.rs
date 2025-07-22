@@ -29,6 +29,8 @@ enum MainLoopRun {
 }
 
 fn test_mainloop(exec: MainLoopRun) {
+    pipewire_native::init();
+
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
     let ml = MainLoop::new(&Dict::new(v)).unwrap();
 

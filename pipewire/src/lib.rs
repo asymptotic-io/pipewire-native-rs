@@ -62,9 +62,9 @@ pub fn init() {
 
         // TODO: Check for/load the systemd logger if PIPEWIRE_SYSTEMD is set
         support
-            .load_interface(
+            .load_interfaces(
                 spa::interface::plugin::LOG_FACTORY,
-                spa::interface::LOG,
+                &[spa::interface::LOG],
                 Some(&log_info),
             )
             .expect("failed to load log interface");
@@ -79,9 +79,9 @@ pub fn init() {
         });
 
         support
-            .load_interface(
+            .load_interfaces(
                 spa::interface::plugin::CPU_FACTORY,
-                spa::interface::CPU,
+                &[spa::interface::CPU],
                 Some(&cpu_info),
             )
             .expect("failed to load CPU interface");
@@ -89,6 +89,29 @@ pub fn init() {
         support.init_log();
 
         // TODO: Load i18n interface
+
+        support
+            .load_interfaces(
+                spa::interface::plugin::SYSTEM_FACTORY,
+                &[spa::interface::SYSTEM],
+                None,
+            )
+            .expect("failed to load system interface");
+        support.init_system();
+
+        support
+            .load_interfaces(
+                spa::interface::plugin::LOOP_FACTORY,
+                &[
+                    spa::interface::LOOP,
+                    spa::interface::LOOP_UTILS,
+                    spa::interface::LOOP_CONTROL,
+                ],
+                None,
+            )
+            .expect("failed to load loop interface");
+        support.init_loop();
+
         support
     });
 }
