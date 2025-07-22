@@ -100,18 +100,5 @@ pub fn init() {
         support.init_system();
 
         support
-            .load_interfaces(
-                spa::interface::plugin::LOOP_FACTORY,
-                &[
-                    spa::interface::LOOP,
-                    spa::interface::LOOP_UTILS,
-                    spa::interface::LOOP_CONTROL,
-                ],
-                None,
-            )
-            .expect("failed to load loop interface");
-        support.init_loop();
-
-        support
     });
 }

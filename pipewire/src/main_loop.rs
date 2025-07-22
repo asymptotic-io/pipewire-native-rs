@@ -17,7 +17,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use crate::support::LoopSupport;
 use crate::GLOBAL_SUPPORT;
 use crate::{debug, default_topic, log, trace};
 
@@ -37,6 +36,15 @@ impl MainLoopEvents {
 
 unsafe impl Send for MainLoopEvents {}
 unsafe impl Sync for MainLoopEvents {}
+
+#[derive(Clone)]
+pub(crate) struct LoopSupport {
+    #[allow(dead_code)]
+    handle: Arc<Box<dyn spa::interface::plugin::Handle + Send + Sync>>,
+    pub(crate) loop_: Arc<Pin<Box<spa::interface::r#loop::LoopImpl>>>,
+    pub(crate) loop_utils: Arc<Pin<Box<spa::interface::r#loop::LoopUtilsImpl>>>,
+    pub(crate) loop_control: Arc<Pin<Box<spa::interface::r#loop::LoopControlImpl>>>,
+}
 
 #[derive(Clone)]
 pub struct MainLoop {
@@ -234,6 +242,30 @@ impl InnerMainLoop {
             .get()
             .expect("Global support should be initialised");
 
+        let handle = support
+            .load_spa_handle(None, spa::interface::plugin::LOOP_FACTORY, None)
+            .ok()?;
+
+        let loop_ = handle.get_interface(spa::interface::LOOP).and_then(|i| {
+            Arc::new(Box::into_pin(i))
+                .downcast_arc_pin_box::<spa::interface::r#loop::LoopImpl>()
+                .ok()
+        })?;
+        let loop_utils = handle
+            .get_interface(spa::interface::LOOP_UTILS)
+            .and_then(|i| {
+                Arc::new(Box::into_pin(i))
+                    .downcast_arc_pin_box::<spa::interface::r#loop::LoopUtilsImpl>()
+                    .ok()
+            })?;
+        let loop_control = handle
+            .get_interface(spa::interface::LOOP_CONTROL)
+            .and_then(|i| {
+                Arc::new(Box::into_pin(i))
+                    .downcast_arc_pin_box::<spa::interface::r#loop::LoopControlImpl>()
+                    .ok()
+            })?;
+
         let name = if let Some(n) = props.lookup("loop.name") {
             n.to_string()
         } else {
@@ -241,7 +273,12 @@ impl InnerMainLoop {
         };
 
         Some(InnerMainLoop {
-            support: support.loop_().clone(),
+            support: LoopSupport {
+                handle: Arc::new(handle),
+                loop_,
+                loop_utils,
+                loop_control,
+            },
             running: AtomicBool::new(false),
             name,
             hooks: HookList::new(),

@@ -12,13 +12,6 @@ use pipewire_native_spa as spa;
 use crate::properties::Properties;
 use crate::utils;
 
-#[derive(Clone)]
-pub(crate) struct LoopSupport {
-    pub(crate) loop_: Arc<Pin<Box<spa::interface::r#loop::LoopImpl>>>,
-    pub(crate) loop_utils: Arc<Pin<Box<spa::interface::r#loop::LoopUtilsImpl>>>,
-    pub(crate) loop_control: Arc<Pin<Box<spa::interface::r#loop::LoopControlImpl>>>,
-}
-
 pub(crate) struct Support {
     // TODO: Implement when we have unload_spa_handle()
     _do_dlclose: bool,
@@ -31,7 +24,6 @@ pub(crate) struct Support {
     inner: Mutex<Inner>,
     log: Option<Arc<Pin<Box<spa::interface::log::LogImpl>>>>,
     system: Option<Arc<Pin<Box<spa::interface::system::SystemImpl>>>>,
-    loop_: Option<LoopSupport>,
 }
 
 struct Inner {
@@ -69,7 +61,6 @@ impl Support {
             }),
             log: None,
             system: None,
-            loop_: None,
         }
     }
 
@@ -90,32 +81,6 @@ impl Support {
             self.system = inner
                 .support
                 .get_interface::<spa::interface::system::SystemImpl>(spa::interface::SYSTEM);
-        }
-    }
-
-    pub(super) fn init_loop(&mut self) {
-        let inner = self.inner.lock().unwrap();
-
-        if self.loop_.is_none() {
-            let loop_ = inner
-                .support
-                .get_interface::<spa::interface::r#loop::LoopImpl>(spa::interface::LOOP)
-                .expect("Loop interface should be available");
-            let loop_utils = inner
-                .support
-                .get_interface::<spa::interface::r#loop::LoopUtilsImpl>(spa::interface::LOOP_UTILS)
-                .expect("Loop utils interface should be available");
-            let loop_control = inner
-                .support
-                .get_interface::<spa::interface::r#loop::LoopControlImpl>(
-                    spa::interface::LOOP_CONTROL,
-                )
-                .expect("Loop control interface should be available");
-            self.loop_ = Some(LoopSupport {
-                loop_,
-                loop_utils,
-                loop_control,
-            });
         }
     }
 
@@ -140,18 +105,12 @@ impl Support {
             .expect("System interface should be initialized")
     }
 
-    pub fn loop_(&self) -> &LoopSupport {
-        self.loop_
-            .as_ref()
-            .expect("Loop interface should be initialized")
-    }
-
     pub fn load_spa_handle(
-        &mut self,
+        &self,
         lib: Option<&str>,
         factory_name: &str,
         info: Option<&Properties>,
-    ) -> std::io::Result<Box<dyn spa::interface::plugin::Handle>> {
+    ) -> std::io::Result<Box<dyn spa::interface::plugin::Handle + Send + Sync>> {
         let mut inner = self.inner.lock().unwrap();
         let lib = lib.unwrap_or(&self.support_lib);
 
