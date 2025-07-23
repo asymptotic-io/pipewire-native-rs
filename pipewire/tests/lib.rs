@@ -4,7 +4,9 @@
 
 use std::sync::Arc;
 
-use pipewire_native::{self as pipewire, main_loop::MainLoop, properties::Properties};
+use pipewire_native::{
+    self as pipewire, context::Context, main_loop::MainLoop, properties::Properties,
+};
 use pipewire_native_spa::dict::Dict;
 
 #[test]
@@ -14,7 +16,10 @@ fn test_lib() {
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
     let ml = MainLoop::new(&Dict::new(v)).unwrap();
 
-    let context = pipewire::context::Context::new(Arc::new(ml), Properties::new());
+    let mut context =
+        Context::new(Arc::new(ml), Properties::new()).expect("Context creation should not fail");
 
-    assert!(context.is_ok());
+    let core = context.connect(None);
+
+    assert!(core.is_ok());
 }

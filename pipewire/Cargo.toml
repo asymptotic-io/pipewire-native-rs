@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2.172"
+paste = "1.0.15"
 pipewire-native-macros = { path = "../macros" }
 pipewire-native-spa = { path = "../spa" }
 tinyjson = "2.5.1"

@@ -149,4 +149,10 @@ impl Properties {
             self.set(k, v.to_string());
         }
     }
+
+    pub fn add_dict(&mut self, dict: &Dict) {
+        for (k, v) in dict.items() {
+            self.set(k, v.to_string());
+        }
+    }
 }

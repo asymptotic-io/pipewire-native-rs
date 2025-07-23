@@ -11,10 +11,13 @@ use support::Support;
 
 pub mod conf;
 pub mod context;
+pub mod core;
 pub mod keys;
 pub mod log;
 pub mod main_loop;
 pub mod properties;
+mod protocol;
+pub mod proxy;
 
 mod support;
 mod utils;
@@ -101,4 +104,68 @@ pub fn init() {
 
         support
     });
+}
+
+pub(crate) trait Refcounted {
+    type WeakRef;
+
+    fn upgrade(this: &Self::WeakRef) -> Option<Self>
+    where
+        Self: Sized;
+    fn downgrade(&self) -> Self::WeakRef;
+}
+
+#[macro_export]
+macro_rules! refcounted {
+    (
+        // FIXME: This will fail if we add additional generic parameters
+        $(#[$(attrs:meta)+])?
+        $visibility:vis struct $name:ident $(<$generic:ident $(: $bound:ty)?>)? {
+            $($body:tt)*
+        }
+    ) => {
+        paste::paste! {
+            #[allow(private_bounds)]
+            #[derive(Clone)]
+            $visibility struct $name $(<$generic $(: $bound)?>)? {
+                inner: Rc<[<Inner $name>] $(<$generic>)?>,
+            }
+
+            #[derive(Clone)]
+            pub(crate) struct [<Weak $name>] $(<$generic $(: $bound)?>)? {
+                inner: Weak<[<Inner $name>] $(<$generic>)?>,
+            }
+
+            #[allow(private_bounds)]
+            impl $(<$generic $(: $bound)?>)? $name $(<$generic>)? {
+                pub(crate) fn downgrade(&self) -> [<Weak $name>] $(<$generic>)? {
+                    [<Weak $name>] {
+                        inner: Rc::downgrade(&self.inner),
+                    }
+                }
+            }
+
+            impl $(<$generic $(: $bound)?>)? [<Weak $name>] $(<$generic>)? {
+                pub(crate) fn upgrade(&self) -> Option<$name $(<$generic>)?> {
+                    self.inner.upgrade().map(|inner| $name { inner })
+                }
+            }
+
+            impl $(<$generic $(: $bound)?>)? crate::Refcounted for $name $(<$generic>)? {
+                type WeakRef = [<Weak $name>] $(<$generic>)?;
+
+                fn upgrade(this: &Self::WeakRef) -> Option<Self> {
+                    this.upgrade()
+                }
+
+                fn downgrade(&self) -> Self::WeakRef {
+                    self.downgrade()
+                }
+            }
+
+            struct [<Inner $name>] $(<$generic $(: $bound)?>)? {
+                $($body)*
+            }
+        }
+    }
 }

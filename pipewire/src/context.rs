@@ -5,12 +5,13 @@
 use std::{
     ffi::CStr,
     pin::Pin,
-    sync::{Arc, LazyLock, Weak},
+    rc::{Rc, Weak},
+    sync::{Arc, LazyLock},
 };
 
 use crate::{
-    conf, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties,
-    GLOBAL_SUPPORT,
+    conf, core::Core, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties,
+    protocol::Protocol, refcounted, GLOBAL_SUPPORT,
 };
 
 use pipewire_native_spa::{
@@ -23,26 +24,20 @@ use pipewire_native_spa::{
 
 default_topic!(log::topic::CONTEXT);
 
-#[derive(Clone)]
-pub struct Context {
-    inner: Arc<InnerContext>,
-}
-
-#[derive(Clone)]
-pub(crate) struct WeakContext {
-    inner: Weak<InnerContext>,
-}
-
-struct InnerContext {
-    main_loop: Arc<MainLoop>,
-    properties: Properties,
-    conf: Properties,
-    #[allow(dead_code)]
-    system: Arc<Pin<Box<SystemImpl>>>,
-    #[allow(dead_code)]
-    loop_: Arc<Pin<Box<LoopImpl>>>,
-    #[allow(dead_code)]
-    loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
+refcounted! {
+    pub struct Context {
+        main_loop: Arc<MainLoop>,
+        properties: Properties,
+        conf: Properties,
+        // In the C implementation, this is a list, but in practice there is only native-protocol
+        protocol: Protocol,
+        #[allow(dead_code)]
+        system: Arc<Pin<Box<SystemImpl>>>,
+        #[allow(dead_code)]
+        loop_: Arc<Pin<Box<LoopImpl>>>,
+        #[allow(dead_code)]
+        loop_utils: Arc<Pin<Box<LoopUtilsImpl>>>,
+    }
 }
 
 static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
@@ -60,25 +55,33 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 
 impl Context {
     pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
-        InnerContext::new(main_loop, properties).map(|inner| Context {
-            inner: Arc::new(inner),
-        })
-    }
+        let inner = InnerContext::new(main_loop, properties)?;
+        let context = Context {
+            inner: Rc::new(inner),
+        };
 
-    pub(crate) fn downgrade(&self) -> WeakContext {
-        WeakContext {
-            inner: Arc::downgrade(&self.inner),
-        }
+        // Provide (weak) reference to inner descendants that need it
+        context.inner.protocol.set_context(context.downgrade());
+
+        Ok(context)
     }
 
     pub fn main_loop(&self) -> Arc<MainLoop> {
         self.inner.main_loop.clone()
     }
-}
 
-impl WeakContext {
-    pub fn upgrade(&self) -> Option<Context> {
-        self.inner.upgrade().map(|inner| Context { inner })
+    pub fn properties(&self) -> &Properties {
+        &self.inner.properties
+    }
+
+    pub(crate) fn protocol(&self) -> &Protocol {
+        &self.inner.protocol
+    }
+
+    pub fn connect(&self, properties: Option<Properties>) -> std::io::Result<Core> {
+        let core = Core::new(self, properties.unwrap_or(Properties::new()));
+
+        Ok(core)
     }
 }
 
@@ -98,6 +101,7 @@ impl InnerContext {
             main_loop,
             properties,
             conf: Properties::new(),
+            protocol: Protocol::new("protocol-native"),
             system,
             loop_,
             loop_utils,
@@ -145,7 +149,7 @@ impl InnerContext {
 
         // TODO: D-Bus...
 
-        // TODO: Create core and register
+        // TODO: Create impl core and register
 
         // TODO: Start data loops
 
