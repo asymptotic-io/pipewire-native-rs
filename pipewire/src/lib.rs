@@ -118,41 +118,41 @@ pub(crate) trait Refcounted {
 #[macro_export]
 macro_rules! refcounted {
     (
-        // FIXME: This will fail if we add additional generic parameters
+        // FIXME: bounds can be non-types, so we probably need something that munches tts
         $(#[$(attrs:meta)+])?
-        $visibility:vis struct $name:ident $(<$generic:ident $(: $bound:ty)?>)? {
+        $visibility:vis struct $name:ident $(<$($generic:ident $(: $bound:ty)?),*>)? {
             $($body:tt)*
         }
     ) => {
         paste::paste! {
             #[allow(private_bounds)]
             #[derive(Clone)]
-            $visibility struct $name $(<$generic $(: $bound)?>)? {
-                inner: Rc<[<Inner $name>] $(<$generic>)?>,
+            $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
+                inner: Rc<[<Inner $name>] $(<$($generic),*>)?>,
             }
 
             #[derive(Clone)]
-            pub(crate) struct [<Weak $name>] $(<$generic $(: $bound)?>)? {
-                inner: Weak<[<Inner $name>] $(<$generic>)?>,
+            pub(crate) struct [<Weak $name>] $(<$($generic $(: $bound)?),*>)? {
+                inner: Weak<[<Inner $name>] $(<$($generic>)?),*>,
             }
 
             #[allow(private_bounds)]
-            impl $(<$generic $(: $bound)?>)? $name $(<$generic>)? {
-                pub(crate) fn downgrade(&self) -> [<Weak $name>] $(<$generic>)? {
+            impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
+                pub(crate) fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
                         inner: Rc::downgrade(&self.inner),
                     }
                 }
             }
 
-            impl $(<$generic $(: $bound)?>)? [<Weak $name>] $(<$generic>)? {
-                pub(crate) fn upgrade(&self) -> Option<$name $(<$generic>)?> {
+            impl $(<$($generic $(: $bound)?),*>)? [<Weak $name>] $(<$($generic),*>)? {
+                pub(crate) fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
                     self.inner.upgrade().map(|inner| $name { inner })
                 }
             }
 
-            impl $(<$generic $(: $bound)?>)? crate::Refcounted for $name $(<$generic>)? {
-                type WeakRef = [<Weak $name>] $(<$generic>)?;
+            impl $(<$($generic $(: $bound)?),*>)? crate::Refcounted for $name $(<$($generic),*>)? {
+                type WeakRef = [<Weak $name>] $(<$($generic),*>)?;
 
                 fn upgrade(this: &Self::WeakRef) -> Option<Self> {
                     this.upgrade()
@@ -163,7 +163,7 @@ macro_rules! refcounted {
                 }
             }
 
-            struct [<Inner $name>] $(<$generic $(: $bound)?>)? {
+            struct [<Inner $name>] $(<$($generic $(: $bound)?),*>)? {
                 $($body)*
             }
         }
