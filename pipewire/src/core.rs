@@ -14,8 +14,8 @@ use crate::{
     log,
     properties::Properties,
     protocol::client::Client,
-    proxy::Proxy,
-    refcounted, types, Id,
+    proxy::{HasProxy, Proxy},
+    refcounted, types,
 };
 
 default_topic!(log::topic::CORE);
@@ -25,7 +25,8 @@ refcounted! {
         context: WeakContext,
         properties: Properties,
         client: Client,
-        proxies: RefCell<IdMap<Box<dyn Proxy>>>,
+        proxy: RefCell<Option<Proxy<Core>>>,
+        proxies: RefCell<IdMap<Box<dyn HasProxy>>>,
     }
 }
 
@@ -37,12 +38,16 @@ impl Core {
 
         // Reserve id 0 because we are id 0
         let _ = this.inner.proxies.borrow_mut().reserve();
+        this.inner
+            .proxy
+            .borrow_mut()
+            .replace(Proxy::new_weak(0, &this));
 
         this
     }
 }
 
-impl Proxy for Core {
+impl HasProxy for Core {
     fn type_() -> types::ObjectType {
         types::interface::CORE
     }
@@ -51,9 +56,13 @@ impl Proxy for Core {
         4
     }
 
-    fn id(&self) -> Id {
-        // Can id ever be non-zero for Core?
-        0
+    fn proxy(&self) -> Proxy<Self> {
+        self.inner
+            .proxy
+            .borrow()
+            .as_ref()
+            .expect("Proxy should be initialised")
+            .clone()
     }
 }
 
@@ -73,6 +82,7 @@ impl InnerCore {
             context: context.downgrade(),
             properties,
             client,
+            proxy: RefCell::new(None),
             proxies: RefCell::new(IdMap::new()),
         }
     }

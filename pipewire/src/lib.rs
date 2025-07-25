@@ -111,7 +111,7 @@ pub fn init() {
     });
 }
 
-pub(crate) trait Refcounted {
+pub trait Refcounted: Clone {
     type WeakRef;
 
     fn upgrade(this: &Self::WeakRef) -> Option<Self>
@@ -130,20 +130,18 @@ macro_rules! refcounted {
         }
     ) => {
         paste::paste! {
-            #[allow(private_bounds)]
             #[derive(Clone)]
             $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
                 inner: Rc<[<Inner $name>] $(<$($generic),*>)?>,
             }
 
             #[derive(Clone)]
-            pub(crate) struct [<Weak $name>] $(<$($generic $(: $bound)?),*>)? {
+            pub struct [<Weak $name>] $(<$($generic $(: $bound)?),*>)? {
                 inner: Weak<[<Inner $name>] $(<$($generic>)?),*>,
             }
 
-            #[allow(private_bounds)]
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
-                pub(crate) fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
+                pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
                         inner: Rc::downgrade(&self.inner),
                     }
@@ -151,7 +149,7 @@ macro_rules! refcounted {
             }
 
             impl $(<$($generic $(: $bound)?),*>)? [<Weak $name>] $(<$($generic),*>)? {
-                pub(crate) fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
+                pub fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
                     self.inner.upgrade().map(|inner| $name { inner })
                 }
             }
