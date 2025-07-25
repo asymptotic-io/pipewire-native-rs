@@ -19,6 +19,10 @@ impl<T: Refcounted> Proxy<T> {
             inner: Rc::new(InnerProxy::<T>::new(object)),
         }
     }
+
+    pub fn object(&self) -> Option<T> {
+        <T as Refcounted>::upgrade(&self.inner.object)
+    }
 }
 
 impl<T: Refcounted> InnerProxy<T> {
