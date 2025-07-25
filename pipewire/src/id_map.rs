@@ -7,8 +7,34 @@ use crate::Id;
 // Mirrors pw_map and provides a compacted list to hold objects (with indices mapping to those
 // objects' ids.
 pub(crate) struct IdMap<T> {
-    objects: Vec<Option<T>>,
+    objects: Vec<Item<T>>,
     // TODO: optimise by retaining lowest free position?
+}
+
+// A tristate representing one of:
+//   - Empty: for a slot that was occupied but is not
+//   - Reserved: for a slot that has been reserved pending a value
+//   - Occupied: for a slot that has a value
+enum Item<T> {
+    Empty,
+    Reserved,
+    Occupied(T),
+}
+
+impl<T> Item<T> {
+    fn is_empty(&self) -> bool {
+        match self {
+            Item::Empty => true,
+            _ => false,
+        }
+    }
+
+    fn as_ref(&self) -> Option<&T> {
+        match self {
+            Item::Occupied(ref object) => Some(object),
+            _ => None,
+        }
+    }
 }
 
 impl<T> IdMap<T> {
@@ -19,13 +45,25 @@ impl<T> IdMap<T> {
     }
 
     pub(crate) fn insert(&mut self, object: T) -> Id {
-        let item = self.objects.iter().enumerate().find(|(_, o)| o.is_none());
+        let item = self.objects.iter().enumerate().find(|(_, o)| o.is_empty());
 
         if let Some((id, _)) = item {
-            self.objects[id] = Some(object);
+            self.objects[id] = Item::Occupied(object);
             id as Id
         } else {
-            self.objects.push(Some(object));
+            self.objects.push(Item::Occupied(object));
+            (self.objects.len() - 1) as Id
+        }
+    }
+
+    pub(crate) fn reserve(&mut self) -> Id {
+        let item = self.objects.iter().enumerate().find(|(_, o)| o.is_empty());
+
+        if let Some((id, _)) = item {
+            self.objects[id] = Item::Reserved;
+            id as Id
+        } else {
+            self.objects.push(Item::Reserved);
             (self.objects.len() - 1) as Id
         }
     }
@@ -35,7 +73,7 @@ impl<T> IdMap<T> {
             return;
         }
 
-        self.objects[id as usize] = None;
+        self.objects[id as usize] = Item::Empty;
     }
 
     pub(crate) fn get(&self, id: Id) -> Option<&T> {
@@ -76,9 +114,11 @@ fn test_id_map() {
 
     assert_eq!(map.get(0), Some(&2));
     assert_eq!(map.get(1), Some(&1));
+    assert_eq!(map.reserve(), 2);
 
     map.remove(1);
 
     assert_eq!(map.get(0), Some(&2));
     assert_eq!(map.get(1), None);
+    assert_eq!(map.get(2), None);
 }
