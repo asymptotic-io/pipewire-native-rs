@@ -9,11 +9,13 @@ use std::{
 
 use crate::{
     context::{Context, WeakContext},
-    debug, default_topic, log,
+    debug, default_topic,
+    id_map::IdMap,
+    log,
     properties::Properties,
     protocol::client::Client,
     proxy::Proxy,
-    refcounted,
+    refcounted, types, Id,
 };
 
 default_topic!(log::topic::CORE);
@@ -23,7 +25,7 @@ refcounted! {
         context: WeakContext,
         properties: Properties,
         client: Client,
-        proxy: RefCell<Option<Proxy<Core>>>,
+        proxies: RefCell<IdMap<Box<dyn Proxy>>>,
     }
 }
 
@@ -33,9 +35,25 @@ impl Core {
             inner: Rc::new(InnerCore::new(context, properties)),
         };
 
-        this.inner.proxy.borrow_mut().replace(Proxy::new(&this));
+        // Reserve id 0 because we are id 0
+        let _ = this.inner.proxies.borrow_mut().reserve();
 
         this
+    }
+}
+
+impl Proxy for Core {
+    fn type_() -> types::ObjectType {
+        types::interface::CORE
+    }
+
+    fn version() -> u32 {
+        4
+    }
+
+    fn id(&self) -> Id {
+        // Can id ever be non-zero for Core?
+        0
     }
 }
 
@@ -55,7 +73,7 @@ impl InnerCore {
             context: context.downgrade(),
             properties,
             client,
-            proxy: RefCell::new(None),
+            proxies: RefCell::new(IdMap::new()),
         }
     }
 }

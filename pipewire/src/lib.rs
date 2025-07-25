@@ -19,6 +19,7 @@ pub mod main_loop;
 pub mod properties;
 mod protocol;
 pub mod proxy;
+pub mod types;
 
 mod support;
 mod utils;
