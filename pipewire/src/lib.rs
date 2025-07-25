@@ -12,6 +12,7 @@ use support::Support;
 pub mod conf;
 pub mod context;
 pub mod core;
+mod id_map;
 pub mod keys;
 pub mod log;
 pub mod main_loop;
@@ -21,6 +22,8 @@ pub mod proxy;
 
 mod support;
 mod utils;
+
+pub type Id = u32;
 
 pub(crate) static GLOBAL_SUPPORT: OnceLock<Support> = OnceLock::new();
 
