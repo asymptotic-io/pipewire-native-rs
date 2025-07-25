@@ -25,6 +25,7 @@ mod support;
 mod utils;
 
 pub type Id = u32;
+pub const INVALID_ID: Id = Id::MAX;
 
 pub(crate) static GLOBAL_SUPPORT: OnceLock<Support> = OnceLock::new();
 
