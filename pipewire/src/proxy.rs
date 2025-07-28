@@ -81,6 +81,7 @@ impl<T: Refcounted> Proxy<T> {
 
     pub(crate) fn set_bound_id(&self, id: Id) {
         self.inner.bound_id.replace(id);
+        spa::emit_hook!(self.inner.hooks, bound, id);
     }
 }
 
