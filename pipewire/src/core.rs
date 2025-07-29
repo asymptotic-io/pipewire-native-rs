@@ -8,12 +8,13 @@ use std::{
 };
 
 use crate::{
+    client::Client,
     context::{Context, WeakContext},
     debug, default_topic,
     id_map::IdMap,
     log,
     properties::Properties,
-    protocol::client::Client,
+    protocol,
     proxy::{HasProxy, Proxy},
     refcounted, types,
 };
@@ -24,7 +25,7 @@ refcounted! {
     pub struct Core {
         context: WeakContext,
         properties: Properties,
-        client: Client,
+        client: protocol::client::Client,
         proxy: RefCell<Option<Proxy<Core>>>,
         proxies: RefCell<IdMap<Box<dyn HasProxy>>>,
     }
@@ -42,6 +43,13 @@ impl Core {
             .proxy
             .borrow_mut()
             .replace(Proxy::new_weak(0, &this));
+
+        let id = this.inner.proxies.borrow_mut().reserve();
+        let client = Client::new(id);
+        this.inner
+            .proxies
+            .borrow_mut()
+            .insert_at(id, Box::new(client));
 
         this
     }

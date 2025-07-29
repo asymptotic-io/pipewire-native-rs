@@ -9,6 +9,7 @@ use pipewire_native_spa as spa;
 use properties::Properties;
 use support::Support;
 
+pub mod client;
 pub mod conf;
 pub mod context;
 pub mod core;
@@ -16,6 +17,7 @@ mod id_map;
 pub mod keys;
 pub mod log;
 pub mod main_loop;
+pub mod permission;
 pub mod properties;
 mod protocol;
 pub mod proxy;

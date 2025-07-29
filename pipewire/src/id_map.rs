@@ -56,6 +56,15 @@ impl<T> IdMap<T> {
         }
     }
 
+    pub(crate) fn insert_at(&mut self, id: Id, object: T) {
+        assert!(self.objects.len() > id as usize);
+
+        match &mut self.objects[id as usize] {
+            val @ Item::Reserved => *val = Item::Occupied(object),
+            _ => unreachable!("IdMap insert should only be into a reserved location"),
+        }
+    }
+
     pub(crate) fn reserve(&mut self) -> Id {
         let item = self.objects.iter().enumerate().find(|(_, o)| o.is_empty());
 

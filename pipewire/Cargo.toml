@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bitflags = "2.8.0"
 libc = "0.2.172"
 paste = "1.0.15"
 pipewire-native-macros = { path = "../macros" }
