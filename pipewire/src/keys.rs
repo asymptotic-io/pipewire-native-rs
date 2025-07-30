@@ -16,6 +16,9 @@ pub const CORE_MONITORS: &str = "core.monitors";
 pub const CPU_MAX_ALIGN: &str = "cpu.max-align";
 pub const CPU_CORES: &str = "cpu.cores";
 
+pub const REMOTE_NAME: &str = "remote.name";
+pub const REMOTE_INTENTION: &str = "remote.intention";
+
 pub const APP_NAME: &str = "application.name";
 pub const APP_ID: &str = "application.id";
 

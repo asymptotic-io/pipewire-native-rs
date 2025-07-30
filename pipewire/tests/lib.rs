@@ -19,7 +19,5 @@ fn test_lib() {
     let mut context =
         Context::new(Arc::new(ml), Properties::new()).expect("Context creation should not fail");
 
-    let core = context.connect(None);
-
-    assert!(core.is_ok());
+    let core = context.connect(None).unwrap();
 }

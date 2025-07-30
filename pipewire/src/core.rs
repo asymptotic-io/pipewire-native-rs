@@ -7,11 +7,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use pipewire_native_spa as spa;
+
 use crate::{
     context::{Context, WeakContext},
     debug, default_topic,
     id_map::IdMap,
-    log,
+    keys, log,
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy},
@@ -19,6 +21,21 @@ use crate::{
 };
 
 default_topic!(log::topic::CORE);
+
+pub const DEFAULT_REMOTE: &str = "pipewire-0";
+
+pub(crate) fn get_remote(props: Option<&spa::dict::Dict>) -> String {
+    std::env::var("PIPEWIRE_REMOTE")
+        .ok()
+        .filter(|v| v.len() > 0)
+        .or_else(|| {
+            props
+                .and_then(|p| p.lookup(keys::REMOTE_NAME).to_owned())
+                .filter(|v| v.len() > 0)
+                .map(|s| s.to_owned())
+        })
+        .unwrap_or(DEFAULT_REMOTE.to_owned())
+}
 
 refcounted! {
     pub struct Core {
@@ -31,7 +48,7 @@ refcounted! {
 }
 
 impl Core {
-    pub(crate) fn new(context: &Context, properties: Properties) -> Self {
+    pub(crate) fn new(context: &Context, properties: Properties) -> std::io::Result<Self> {
         let this = Self {
             inner: Rc::new(InnerCore::new(context, properties)),
         };
@@ -50,7 +67,15 @@ impl Core {
             .borrow_mut()
             .insert_at(id, Box::new(client));
 
-        this
+        // add core and proxy event listeners
+        // send hello
+        // update client properties
+
+        this.inner
+            .client
+            .connect(Some(&this.inner.properties.dict()), None)?;
+
+        Ok(this)
     }
 }
 
@@ -82,8 +107,6 @@ impl InnerCore {
         // TODO: Create mempool
 
         let client = context.protocol().new_client(None);
-
-        // TODO: Create proxy for core and client
 
         Self {
             context: context.downgrade(),

@@ -79,9 +79,7 @@ impl Context {
     }
 
     pub fn connect(&self, properties: Option<Properties>) -> std::io::Result<Core> {
-        let core = Core::new(self, properties.unwrap_or(Properties::new()));
-
-        Ok(core)
+        Core::new(self, properties.unwrap_or(Properties::new()))
     }
 }
 
