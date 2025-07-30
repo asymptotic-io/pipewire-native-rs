@@ -8,14 +8,13 @@ use std::{
 };
 
 use crate::{
-    client::Client,
     context::{Context, WeakContext},
     debug, default_topic,
     id_map::IdMap,
     log,
     properties::Properties,
     protocol,
-    proxy::{HasProxy, Proxy},
+    proxy::{self, HasProxy, Proxy},
     refcounted, types,
 };
 
@@ -45,7 +44,7 @@ impl Core {
             .replace(Proxy::new_weak(0, &this));
 
         let id = this.inner.proxies.borrow_mut().reserve();
-        let client = Client::new(id);
+        let client = proxy::client::Client::new(id);
         this.inner
             .proxies
             .borrow_mut()

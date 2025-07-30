@@ -12,6 +12,8 @@ use crate::{refcounted, Refcounted, INVALID_ID};
 
 use crate::{types::ObjectType, Id};
 
+pub mod client;
+
 pub trait HasProxy {
     fn type_() -> ObjectType
     where
