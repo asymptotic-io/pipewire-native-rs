@@ -81,6 +81,19 @@ impl<T> HookList<T> {
 
 #[macro_export]
 macro_rules! emit_hook {
+    ($hook_list:expr, $method:ident) => {
+        {
+            let _h = $hook_list.clone();
+            let mut _h = _h.lock();
+            let _hooks = _h.as_deref_mut().unwrap();
+
+            for h in _hooks.iter_mut() {
+                if let Some(_method) = h.callbacks().$method.as_deref_mut() {
+                    (_method)();
+                }
+            }
+        }
+    };
     ($hook_list:expr, $method:ident, $($args:tt)*) => {
         {
             let _h = $hook_list.clone();

@@ -286,7 +286,7 @@ impl InnerMainLoop {
     }
 
     fn destroy(&self) {
-        emit_hook!(self.hooks, destroy,);
+        emit_hook!(self.hooks, destroy);
     }
 
     fn run(this: &Arc<Self>) {
