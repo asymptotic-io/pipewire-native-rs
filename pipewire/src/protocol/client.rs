@@ -16,6 +16,7 @@ use std::{
 use pipewire_native_spa as spa;
 
 use crate::{
+    closure,
     core::{self, Core, WeakCore},
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
@@ -52,21 +53,13 @@ impl Client {
             inner: Rc::new(InnerClient::new()),
         };
 
-        let weak_client1 = this.downgrade();
-        let weak_client2 = this.downgrade();
         let listener = this.inner.connection.add_listener(ConnectionEvents {
-            destroy: Some(Box::new(move || {
-                weak_client1
-                    .upgrade()
-                    .expect("Client should outlive connection")
-                    .on_destroy();
+            destroy: Some(closure!(this, {
+                this.on_destroy();
             })),
             error: None,
-            need_flush: Some(Box::new(move || {
-                weak_client2
-                    .upgrade()
-                    .expect("Client should outlive connection")
-                    .on_need_flush();
+            need_flush: Some(closure!(this, {
+                this.on_need_flush();
             })),
             start: None,
         });
@@ -102,18 +95,14 @@ impl Client {
         debug!("Setting fd on connection: {fd}");
         self.inner.connection.set_fd(fd);
 
-        let weak_client = self.downgrade();
         let main_loop = self.core().context().main_loop();
 
         let source = main_loop.add_io(
             fd,
             spa::flags::Io::all(),
             close,
-            Box::new(move |fd, mask| {
-                weak_client
-                    .upgrade()
-                    .expect("Client should outlive I/O source")
-                    .on_remote_data(fd, spa::flags::Io::from_bits_truncate(mask));
+            closure!(client <- self, fd, mask, {
+                client.on_remote_data(fd, spa::flags::Io::from_bits_truncate(mask));
             }),
         );
 

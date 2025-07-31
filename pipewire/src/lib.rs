@@ -173,3 +173,43 @@ macro_rules! refcounted {
         }
     }
 }
+
+#[macro_export]
+macro_rules! closure {
+    ($object:ident, $body:block) => {
+        {
+            let _weak = $object.downgrade();
+            Box::new(move || {
+                let $object = _weak.upgrade().unwrap();
+                $body
+            })
+        }
+    };
+    ($object:ident, $($args:ident),*, $body:block) => {
+        {
+            let _weak = $object.downgrade();
+            Box::new(move |$($args),*| {
+                let $object = _weak.upgrade().unwrap();
+                $body
+            })
+        }
+    };
+    ($name:ident <- $object:ident, $body:block) => {
+        {
+            let _weak = $object.downgrade();
+            Box::new(move || {
+                let $name = _weak.upgrade().unwrap();
+                $body
+            })
+        }
+    };
+    ($name:ident <- $object:ident, $($args:ident),*, $body:block) => {
+        {
+            let _weak = $object.downgrade();
+            Box::new(move |$($args),*| {
+                let $name = _weak.upgrade().unwrap();
+                $body
+            })
+        }
+    };
+}
