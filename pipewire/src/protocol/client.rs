@@ -20,7 +20,7 @@ use crate::{
     core::{self, Core, WeakCore},
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
-    refcounted,
+    refcounted, some_closure,
 };
 
 default_topic!(log::topic::PROTOCOL);
@@ -54,13 +54,13 @@ impl Client {
         };
 
         let listener = this.inner.connection.add_listener(ConnectionEvents {
-            destroy: Some(closure!(this, {
+            destroy: some_closure!(this, {
                 this.on_destroy();
-            })),
+            }),
             error: None,
-            need_flush: Some(closure!(this, {
+            need_flush: some_closure!(this, {
                 this.on_need_flush();
-            })),
+            }),
             start: None,
         });
 

@@ -20,7 +20,7 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
-    refcounted, types,
+    refcounted, some_closure, types, Id, Refcounted,
 };
 
 default_topic!(log::topic::CORE);
@@ -71,14 +71,10 @@ impl Core {
 
         this.inner.client.set_core(this.downgrade());
 
-        let weak_core = this.downgrade();
         core_proxy.add_listener(ProxyEvents {
-            destroy: Some(Box::new(move || {
-                let _core = weak_core
-                    .upgrade()
-                    .expect("Core should be live when proxy is destroyed");
+            destroy: some_closure!(this, {
                 todo!("clean up proxies etc., or delegate to Drop");
-            })),
+            }),
             bound: None,
             removed: None,
             done: None,

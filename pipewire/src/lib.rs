@@ -213,3 +213,8 @@ macro_rules! closure {
         }
     };
 }
+
+#[macro_export]
+macro_rules! some_closure {
+    ($($args:tt)*) => { Some($crate::closure!($($args)*)) };
+}
