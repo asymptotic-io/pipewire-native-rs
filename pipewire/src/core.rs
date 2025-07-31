@@ -16,7 +16,7 @@ use crate::{
     keys, log,
     properties::Properties,
     protocol,
-    proxy::{self, HasProxy, Proxy},
+    proxy::{self, HasProxy, Proxy, ProxyEvents},
     refcounted, types,
 };
 
@@ -55,10 +55,8 @@ impl Core {
 
         // Reserve id 0 because we are id 0
         let _ = this.inner.proxies.borrow_mut().reserve();
-        this.inner
-            .proxy
-            .borrow_mut()
-            .replace(Proxy::new_weak(0, &this));
+        let core_proxy = Proxy::new_weak(0, &this);
+        this.inner.proxy.borrow_mut().replace(core_proxy.clone());
 
         let id = this.inner.proxies.borrow_mut().reserve();
         let client = proxy::client::Client::new(id);
@@ -69,7 +67,22 @@ impl Core {
 
         this.inner.client.set_core(this.downgrade());
 
-        // add core and proxy event listeners
+        let weak_core = this.downgrade();
+        core_proxy.add_listener(ProxyEvents {
+            destroy: Some(Box::new(move || {
+                let _core = weak_core
+                    .upgrade()
+                    .expect("Core should be live when proxy is destroyed");
+                todo!("clean up proxies etc., or delegate to Drop");
+            })),
+            bound: None,
+            removed: None,
+            done: None,
+            error: None,
+            bound_props: None,
+        });
+
+        // add core event listeners
         // send hello
         // update client properties
 
@@ -78,6 +91,13 @@ impl Core {
             .connect(Some(&this.inner.properties.dict()), None)?;
 
         Ok(this)
+    }
+
+    pub(crate) fn context(&self) -> Context {
+        self.inner
+            .context
+            .upgrade()
+            .expect("Context should outlive core")
     }
 }
 

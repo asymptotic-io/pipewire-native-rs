@@ -9,13 +9,14 @@ use std::{
         unix::net::UnixStream,
     },
     path::PathBuf,
+    pin::Pin,
     rc::{Rc, Weak},
 };
 
 use pipewire_native_spa as spa;
 
 use crate::{
-    core::{self, WeakCore},
+    core::{self, Core, WeakCore},
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
     refcounted,
@@ -38,6 +39,8 @@ refcounted! {
     pub(crate) struct Client {
         core: RefCell<Option<WeakCore>>,
         connection: Connection,
+        need_flush: RefCell<bool>,
+        source: RefCell<Option<Pin<Box<spa::interface::r#loop::LoopUtilsSource>>>>,
         listener: RefCell<Option<spa::hook::HookId>>,
     }
 }
@@ -49,22 +52,37 @@ impl Client {
             inner: Rc::new(InnerClient::new()),
         };
 
-        let weak_client = this.downgrade();
+        let weak_client1 = this.downgrade();
+        let weak_client2 = this.downgrade();
         let listener = this.inner.connection.add_listener(ConnectionEvents {
             destroy: Some(Box::new(move || {
-                let client = weak_client
+                weak_client1
                     .upgrade()
-                    .expect("Client should outlive connection");
-                client.on_destroy();
+                    .expect("Client should outlive connection")
+                    .on_destroy();
             })),
             error: None,
-            need_flush: Some(Box::new(|| todo!("implement client need_flush"))),
+            need_flush: Some(Box::new(move || {
+                weak_client2
+                    .upgrade()
+                    .expect("Client should outlive connection")
+                    .on_need_flush();
+            })),
             start: None,
         });
 
         this.inner.listener.borrow_mut().replace(listener);
 
         this
+    }
+
+    pub(crate) fn core(&self) -> Core {
+        self.inner
+            .core
+            .borrow()
+            .clone()
+            .and_then(|w| w.upgrade())
+            .expect("Client shoud have core initialised on creation")
     }
 
     pub(crate) fn set_core(&self, core: WeakCore) {
@@ -81,8 +99,25 @@ impl Client {
     }
 
     pub(crate) fn set_fd(&self, fd: RawFd, close: bool) -> std::io::Result<()> {
+        debug!("Setting fd on connection: {fd}");
         self.inner.connection.set_fd(fd);
-        // hook up source to process messages
+
+        let weak_client = self.downgrade();
+        let main_loop = self.core().context().main_loop();
+
+        let source = main_loop.add_io(
+            fd,
+            spa::flags::Io::all(),
+            close,
+            Box::new(move |fd, mask| {
+                weak_client
+                    .upgrade()
+                    .expect("Client should outlive I/O source")
+                    .on_remote_data(fd, spa::flags::Io::from_bits_truncate(mask));
+            }),
+        );
+
+        self.inner.source.replace(source);
 
         Ok(())
     }
@@ -91,6 +126,24 @@ impl Client {
         self.inner
             .connection
             .remove_listener(self.inner.listener.borrow().unwrap());
+    }
+
+    fn on_need_flush(&self) {
+        self.inner.need_flush.replace(true);
+
+        if let Some(source) = self.inner.source.borrow_mut().as_mut() {
+            let main_loop = self.core().context().main_loop();
+            let _ = main_loop.update_io(source, spa::flags::Io::OUT);
+        }
+    }
+
+    fn on_remote_data(&self, fd: RawFd, mask: spa::flags::Io) {
+        // check for err
+        // process messages IN
+        // process OUT/need_flush
+        // - check connected status
+        // - protocol native connection flush
+        // - update io with mask ~OUT
     }
 
     fn connect_local_socket(
@@ -162,6 +215,8 @@ impl InnerClient {
         Self {
             core: RefCell::new(None),
             connection: Connection::new(-1),
+            need_flush: RefCell::new(false),
+            source: RefCell::new(None),
             listener: RefCell::new(None),
         }
     }

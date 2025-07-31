@@ -85,6 +85,10 @@ impl<T: Refcounted> Proxy<T> {
         self.inner.bound_id.replace(id);
         spa::emit_hook!(self.inner.hooks, bound, id);
     }
+
+    pub(crate) fn add_listener(&self, events: ProxyEvents) {
+        self.inner.hooks.lock().unwrap().append(events);
+    }
 }
 
 impl<T: Refcounted> InnerProxy<T> {
