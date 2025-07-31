@@ -4,9 +4,12 @@
 
 use std::{
     cell::RefCell,
+    os::fd::RawFd,
     rc::{Rc, Weak},
+    sync::{Arc, Mutex},
 };
 
+use bitflags::bitflags;
 use pipewire_native_spa as spa;
 
 use crate::{
@@ -44,6 +47,7 @@ refcounted! {
         client: protocol::client::Client,
         proxy: RefCell<Option<Proxy<Core>>>,
         proxies: RefCell<IdMap<Box<dyn HasProxy>>>,
+        hooks: Arc<Mutex<spa::hook::HookList<CoreEvents>>>,
     }
 }
 
@@ -99,6 +103,10 @@ impl Core {
             .upgrade()
             .expect("Context should outlive core")
     }
+
+    pub fn add_listener(&self, events: CoreEvents) {
+        self.inner.hooks.lock().unwrap().append(events);
+    }
 }
 
 impl HasProxy for Core {
@@ -120,6 +128,37 @@ impl HasProxy for Core {
     }
 }
 
+bitflags! {
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct CoreChangeMask : u32 {
+        const PROPS = (1 << 0);
+    }
+}
+
+pub struct CoreInfo<'a> {
+    pub id: u32,
+    pub cookie: u32,
+    pub user_name: &'a str,
+    pub host_name: &'a str,
+    pub version: &'a str,
+    pub name: &'a str,
+    pub mask: CoreChangeMask,
+    pub props: &'a spa::dict::Dict,
+}
+
+pub struct CoreEvents {
+    pub info: Option<Box<dyn FnMut(CoreInfo<'_>)>>,
+    pub done: Option<Box<dyn FnMut(u32, u32)>>,
+    pub error: Option<Box<dyn FnMut(u32, u32, u32, &str)>>,
+    pub(crate) ping: Option<Box<dyn FnMut(u32, u32)>>,
+    pub(crate) remove_id: Option<Box<dyn FnMut(u32)>>,
+    pub(crate) bound_id: Option<Box<dyn FnMut(u32, u32)>>,
+    pub(crate) add_mem: Option<Box<dyn FnMut(u32, u32, RawFd, u32)>>,
+    pub(crate) remove_mem: Option<Box<dyn FnMut(u32)>>,
+    pub(crate) bound_props: Option<Box<dyn FnMut(u32, u32, &spa::dict::Dict)>>,
+}
+
 impl InnerCore {
     fn new(context: &Context, mut properties: Properties) -> Self {
         debug!("Creating new core");
@@ -136,6 +175,7 @@ impl InnerCore {
             client,
             proxy: RefCell::new(None),
             proxies: RefCell::new(IdMap::new()),
+            hooks: spa::hook::HookList::new(),
         }
     }
 }
