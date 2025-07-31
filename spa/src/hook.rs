@@ -88,7 +88,9 @@ macro_rules! emit_hook {
             let _hooks = _h.as_deref_mut().unwrap();
 
             for h in _hooks.iter_mut() {
-                (h.callbacks().$method)($($args)*);
+                if let Some(_method) = h.callbacks().$method.as_deref_mut() {
+                    (_method)($($args)*);
+                }
             }
         }
     };

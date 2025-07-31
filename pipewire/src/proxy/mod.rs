@@ -47,12 +47,12 @@ enum ProxyObject<T: Refcounted> {
 }
 
 pub struct ProxyEvents {
-    pub destroy: Box<dyn FnMut()>,
-    pub bound: Box<dyn FnMut(Id)>,
-    pub removed: Box<dyn FnMut()>,
-    pub done: Box<dyn FnMut(u32)>,
-    pub error: Box<dyn FnMut(u32, u32, &str)>,
-    pub bound_props: Box<dyn FnMut(u32, &spa::dict::Dict)>,
+    pub destroy: Option<Box<dyn FnMut()>>,
+    pub bound: Option<Box<dyn FnMut(Id)>>,
+    pub removed: Option<Box<dyn FnMut()>>,
+    pub done: Option<Box<dyn FnMut(u32)>>,
+    pub error: Option<Box<dyn FnMut(u32, u32, &str)>>,
+    pub bound_props: Option<Box<dyn FnMut(u32, &spa::dict::Dict)>>,
 }
 
 impl<T: Refcounted> Proxy<T> {

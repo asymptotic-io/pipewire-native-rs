@@ -10,9 +10,9 @@ use std::{
 use pipewire_native_spa::{emit_hook, hook::HookList};
 
 struct TestEvents {
-    constie: Box<dyn FnMut(i32)>,
-    normie: Box<dyn FnMut(&TestStruct, i32, &str)>,
-    mutie: Box<dyn FnMut(&mut TestStruct, i32, &str)>,
+    constie: Option<Box<dyn FnMut(i32)>>,
+    normie: Option<Box<dyn FnMut(&TestStruct, i32, &str)>>,
+    mutie: Option<Box<dyn FnMut(&mut TestStruct, i32, &str)>>,
 }
 
 struct TestStruct {
@@ -30,17 +30,17 @@ fn test_hooks() {
 
     let events = TestEvents {
         // Increment accumulator by callback value
-        constie: Box::new(move |i| *accum1.lock().unwrap() += i),
+        constie: Some(Box::new(move |i| *accum1.lock().unwrap() += i)),
         // Increment accumulator by struct value * callback value
-        normie: Box::new(move |this, i, s| {
+        normie: Some(Box::new(move |this, i, s| {
             *accum2.lock().unwrap() += this.value * i;
             assert_eq!(s, &this.name);
-        }),
+        })),
         // Set struct value to callback value
-        mutie: Box::new(move |this, i, s| {
+        mutie: Some(Box::new(move |this, i, s| {
             this.value = i;
             this.name = s.to_string();
-        }),
+        })),
     };
 
     let mut this = TestStruct {
