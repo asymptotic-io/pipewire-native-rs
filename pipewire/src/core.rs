@@ -67,6 +67,8 @@ impl Core {
             .borrow_mut()
             .insert_at(id, Box::new(client));
 
+        this.inner.client.set_core(this.downgrade());
+
         // add core and proxy event listeners
         // send hello
         // update client properties
