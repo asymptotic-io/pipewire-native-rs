@@ -86,6 +86,7 @@ impl Core {
         this.add_listener(CoreEvents {
             info: some_closure!(this, info, {
                 if let Some(props) = info.props {
+                    debug!("updating props {:?}", props);
                     this.context()
                         .update_properties(props, vec!["default.clock.quantum-limit"]);
                 }

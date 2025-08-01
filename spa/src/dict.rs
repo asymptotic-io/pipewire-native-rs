@@ -109,3 +109,13 @@ impl Drop for Dict {
         }
     }
 }
+
+impl std::fmt::Debug for Dict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ ")?;
+        for item in self.items() {
+            write!(f, "{} = {}, ", item.0, item.1,)?;
+        }
+        write!(f, " }}")
+    }
+}
