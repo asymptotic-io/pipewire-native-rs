@@ -52,14 +52,14 @@ pub struct RawPod<'a> {
 impl<'a> RawPod<'a> {
     pub fn wrap(data: &'a [u8]) -> Result<RawPod<'a>, Error> {
         if data.len() < 8 {
-            return Err(Error::Invalid);
+            return Err(Error::NoSpace);
         }
 
         let internal_size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         let size = 8 + internal_size + pad_8(internal_size);
 
         if size > data.len() {
-            return Err(Error::Invalid);
+            return Err(Error::NoSpace);
         }
 
         let type_ = Type::try_from(u32::from_ne_bytes(data[4..8].try_into().unwrap()))
@@ -797,7 +797,7 @@ where
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         if data.len() < 8 {
-            return Err(Error::Invalid);
+            return Err(Error::NoSpace);
         }
 
         data[0..4].copy_from_slice(&self.key.into().to_ne_bytes());
