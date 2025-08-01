@@ -2,9 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use pipewire_native_spa::pod::builder::Builder;
-use pipewire_native_spa::pod::parser::Parser;
-use pipewire_native_spa::pod::{Error, Pod};
+use pipewire_native_spa::pod::Pod;
 
 use pipewire_native_macros::PodStruct;
 

@@ -44,11 +44,11 @@ pub fn derive_pod_struct(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        impl #generics Pod for #ident {
+        impl #generics pipewire_native_spa::pod::Pod for #ident {
             type DecodesTo = #ident;
 
-            fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-                let builder = Builder::new(data);
+            fn encode(&self, data: &mut [u8]) -> Result<usize, pipewire_native_spa::pod::Error> {
+                let builder = pipewire_native_spa::pod::builder::Builder::new(data);
 
                 builder.push_struct(|struct_builder| {
                     struct_builder
@@ -57,8 +57,8 @@ pub fn derive_pod_struct(input: TokenStream) -> TokenStream {
                 .build().map(|res| res.len())
             }
 
-            fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
-                let mut parser = Parser::new(data);
+            fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), pipewire_native_spa::pod::Error> {
+                let mut parser = pipewire_native_spa::pod::parser::Parser::new(data);
 
                 parser.pop_struct(|#struct_parser_ident| {
                     Ok(Self {
