@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
@@ -14,10 +15,15 @@ use crate::{types::ObjectType, Id};
 
 pub mod client;
 
-pub trait HasProxy {
+pub trait HasProxy: Any {
+    // See the invoke! and notify! macros below
+    // type Methods;
+    // type Events;
+
     fn type_() -> ObjectType
     where
         Self: Sized;
+
     fn version() -> u32
     where
         Self: Sized;
@@ -27,8 +33,60 @@ pub trait HasProxy {
         Self: Refcounted;
 }
 
+impl dyn HasProxy {
+    pub fn downcast_proxy<T: HasProxy + Refcounted>(&self) -> Option<Proxy<T>> {
+        if let Some(object) = (self as &dyn Any).downcast_ref::<T>() {
+            Some(object.proxy())
+        } else {
+            None
+        }
+    }
+}
+
+// We expect each proxy object to have a set of associated methods (which can be invoked on the
+// object) and/or events (which notify listeners via hooks). Unfortunately, expressing this via the
+// type system makes things complicated. Notably, the `proxies` list on `Core` can no longer be a
+// container of `dyn HasProxy`, as the associated types all need to be specified.
+//
+// As a compromise, we provide these two macros that assume types that implement `HasProxy` also
+// implement either or both functions, methods() and events(). These return a struct of their
+// respective types, on which an invocation or notification can be triggered.
+#[macro_export]
+macro_rules! proxy_object_invoke {
+    ($proxy:ident, $method:ident, $($args:tt)*) => {
+        ($proxy.object().unwrap().methods().$method)(&$proxy, $($args)*)
+    }
+}
+
+#[macro_export]
+macro_rules! proxy_object_notify {
+    ($proxy:ident, $event:ident, $($args:tt)*) => {
+        if let Some(_object) = $proxy.object() {
+            spa::emit_hook!(_object.events(), $event, ($($args)*));
+        }
+    };
+}
+
+// To go from an object in dyn Proxy form to its proxy, we need to do some dyn Any shenanigans, so
+// let's hide that away in a macro as well.
+#[macro_export]
+macro_rules! proxy_notify {
+    ($object:ident, $event:ident, $($args:tt),*) => {
+        let _type_id = ($object as &dyn std::any::Any).type_id();
+        if _type_id ==  std::any::TypeId::of::<$crate::core::Core>() {
+            let _proxy = $object.downcast_proxy::<$crate::core::Core>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event, $($args),*);
+        } else if _type_id ==  std::any::TypeId::of::<$crate::proxy::client::Client>() {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event, $($args),*);
+        } else {
+            unreachable!()
+        };
+    };
+}
+
 refcounted! {
-    pub struct Proxy<T: Refcounted> {
+    pub struct Proxy<T: HasProxy + Refcounted> {
         object: ProxyObject<T>,
         id: Id,
         bound_id: RefCell<Id>,
@@ -55,7 +113,7 @@ pub struct ProxyEvents {
     pub bound_props: Option<Box<dyn FnMut(u32, &spa::dict::Dict)>>,
 }
 
-impl<T: Refcounted> Proxy<T> {
+impl<T: HasProxy + Refcounted> Proxy<T> {
     pub(crate) fn new(id: Id, object: &T) -> Self {
         Self {
             inner: Rc::new(InnerProxy::<T>::new(
@@ -89,9 +147,13 @@ impl<T: Refcounted> Proxy<T> {
     pub(crate) fn add_listener(&self, events: ProxyEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
+
+    pub(crate) fn events(&self) -> Arc<Mutex<spa::hook::HookList<ProxyEvents>>> {
+        self.inner.hooks.clone()
+    }
 }
 
-impl<T: Refcounted> InnerProxy<T> {
+impl<T: HasProxy + Refcounted> InnerProxy<T> {
     fn new(id: Id, object: ProxyObject<T>) -> Self {
         Self {
             object,

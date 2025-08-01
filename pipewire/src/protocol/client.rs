@@ -126,7 +126,7 @@ impl Client {
         }
     }
 
-    fn on_remote_data(&self, fd: RawFd, mask: spa::flags::Io) {
+    fn on_remote_data(&self, _fd: RawFd, _mask: spa::flags::Io) {
         // check for err
         // process messages IN
         // process OUT/need_flush

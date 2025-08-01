@@ -20,7 +20,7 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
-    refcounted, some_closure, types, Id, Refcounted,
+    proxy_notify, proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
 };
 
 default_topic!(log::topic::CORE);
@@ -47,6 +47,7 @@ refcounted! {
         client: protocol::client::Client,
         proxy: RefCell<Option<Proxy<Core>>>,
         proxies: RefCell<IdMap<Box<dyn HasProxy>>>,
+        methods: RefCell<Option<CoreMethods<Core>>>,
         hooks: Arc<Mutex<spa::hook::HookList<CoreEvents>>>,
     }
 }
@@ -82,7 +83,34 @@ impl Core {
             bound_props: None,
         });
 
-        // add core event listeners
+        this.add_listener(CoreEvents {
+            info: some_closure!(this, info, {
+                if let Some(props) = info.props {
+                    this.context()
+                        .update_properties(props, vec!["default.clock.quantum-limit"]);
+                }
+            }),
+            done: some_closure!(core_proxy, id, seq, {
+                debug!("got done: {id} {seq}");
+                let core = core_proxy.object().unwrap();
+                let proxies = core.inner.proxies.borrow();
+
+                if let Some(object) = proxies.get(id) {
+                    proxy_notify!(object, done, seq);
+                }
+            }),
+            error: None,
+            ping: some_closure!(core_proxy, id, seq, {
+                debug!("got ping: {id} {seq}");
+                let _ = proxy_object_invoke!(core_proxy, pong, id, seq);
+            }),
+            remove_id: None,
+            bound_id: None,
+            add_mem: None,
+            remove_mem: None,
+            bound_props: None,
+        });
+
         // send hello
         // update client properties
 
@@ -103,6 +131,10 @@ impl Core {
     pub fn add_listener(&self, events: CoreEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
+
+    pub fn methods(&self) -> CoreMethods<Core> {
+        self.inner.methods.borrow().clone().unwrap()
+    }
 }
 
 impl HasProxy for Core {
@@ -114,7 +146,7 @@ impl HasProxy for Core {
         4
     }
 
-    fn proxy(&self) -> Proxy<Self> {
+    fn proxy(&self) -> Proxy<Core> {
         self.inner
             .proxy
             .borrow()
@@ -140,26 +172,39 @@ pub struct CoreInfo<'a> {
     pub version: &'a str,
     pub name: &'a str,
     pub mask: CoreChangeMask,
-    pub props: &'a spa::dict::Dict,
+    pub props: Option<&'a spa::dict::Dict>,
+}
+
+#[derive(Copy, Clone)]
+pub struct CoreMethods<T: HasProxy + Refcounted> {
+    pub(crate) hello: fn(&Proxy<T>, version: u32) -> std::io::Result<()>,
+    pub(crate) sync: fn(&Proxy<T>, id: Id, seq: u32) -> std::io::Result<()>,
+    pub(crate) pong: fn(&Proxy<T>, id: Id, seq: u32) -> std::io::Result<()>,
+    pub(crate) error:
+        fn(&Proxy<T>, id: Id, seq: u32, res: u32, message: &str) -> std::io::Result<()>,
+    // pub(crate) get_registry: fn(...)
+    pub(crate) create_object:
+        fn(&Proxy<T>, factory_name: &str, type_: &str, version: u32, props: &spa::dict::Dict),
+    pub(crate) destroy: fn(&Proxy<T>, proxy: Box<dyn HasProxy>) -> std::io::Result<()>,
 }
 
 pub struct CoreEvents {
     pub info: Option<Box<dyn FnMut(CoreInfo<'_>)>>,
-    pub done: Option<Box<dyn FnMut(u32, u32)>>,
-    pub error: Option<Box<dyn FnMut(u32, u32, u32, &str)>>,
-    pub(crate) ping: Option<Box<dyn FnMut(u32, u32)>>,
-    pub(crate) remove_id: Option<Box<dyn FnMut(u32)>>,
-    pub(crate) bound_id: Option<Box<dyn FnMut(u32, u32)>>,
-    pub(crate) add_mem: Option<Box<dyn FnMut(u32, u32, RawFd, u32)>>,
-    pub(crate) remove_mem: Option<Box<dyn FnMut(u32)>>,
-    pub(crate) bound_props: Option<Box<dyn FnMut(u32, u32, &spa::dict::Dict)>>,
+    pub done: Option<Box<dyn FnMut(Id, u32)>>,
+    pub error: Option<Box<dyn FnMut(Id, u32, u32, &str)>>,
+    pub(crate) ping: Option<Box<dyn FnMut(Id, u32)>>,
+    pub(crate) remove_id: Option<Box<dyn FnMut(Id)>>,
+    pub(crate) bound_id: Option<Box<dyn FnMut(Id, Id)>>,
+    pub(crate) add_mem: Option<Box<dyn FnMut(Id, u32, RawFd, u32)>>,
+    pub(crate) remove_mem: Option<Box<dyn FnMut(Id)>>,
+    pub(crate) bound_props: Option<Box<dyn FnMut(Id, Id, &spa::dict::Dict)>>,
 }
 
 impl InnerCore {
     fn new(context: &Context, mut properties: Properties) -> Self {
         debug!("Creating new core");
 
-        properties.add_dict(&context.properties().dict());
+        properties.add_dict(&context.properties());
 
         // TODO: Create mempool
 
@@ -171,6 +216,7 @@ impl InnerCore {
             client,
             proxy: RefCell::new(None),
             proxies: RefCell::new(IdMap::new()),
+            methods: RefCell::new(None),
             hooks: spa::hook::HookList::new(),
         }
     }
