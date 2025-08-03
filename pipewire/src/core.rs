@@ -20,10 +20,12 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
-    proxy_notify, proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
+    proxy_notify_dyn, proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
 };
 
 default_topic!(log::topic::CORE);
+
+pub const VERSION: u32 = 3;
 
 pub const DEFAULT_REMOTE: &str = "pipewire-0";
 
@@ -47,7 +49,7 @@ refcounted! {
         client: protocol::client::Client,
         proxy: RefCell<Option<Proxy<Core>>>,
         proxies: RefCell<IdMap<Box<dyn HasProxy>>>,
-        methods: RefCell<Option<CoreMethods<Core>>>,
+        methods: Rc<RefCell<CoreMethods<Core>>>,
         hooks: Arc<Mutex<spa::hook::HookList<CoreEvents>>>,
     }
 }
@@ -97,13 +99,13 @@ impl Core {
                 let proxies = core.inner.proxies.borrow();
 
                 if let Some(object) = proxies.get(id) {
-                    proxy_notify!(object, done, seq);
+                    proxy_notify_dyn!(object, done, seq);
                 }
             }),
             error: None,
             ping: some_closure!(core_proxy, id, seq, {
                 debug!("got ping: {id} {seq}");
-                let _ = proxy_object_invoke!(core_proxy, pong, id, seq);
+                let _ = proxy_object_invoke!(core_proxy, pong, seq);
             }),
             remove_id: None,
             bound_id: None,
@@ -112,7 +114,7 @@ impl Core {
             bound_props: None,
         });
 
-        // send hello
+        proxy_object_invoke!(core_proxy, hello, VERSION)?;
         // update client properties
 
         this.inner
@@ -133,8 +135,8 @@ impl Core {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
-    pub fn methods(&self) -> CoreMethods<Core> {
-        self.inner.methods.borrow().clone().unwrap()
+    pub fn methods(&self) -> Rc<RefCell<CoreMethods<Core>>> {
+        self.inner.methods.clone()
     }
 }
 
@@ -176,17 +178,14 @@ pub struct CoreInfo<'a> {
     pub props: Option<&'a spa::dict::Dict>,
 }
 
-#[derive(Copy, Clone)]
 pub struct CoreMethods<T: HasProxy + Refcounted> {
-    pub(crate) hello: fn(&Proxy<T>, version: u32) -> std::io::Result<()>,
-    pub(crate) sync: fn(&Proxy<T>, id: Id, seq: u32) -> std::io::Result<()>,
-    pub(crate) pong: fn(&Proxy<T>, id: Id, seq: u32) -> std::io::Result<()>,
-    pub(crate) error:
-        fn(&Proxy<T>, id: Id, seq: u32, res: u32, message: &str) -> std::io::Result<()>,
+    pub(crate) hello: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
+    pub(crate) sync: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
+    pub(crate) pong: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
+    pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     // pub(crate) get_registry: fn(...)
-    pub(crate) create_object:
-        fn(&Proxy<T>, factory_name: &str, type_: &str, version: u32, props: &spa::dict::Dict),
-    pub(crate) destroy: fn(&Proxy<T>, proxy: Box<dyn HasProxy>) -> std::io::Result<()>,
+    pub(crate) create_object: Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &spa::dict::Dict)>,
+    pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,
 }
 
 pub struct CoreEvents {
@@ -210,6 +209,7 @@ impl InnerCore {
         // TODO: Create mempool
 
         let client = context.protocol().new_client(None);
+        let connection = client.connection();
 
         Self {
             context: context.downgrade(),
@@ -217,7 +217,7 @@ impl InnerCore {
             client,
             proxy: RefCell::new(None),
             proxies: RefCell::new(IdMap::new()),
-            methods: RefCell::new(None),
+            methods: Rc::new(RefCell::new(protocol::marshal::core::methods(connection))),
             hooks: spa::hook::HookList::new(),
         }
     }

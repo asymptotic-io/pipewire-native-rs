@@ -4,6 +4,7 @@
 
 use std::{
     cell::RefCell,
+    io::ErrorKind,
     os::{
         fd::{AsRawFd, RawFd},
         unix::net::UnixStream,
@@ -20,7 +21,8 @@ use crate::{
     core::{self, Core, WeakCore},
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
-    refcounted, some_closure,
+    proxy::HasProxy,
+    proxy_notify, refcounted, some_closure, warn,
 };
 
 default_topic!(log::topic::PROTOCOL);
@@ -39,7 +41,9 @@ fn get_system_dir() -> String {
 refcounted! {
     pub(crate) struct Client {
         core: RefCell<Option<WeakCore>>,
+        stream: RefCell<Option<UnixStream>>,
         connection: Connection,
+        connected: RefCell<bool>,
         need_flush: RefCell<bool>,
         source: RefCell<Option<Pin<Box<spa::interface::r#loop::LoopUtilsSource>>>>,
         listener: RefCell<Option<spa::hook::HookId>>,
@@ -69,6 +73,10 @@ impl Client {
         this
     }
 
+    pub(crate) fn connection(&self) -> Connection {
+        self.inner.connection.clone()
+    }
+
     pub(crate) fn core(&self) -> Core {
         self.inner
             .core
@@ -91,9 +99,16 @@ impl Client {
         self.connect_local_socket(props, done_cb)
     }
 
-    pub(crate) fn set_fd(&self, fd: RawFd, close: bool) -> std::io::Result<()> {
-        debug!("Setting fd on connection: {fd}");
-        self.inner.connection.set_fd(fd);
+    pub(crate) fn set_stream(&self, stream: UnixStream, close: bool) -> std::io::Result<()> {
+        debug!("Setting fd on connection: {stream:?}");
+
+        let fd = stream.as_raw_fd();
+
+        self.inner
+            .connection
+            .set_stream(stream.try_clone().expect("unix stream should be cloneable"));
+        self.inner.stream.replace(Some(stream));
+        self.inner.connected.replace(true);
 
         let main_loop = self.core().context().main_loop();
 
@@ -126,13 +141,59 @@ impl Client {
         }
     }
 
-    fn on_remote_data(&self, _fd: RawFd, _mask: spa::flags::Io) {
-        // check for err
-        // process messages IN
-        // process OUT/need_flush
-        // - check connected status
-        // - protocol native connection flush
-        // - update io with mask ~OUT
+    fn on_remote_data(&self, _fd: RawFd, mask: spa::flags::Io) {
+        if mask.contains(spa::flags::Io::ERR | spa::flags::Io::HUP) {
+            self.on_connection_error(
+                std::io::Error::from(std::io::ErrorKind::BrokenPipe),
+                "I/O error",
+            );
+            return;
+        }
+
+        // TODO: process messages IN
+
+        if mask.contains(spa::flags::Io::OUT) || *self.inner.need_flush.borrow() {
+            match self.inner.stream.borrow().as_ref().unwrap().take_error() {
+                Ok(None) => { /* all good, nothing to do */ }
+                Ok(Some(err)) => {
+                    self.on_connection_error(err, "connection error");
+                    return;
+                }
+                Err(err) => {
+                    self.on_connection_error(err, "getsockopt failed");
+                    return;
+                }
+            }
+
+            match self.inner.connection.flush() {
+                Ok(_) => {
+                    let main_loop = self.core().context().main_loop();
+                    let _ = main_loop.update_io(
+                        self.inner.source.borrow_mut().as_mut().unwrap(),
+                        mask.difference(spa::flags::Io::OUT),
+                    );
+                }
+                Err(err) => {
+                    if err.raw_os_error() != Some(libc::EAGAIN) {
+                        self.on_connection_error(err, "flush failed");
+                    }
+                }
+            }
+        }
+    }
+
+    fn on_connection_error(&self, err: std::io::Error, msg: &str) {
+        warn!("Got connection error: {:?}", err);
+
+        if let Some(source) = self.inner.source.take() {
+            let main_loop = self.core().context().main_loop();
+            main_loop.destroy_source(source);
+        }
+
+        let core = &self.core();
+        let res = err.raw_os_error().unwrap_or(err.kind() as i32).abs() as u32;
+
+        proxy_notify!(core, error, 0 /* TODO: seq */, res, msg);
     }
 
     fn connect_local_socket(
@@ -189,7 +250,7 @@ impl Client {
         let stream = UnixStream::connect(socket_path)?;
         stream.set_nonblocking(true)?;
 
-        let res = self.set_fd(stream.as_raw_fd(), true);
+        let res = self.set_stream(stream, true);
 
         if let Some(cb) = done_cb {
             cb(res);
@@ -203,7 +264,9 @@ impl InnerClient {
     fn new() -> Self {
         Self {
             core: RefCell::new(None),
-            connection: Connection::new(-1),
+            stream: RefCell::new(None),
+            connection: Connection::new(None),
+            connected: RefCell::new(false),
             need_flush: RefCell::new(false),
             source: RefCell::new(None),
             listener: RefCell::new(None),

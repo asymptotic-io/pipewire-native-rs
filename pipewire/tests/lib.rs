@@ -16,8 +16,26 @@ fn test_lib() {
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
     let ml = MainLoop::new(&Dict::new(v)).unwrap();
 
-    let mut context =
+    let context =
         Context::new(Arc::new(ml), Properties::new()).expect("Context creation should not fail");
 
     let core = context.connect(None).unwrap();
+
+    let ml = context.main_loop();
+
+    let ml2 = ml.clone();
+    let mut timer_src = ml
+        .add_timer(Box::new(move |_expirations| {
+            ml2.quit();
+        }))
+        .unwrap();
+
+    let timeout = libc::timespec {
+        tv_sec: 5,
+        tv_nsec: 0,
+    };
+    let res = ml.update_timer(&mut timer_src, &timeout, None, true);
+    assert!(res.is_ok());
+
+    ml.run();
 }

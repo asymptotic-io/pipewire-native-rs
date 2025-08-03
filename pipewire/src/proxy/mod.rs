@@ -54,7 +54,7 @@ impl dyn HasProxy {
 #[macro_export]
 macro_rules! proxy_object_invoke {
     ($proxy:ident, $method:ident, $($args:tt)*) => {
-        ($proxy.object().unwrap().methods().$method)(&$proxy, $($args)*)
+        ($proxy.object().unwrap().methods().borrow_mut().$method)(&$proxy, $($args)*)
     }
 }
 
@@ -70,7 +70,7 @@ macro_rules! proxy_object_notify {
 // To go from an object in dyn Proxy form to its proxy, we need to do some dyn Any shenanigans, so
 // let's hide that away in a macro as well.
 #[macro_export]
-macro_rules! proxy_notify {
+macro_rules! proxy_notify_dyn {
     ($object:ident, $event:ident, $($args:tt),*) => {
         let _type_id = ($object as &dyn std::any::Any).type_id();
         if _type_id ==  std::any::TypeId::of::<$crate::core::Core>() {
@@ -82,6 +82,13 @@ macro_rules! proxy_notify {
         } else {
             unreachable!()
         };
+    };
+}
+
+#[macro_export]
+macro_rules! proxy_notify {
+    ($object:ident, $event:ident, $($args:tt),*) => {
+        spa::emit_hook!($object.proxy().events(), $event, $($args),*);
     };
 }
 
@@ -130,6 +137,10 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
                 ProxyObject::Weak(object.downgrade()),
             )),
         }
+    }
+
+    pub fn id(&self) -> Id {
+        self.inner.id
     }
 
     pub fn object(&self) -> Option<T> {
