@@ -17,6 +17,9 @@ use crate::{context::WeakContext, debug, default_topic, log, properties::Propert
 
 default_topic!(log::topic::PROTOCOL);
 
+const ASYNC_SEQ_BIT: u32 = 1 << 30;
+const ASYNC_SEQ_MASK: u32 = ASYNC_SEQ_BIT - 1;
+
 refcounted! {
     pub(crate) struct Protocol {
         context: RefCell<Option<WeakContext>>,

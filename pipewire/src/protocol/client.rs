@@ -4,7 +4,6 @@
 
 use std::{
     cell::RefCell,
-    io::ErrorKind,
     os::{
         fd::{AsRawFd, RawFd},
         unix::net::UnixStream,
@@ -22,7 +21,7 @@ use crate::{
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
     proxy::HasProxy,
-    proxy_notify, refcounted, some_closure, warn,
+    proxy_notify, refcounted, some_closure, trace, warn,
 };
 
 default_topic!(log::topic::PROTOCOL);
@@ -142,7 +141,9 @@ impl Client {
     }
 
     fn on_remote_data(&self, _fd: RawFd, mask: spa::flags::Io) {
-        if mask.contains(spa::flags::Io::ERR | spa::flags::Io::HUP) {
+        trace!("on remote data: {mask:?}");
+
+        if mask.intersects(spa::flags::Io::ERR | spa::flags::Io::HUP) {
             self.on_connection_error(
                 std::io::Error::from(std::io::ErrorKind::BrokenPipe),
                 "I/O error",
@@ -150,9 +151,13 @@ impl Client {
             return;
         }
 
-        // TODO: process messages IN
+        if mask.contains(spa::flags::Io::IN) {
+            trace!("incoming data");
+        }
 
         if mask.contains(spa::flags::Io::OUT) || *self.inner.need_flush.borrow() {
+            self.inner.need_flush.replace(false);
+
             match self.inner.stream.borrow().as_ref().unwrap().take_error() {
                 Ok(None) => { /* all good, nothing to do */ }
                 Ok(Some(err)) => {
@@ -170,7 +175,7 @@ impl Client {
                     let main_loop = self.core().context().main_loop();
                     let _ = main_loop.update_io(
                         self.inner.source.borrow_mut().as_mut().unwrap(),
-                        mask.difference(spa::flags::Io::OUT),
+                        mask & !spa::flags::Io::OUT,
                     );
                 }
                 Err(err) => {
@@ -193,7 +198,7 @@ impl Client {
         let core = &self.core();
         let res = err.raw_os_error().unwrap_or(err.kind() as i32).abs() as u32;
 
-        proxy_notify!(core, error, 0 /* TODO: seq */, res, msg);
+        proxy_notify!(core, error, 0 /* TODO: recv_seq */, res, msg);
     }
 
     fn connect_local_socket(

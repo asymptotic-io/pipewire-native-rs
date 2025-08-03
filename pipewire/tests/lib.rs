@@ -31,10 +31,10 @@ fn test_lib() {
         .unwrap();
 
     let timeout = libc::timespec {
-        tv_sec: 5,
+        tv_sec: 2,
         tv_nsec: 0,
     };
-    let res = ml.update_timer(&mut timer_src, &timeout, None, true);
+    let res = ml.update_timer(&mut timer_src, &timeout, None, false);
     assert!(res.is_ok());
 
     ml.run();

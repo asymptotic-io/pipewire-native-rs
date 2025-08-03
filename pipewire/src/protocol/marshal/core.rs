@@ -8,12 +8,35 @@ use pipewire_native_spa as spa;
 use crate::{
     closure,
     core::{Core, CoreMethods},
-    protocol::connection::Connection,
+    protocol::{connection::Connection, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK},
 };
+
+#[repr(u8)]
+enum Methods {
+    Hello = 1,
+    Sync,
+    Pong,
+    Error,
+    GetRegistry,
+    CreateObject,
+    Destroy,
+}
 
 #[derive(macros::PodStruct)]
 struct Hello {
     version: i64,
+}
+
+#[derive(macros::PodStruct)]
+struct Sync {
+    id: i64,
+    seq: i64,
+}
+
+#[derive(macros::PodStruct)]
+struct Pong {
+    id: i64,
+    seq: i64,
 }
 
 pub(crate) fn methods(connection: Connection) -> CoreMethods<Core> {
@@ -21,14 +44,33 @@ pub(crate) fn methods(connection: Connection) -> CoreMethods<Core> {
         hello: closure!(connection, proxy, version, {
             connection.push(
                 proxy.id(),
-                0,
+                Methods::Hello as u8,
                 Hello {
                     version: version as i64,
                 },
             )
         }),
-        sync: closure!(connection, proxy, seq, { todo!() }),
-        pong: closure!(connection, proxy, seq, { todo!() }),
+        sync: closure!(connection, proxy, id, {
+            let seq = ASYNC_SEQ_BIT | (connection.next_seq() & ASYNC_SEQ_MASK);
+            connection.push(
+                proxy.id(),
+                Methods::Sync as u8,
+                Sync {
+                    id: id as i64,
+                    seq: seq as i64,
+                },
+            )
+        }),
+        pong: closure!(connection, proxy, id, seq, {
+            connection.push(
+                proxy.id(),
+                Methods::Pong as u8,
+                Pong {
+                    id: id as i64,
+                    seq: seq as i64,
+                },
+            )
+        }),
         error: closure!(connection, proxy, seq, res, message, { todo!() }),
         create_object: closure!(connection, proxy, factory_name, type_, version, props, {
             todo!()

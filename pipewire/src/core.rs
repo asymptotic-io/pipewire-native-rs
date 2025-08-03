@@ -105,7 +105,7 @@ impl Core {
             error: None,
             ping: some_closure!(core_proxy, id, seq, {
                 debug!("got ping: {id} {seq}");
-                let _ = proxy_object_invoke!(core_proxy, pong, seq);
+                let _ = proxy_object_invoke!(core_proxy, pong, id, seq);
             }),
             remove_id: None,
             bound_id: None,
@@ -180,8 +180,8 @@ pub struct CoreInfo<'a> {
 
 pub struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) hello: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
-    pub(crate) sync: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
-    pub(crate) pong: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
+    pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
+    pub(crate) pong: Box<dyn FnMut(&Proxy<T>, Id, u32) -> std::io::Result<()>>,
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     // pub(crate) get_registry: fn(...)
     pub(crate) create_object: Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &spa::dict::Dict)>,

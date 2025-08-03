@@ -12,7 +12,11 @@ use std::{
 
 use pipewire_native_spa::{self as spa, pod::Pod};
 
-use crate::{debug, default_topic, log, protocol::marshal, refcounted, Id};
+use crate::{
+    debug, default_topic, log,
+    protocol::{marshal, ASYNC_SEQ_MASK},
+    refcounted, trace, Id,
+};
 
 default_topic!(log::topic::CONNECTION);
 
@@ -25,6 +29,7 @@ refcounted! {
         // Data to send
         seq: RefCell<u32>,
         buf: RefCell<Vec<u8>>,
+        size: RefCell<usize>,
         fds: RefCell<Vec<RawFd>>,
     }
 }
@@ -42,6 +47,10 @@ impl Connection {
         Self {
             inner: Rc::new(InnerConnection::new(stream)),
         }
+    }
+
+    pub(crate) fn next_seq(&self) -> u32 {
+        *self.inner.seq.borrow()
     }
 
     pub(crate) fn set_stream(&self, stream: UnixStream) {
@@ -75,12 +84,18 @@ impl Connection {
             footer: None, // TODO
         };
 
-        loop {
-            let mut buf = self.inner.buf.borrow_mut();
-            let rest = unsafe { std::mem::transmute(buf.spare_capacity_mut()) };
+        trace!("pushing message id:{id} opcode:{opcode}");
 
+        let mut buf = self.inner.buf.borrow_mut();
+        let mut size = self.inner.size.borrow_mut();
+
+        loop {
+            let rest = &mut buf.as_mut_slice()[*size..];
             match message.encode(rest) {
-                Ok(_) => break,
+                Ok(written) => {
+                    *size += written;
+                    break;
+                }
                 Err(spa::pod::Error::NoSpace) => {
                     let capacity = buf.capacity();
                     if capacity > MAX_MESSAGE_SIZE {
@@ -89,14 +104,14 @@ impl Connection {
                             format!("cannot send message > {MAX_MESSAGE_SIZE}"),
                         ));
                     }
-                    buf.reserve(capacity);
+                    buf.resize(capacity * 2, 0);
                     // And now we try again
                 }
                 _ => unreachable!(),
             }
         }
 
-        self.inner.seq.replace(seq + 1);
+        self.inner.seq.replace((seq + 1) & ASYNC_SEQ_MASK);
         spa::emit_hook!(self.inner.hooks, need_flush);
 
         Ok(())
@@ -106,11 +121,14 @@ impl Connection {
         let mut o_stream = self.inner.stream.borrow_mut();
         let stream = o_stream.as_mut().unwrap();
         let mut buf = self.inner.buf.borrow_mut();
+        let mut size = self.inner.size.borrow_mut();
         let mut idx = 0;
         let mut res = Ok(());
 
-        while idx < buf.len() {
-            let sent = match stream.write(&buf[idx..]) {
+        trace!("flushing {} bytes", *size);
+
+        while idx < *size {
+            let sent = match stream.write(&buf[idx..*size]) {
                 Ok(size) => size,
                 Err(err) => {
                     if err.kind() == std::io::ErrorKind::Interrupted {
@@ -127,8 +145,10 @@ impl Connection {
 
         if idx == buf.len() {
             buf.clear();
+            *size = 0;
         } else {
             buf.copy_within(idx.., 0);
+            *size -= idx;
         }
 
         res
@@ -141,7 +161,8 @@ impl InnerConnection {
             stream: RefCell::new(stream),
             hooks: spa::hook::HookList::new(),
             seq: RefCell::new(0),
-            buf: RefCell::new(Vec::with_capacity(16384)), // Initial size, can grow if needed
+            buf: RefCell::new(vec![0; 16384]),
+            size: RefCell::new(0),
             fds: RefCell::new(Vec::new()),
         }
     }
