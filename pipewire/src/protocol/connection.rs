@@ -27,10 +27,10 @@ refcounted! {
         stream: RefCell<Option<UnixStream>>,
         hooks: Arc<Mutex<spa::hook::HookList<ConnectionEvents>>>,
         // Data to send
-        seq: RefCell<u32>,
-        buf: RefCell<Vec<u8>>,
-        size: RefCell<usize>,
-        fds: RefCell<Vec<RawFd>>,
+        out_seq: RefCell<u32>,
+        out_buf: RefCell<Vec<u8>>,
+        out_size: RefCell<usize>,
+        out_fds: RefCell<Vec<RawFd>>,
     }
 }
 
@@ -50,7 +50,7 @@ impl Connection {
     }
 
     pub(crate) fn next_seq(&self) -> u32 {
-        *self.inner.seq.borrow()
+        *self.inner.out_seq.borrow()
     }
 
     pub(crate) fn set_stream(&self, stream: UnixStream) {
@@ -71,7 +71,7 @@ impl Connection {
         opcode: u8,
         data: T,
     ) -> std::io::Result<()> {
-        let seq = *self.inner.seq.borrow();
+        let seq = *self.inner.out_seq.borrow();
         let message = marshal::Message {
             header: marshal::Header {
                 id,
@@ -86,8 +86,8 @@ impl Connection {
 
         trace!("pushing message id:{id} opcode:{opcode}");
 
-        let mut buf = self.inner.buf.borrow_mut();
-        let mut size = self.inner.size.borrow_mut();
+        let mut buf = self.inner.out_buf.borrow_mut();
+        let mut size = self.inner.out_size.borrow_mut();
 
         loop {
             let rest = &mut buf.as_mut_slice()[*size..];
@@ -111,7 +111,7 @@ impl Connection {
             }
         }
 
-        self.inner.seq.replace((seq + 1) & ASYNC_SEQ_MASK);
+        self.inner.out_seq.replace((seq + 1) & ASYNC_SEQ_MASK);
         spa::emit_hook!(self.inner.hooks, need_flush);
 
         Ok(())
@@ -120,8 +120,8 @@ impl Connection {
     pub(crate) fn flush(&self) -> std::io::Result<()> {
         let mut o_stream = self.inner.stream.borrow_mut();
         let stream = o_stream.as_mut().unwrap();
-        let mut buf = self.inner.buf.borrow_mut();
-        let mut size = self.inner.size.borrow_mut();
+        let mut buf = self.inner.out_buf.borrow_mut();
+        let mut size = self.inner.out_size.borrow_mut();
         let mut idx = 0;
         let mut res = Ok(());
 
@@ -160,10 +160,10 @@ impl InnerConnection {
         InnerConnection {
             stream: RefCell::new(stream),
             hooks: spa::hook::HookList::new(),
-            seq: RefCell::new(0),
-            buf: RefCell::new(vec![0; 16384]),
-            size: RefCell::new(0),
-            fds: RefCell::new(Vec::new()),
+            out_seq: RefCell::new(0),
+            out_buf: RefCell::new(vec![0; 16384]),
+            out_size: RefCell::new(0),
+            out_fds: RefCell::new(Vec::new()),
         }
     }
 }
