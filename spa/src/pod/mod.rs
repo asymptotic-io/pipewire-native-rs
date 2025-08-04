@@ -540,7 +540,7 @@ impl Pod for Pointer {
 //
 impl<T> Pod for &[T]
 where
-    T: Primitive + Pod,
+    T: Primitive,
 {
     type DecodesTo = Vec<T>;
 
