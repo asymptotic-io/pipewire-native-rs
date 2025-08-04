@@ -136,7 +136,7 @@ impl Client {
 
         if let Some(source) = self.inner.source.borrow_mut().as_mut() {
             let main_loop = self.core().context().main_loop();
-            let _ = main_loop.update_io(source, spa::flags::Io::OUT);
+            let _ = main_loop.update_io(source, source.mask | spa::flags::Io::OUT);
         }
     }
 
@@ -173,10 +173,9 @@ impl Client {
             match self.inner.connection.flush() {
                 Ok(_) => {
                     let main_loop = self.core().context().main_loop();
-                    let _ = main_loop.update_io(
-                        self.inner.source.borrow_mut().as_mut().unwrap(),
-                        mask & !spa::flags::Io::OUT,
-                    );
+                    let mut source_ref = self.inner.source.borrow_mut();
+                    let source = source_ref.as_mut().unwrap();
+                    let _ = main_loop.update_io(source, source.mask & !spa::flags::Io::OUT);
                 }
                 Err(err) => {
                     if err.raw_os_error() != Some(libc::EAGAIN) {

@@ -67,7 +67,11 @@ impl Connection {
         let _ = self.inner.hooks.lock().unwrap().remove(listener);
     }
 
-    pub(crate) fn push<T: Marshallable>(&self, id: Id, object: T) -> std::io::Result<()> {
+    pub(crate) fn push<T: Marshallable + std::fmt::Debug>(
+        &self,
+        id: Id,
+        object: T,
+    ) -> std::io::Result<()> {
         let seq = *self.inner.out_seq.borrow();
         let message = marshal::Message {
             header: marshal::Header {
@@ -80,8 +84,6 @@ impl Connection {
             object,
             footer: None, // TODO
         };
-
-        trace!("pushing message id:{id} opcode:{}", message.header.opcode);
 
         let mut buf = self.inner.out_buf.borrow_mut();
         let mut size = self.inner.out_size.borrow_mut();
@@ -107,6 +109,12 @@ impl Connection {
                 _ => unreachable!(),
             }
         }
+
+        trace!(
+            "pushed message id:{id} opcode:{} seq:{seq} payload:{:?} (filled: {size})",
+            message.header.opcode,
+            message.object
+        );
 
         self.inner.out_seq.replace((seq + 1) & ASYNC_SEQ_MASK);
         spa::emit_hook!(self.inner.hooks, need_flush);

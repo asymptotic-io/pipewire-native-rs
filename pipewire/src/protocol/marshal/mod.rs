@@ -38,18 +38,18 @@ impl<T: Marshallable> Pod for Message<T> {
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
         // Header + at least one byte for data
-        if data.len() < 5 {
+        if data.len() < 17 {
             return Err(spa::pod::Error::NoSpace);
         }
 
-        let payload_size = self.object.encode(&mut data[4..])?;
+        let payload_size = self.object.encode(&mut data[16..])?;
         let footer_size = if let Some(footer) = &self.footer {
-            footer.encode(&mut data[4 + payload_size..])?
+            footer.encode(&mut data[16 + payload_size..])?
         } else {
             0
         };
 
-        let size = 4 + payload_size + footer_size;
+        let size = payload_size + footer_size;
         let header = Header {
             size: size as u32,
             ..self.header
@@ -57,11 +57,11 @@ impl<T: Marshallable> Pod for Message<T> {
 
         header.encode(data)?;
 
-        Ok(size)
+        Ok(16 + size)
     }
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
-        if data.len() < 4 {
+        if data.len() < 16 {
             return Err(spa::pod::Error::Invalid);
         }
 
@@ -96,13 +96,13 @@ impl Pod for Header {
     type DecodesTo = Self;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
-        if data.len() < 4 {
+        if data.len() < 16 {
             return Err(spa::pod::Error::NoSpace);
         }
 
         data[0..4].copy_from_slice(&self.id.to_ne_bytes());
-        data[4] = self.opcode;
-        data[5..8].copy_from_slice(&self.size.to_ne_bytes()[0..3]);
+        let word = (self.opcode as u32) << 24 | (self.size & ((1 << 24) - 1));
+        data[4..8].copy_from_slice(&word.to_ne_bytes());
         data[8..12].copy_from_slice(&self.seq.to_ne_bytes());
         data[12..16].copy_from_slice(&self.n_fds.to_ne_bytes());
 
@@ -110,13 +110,14 @@ impl Pod for Header {
     }
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
-        if data.len() < 4 {
+        if data.len() < 16 {
             return Err(spa::pod::Error::Invalid);
         }
 
         let id = u32::from_ne_bytes(data[0..4].try_into().unwrap());
-        let opcode = data[4];
-        let size = (data[7] as u32) << 16 | (data[6] as u32) << 8 | data[5] as u32;
+        let word = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        let opcode = (word >> 24) as u8;
+        let size = word & ((1 << 24) - 1);
         let seq = u32::from_ne_bytes(data[8..12].try_into().unwrap());
         let n_fds = u32::from_ne_bytes(data[12..16].try_into().unwrap());
 

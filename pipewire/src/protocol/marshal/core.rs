@@ -13,6 +13,7 @@ use crate::{
 
 use super::Marshallable;
 
+#[derive(Debug)]
 enum Methods {
     Hello(Hello),
     Sync(Sync),
@@ -35,6 +36,7 @@ impl Marshallable for Methods {
             Self::Destroy(_) => 7,
         }
     }
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
         match self {
             Self::Hello(o) => o.encode(data),
@@ -54,18 +56,18 @@ impl Marshallable for Methods {
     }
 }
 
-#[derive(macros::PodStruct)]
+#[derive(Debug, macros::PodStruct)]
 struct Hello {
     version: i32,
 }
 
-#[derive(macros::PodStruct)]
+#[derive(Debug, macros::PodStruct)]
 struct Sync {
     id: i32,
     seq: i32,
 }
 
-#[derive(macros::PodStruct)]
+#[derive(Debug, macros::PodStruct)]
 struct Pong {
     id: i32,
     seq: i32,
