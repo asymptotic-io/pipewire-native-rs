@@ -7,9 +7,18 @@ pub(crate) mod core;
 use pipewire_native_macros as macros;
 use pipewire_native_spa::{self as spa, pod::Pod};
 
-pub(crate) struct Message<O: Pod<DecodesTo = O>> {
+pub(crate) trait Marshallable {
+    fn opcode(&self) -> u8;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error>;
+    fn decode(opcode: u8, data: &[u8]) -> Result<(Self, usize), spa::pod::Error>
+    where
+        Self: Sized;
+}
+
+pub(crate) struct Message<T: Marshallable> {
     pub(crate) header: Header,
-    pub(crate) object: O,
+    pub(crate) object: T,
     pub(crate) footer: Option<Footer>,
 }
 
@@ -24,7 +33,7 @@ pub(crate) struct Header {
 #[derive(macros::PodStruct)]
 pub(crate) struct Footer {}
 
-impl<O: Pod<DecodesTo = O>> Pod for Message<O> {
+impl<T: Marshallable> Pod for Message<T> {
     type DecodesTo = Self;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
@@ -58,7 +67,7 @@ impl<O: Pod<DecodesTo = O>> Pod for Message<O> {
 
         let (header, header_size) = Header::decode(data)?;
         let size = header.size as usize;
-        let (object, payload_size) = O::decode(&data[header_size..])?;
+        let (object, payload_size) = T::decode(header.opcode, &data[header_size..])?;
 
         let (footer, footer_size) = if size > header_size + payload_size {
             let (f, s) = Footer::decode(&data[header_size + payload_size..size])?;

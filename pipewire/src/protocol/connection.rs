@@ -18,6 +18,8 @@ use crate::{
     refcounted, trace, Id,
 };
 
+use super::marshal::Marshallable;
+
 default_topic!(log::topic::CONNECTION);
 
 const MAX_MESSAGE_SIZE: usize = 16_777_216;
@@ -65,26 +67,21 @@ impl Connection {
         let _ = self.inner.hooks.lock().unwrap().remove(listener);
     }
 
-    pub(crate) fn push<T: spa::pod::Pod<DecodesTo = T>>(
-        &self,
-        id: Id,
-        opcode: u8,
-        data: T,
-    ) -> std::io::Result<()> {
+    pub(crate) fn push<T: Marshallable>(&self, id: Id, object: T) -> std::io::Result<()> {
         let seq = *self.inner.out_seq.borrow();
         let message = marshal::Message {
             header: marshal::Header {
                 id,
-                opcode,
+                opcode: object.opcode(),
                 seq,
                 size: 0,  // filled by encode
                 n_fds: 0, // TOOO
             },
-            object: data,
+            object,
             footer: None, // TODO
         };
 
-        trace!("pushing message id:{id} opcode:{opcode}");
+        trace!("pushing message id:{id} opcode:{}", message.header.opcode);
 
         let mut buf = self.inner.out_buf.borrow_mut();
         let mut size = self.inner.out_size.borrow_mut();
