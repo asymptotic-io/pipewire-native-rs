@@ -56,19 +56,19 @@ impl Marshallable for Methods {
 
 #[derive(macros::PodStruct)]
 struct Hello {
-    version: i64,
+    version: i32,
 }
 
 #[derive(macros::PodStruct)]
 struct Sync {
-    id: i64,
-    seq: i64,
+    id: i32,
+    seq: i32,
 }
 
 #[derive(macros::PodStruct)]
 struct Pong {
-    id: i64,
-    seq: i64,
+    id: i32,
+    seq: i32,
 }
 
 pub(crate) fn methods(connection: Connection) -> CoreMethods<Core> {
@@ -77,7 +77,7 @@ pub(crate) fn methods(connection: Connection) -> CoreMethods<Core> {
             connection.push(
                 proxy.id(),
                 Methods::Hello(Hello {
-                    version: version as i64,
+                    version: version as i32,
                 }),
             )
         }),
@@ -86,8 +86,8 @@ pub(crate) fn methods(connection: Connection) -> CoreMethods<Core> {
             connection.push(
                 proxy.id(),
                 Methods::Sync(Sync {
-                    id: id as i64,
-                    seq: seq as i64,
+                    id: id as i32,
+                    seq: seq as i32,
                 }),
             )
         }),
@@ -95,8 +95,8 @@ pub(crate) fn methods(connection: Connection) -> CoreMethods<Core> {
             connection.push(
                 proxy.id(),
                 Methods::Pong(Pong {
-                    id: id as i64,
-                    seq: seq as i64,
+                    id: id as i32,
+                    seq: seq as i32,
                 }),
             )
         }),
