@@ -168,6 +168,7 @@ pub enum LoopUtilsSourceCb {
 
 pub struct LoopUtilsSource {
     pub cb: LoopUtilsSourceCb,
+    pub mask: flags::Io,
     pub inner: Box<dyn Any>,
 }
 

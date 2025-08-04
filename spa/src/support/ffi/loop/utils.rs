@@ -125,6 +125,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Io(func),
+            mask,
             inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
@@ -152,6 +153,8 @@ impl CLoopUtilsImpl {
         source: &mut Pin<Box<LoopUtilsSource>>,
         mask: flags::Io,
     ) -> std::io::Result<i32> {
+        source.mask = mask;
+
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
@@ -181,6 +184,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Idle(func),
+            mask: flags::Io::IN,
             inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
@@ -234,6 +238,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Event(func),
+            mask: flags::Io::IN,
             inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
@@ -285,6 +290,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Timer(func),
+            mask: flags::Io::IN,
             inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
@@ -347,6 +353,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Signal(func),
+            mask: flags::Io::IN,
             inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
