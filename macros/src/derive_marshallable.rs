@@ -19,8 +19,6 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
         _ => return quote! {}.into(),
     };
 
-    let data_ident: Ident = parse_quote!(data);
-
     let mut variant_names = vec![];
     let mut variant_types = vec![];
     let mut discriminants = vec![];
@@ -52,10 +50,18 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
 
     quote! {
         impl #generics crate::protocol::marshal::Marshallable for #ident {
+            fn opcode(&self) -> u8 {
+                match self {
+                #(
+                    Self::#variant_names(_) => #discriminants,
+                )*
+                }
+            }
+
             fn encode(&self, data: &mut [u8]) -> Result<usize, pipewire_native_spa::pod::Error> {
                 match self {
                 #(
-                    Self::#variant_names(o) => o.encode(#data_ident),
+                    Self::#variant_names(o) => o.encode(data),
                 )*
                 }
             }
@@ -66,7 +72,7 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
             {
                 #(
                     if opcode == #discriminants {
-                        return #variant_types::decode(#data_ident).map(|(o, s)| {
+                        return #variant_types::decode(data).map(|(o, s)| {
                             (Self::#variant_names(o), s)
                         })
                     }

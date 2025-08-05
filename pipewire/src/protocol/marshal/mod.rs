@@ -10,11 +10,7 @@ use pipewire_native_spa::{self as spa, pod::Pod};
 pub(crate) const HEADER_LEN: usize = 16;
 
 pub(crate) trait Marshallable {
-    fn opcode(&self) -> u8 {
-        // Default implementation assumes the enum is #[repr(u8)] and does some unsafe shenanigans
-        // to extract the enum discriminant
-        unsafe { *(self as *const Self as *const u8) }
-    }
+    fn opcode(&self) -> u8;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error>;
     fn decode(opcode: u8, data: &[u8]) -> Result<(Self, usize), spa::pod::Error>

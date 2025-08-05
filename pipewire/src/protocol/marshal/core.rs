@@ -137,7 +137,6 @@ impl Methods {
     }
 }
 
-#[repr(u8)]
 #[derive(Debug, macros::Marshallable)]
 pub(crate) enum Events {
     Info(Info),
