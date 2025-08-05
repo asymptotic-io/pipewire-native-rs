@@ -212,7 +212,7 @@ impl Client {
         match object_type {
             types::interface::CORE => {
                 let proxy = core.find_proxy::<Core>(header.id).unwrap();
-                super::marshal::core::demarshal_event(&self.inner.connection, &header, proxy)?;
+                super::marshal::core::Events::demarshal(&self.inner.connection, &header, proxy)?;
             }
             _ => unreachable!(),
         }

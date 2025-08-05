@@ -242,7 +242,7 @@ impl InnerCore {
             client,
             proxy: RefCell::new(None),
             proxies: RefCell::new(IdMap::new()),
-            methods: Rc::new(RefCell::new(protocol::marshal::core::marshal_methods(
+            methods: Rc::new(RefCell::new(protocol::marshal::core::Methods::marshal(
                 connection,
             ))),
             hooks: spa::hook::HookList::new(),

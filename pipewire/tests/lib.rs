@@ -61,5 +61,7 @@ fn test_lib() {
     let res = ml.update_timer(&mut timer_src, &timeout, None, false);
     assert!(res.is_ok());
 
+    core.sync().unwrap();
+
     ml.run();
 }

@@ -60,7 +60,7 @@ macro_rules! proxy_object_invoke {
 macro_rules! proxy_object_notify {
     ($proxy:ident, $event:ident, $($args:tt)*) => {
         if let Some(_object) = $proxy.object() {
-            spa::emit_hook!(_object.events(), $event, ($($args)*));
+            spa::emit_hook!(_object.events(), $event, $($args)*);
         }
     };
 }
