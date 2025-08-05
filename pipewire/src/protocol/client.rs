@@ -152,8 +152,15 @@ impl Client {
         }
 
         if mask.contains(spa::flags::Io::IN) {
-            if let Err(err) = self.process_messages() {
-                self.on_connection_error(err, "failed to read messages");
+            loop {
+                if let Err(err) = self.process_messages() {
+                    // We use EAGAIN to signify there are no more messages pending
+                    if err.raw_os_error() == Some(libc::EAGAIN) {
+                        break;
+                    } else {
+                        self.on_connection_error(err, "failed to read messages");
+                    }
+                }
             }
         }
 

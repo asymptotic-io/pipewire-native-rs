@@ -271,11 +271,15 @@ impl Connection {
         let read = stream.read(&mut buf[*offset..])?;
         trace!("read {read} bytes");
 
-        *size += read;
-
         // TODO: control messages
 
-        Ok(())
+        if read > 0 {
+            *size += read;
+            Ok(())
+        } else {
+            // Nothing to process, we're done
+            Err(std::io::Error::from_raw_os_error(libc::EAGAIN))
+        }
     }
 }
 
