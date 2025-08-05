@@ -171,11 +171,23 @@ impl Connection {
             if self.inner.in_buf.borrow().capacity() < wanted_capacity {
                 // Not enough space for header or message, make some space, try to fill some data,
                 // and then retry
+                trace!(
+                    "expanding capacity from {} -> {}",
+                    self.inner.in_buf.borrow().capacity(),
+                    wanted_capacity
+                );
                 self.inner.in_buf.borrow_mut().resize(wanted_capacity, 0);
                 self.read()?;
             } else if let Some(header) = header {
                 // We had enough space, and got the header, so we should be good to have the caller
                 // try to decode the message too
+                trace!(
+                    "got message id:{} opcode:{} seq:{} size:{}",
+                    header.id,
+                    header.opcode,
+                    header.seq,
+                    header.size
+                );
                 return Ok(header);
             } else {
                 // We had enough space, but don't have the data, let's try to read data into the
@@ -230,6 +242,8 @@ impl Connection {
             return Ok((marshal::HEADER_LEN, None));
         }
 
+        trace!("looking for message header from [{offset}..{size}]");
+
         let buf = self.inner.in_buf.borrow();
         let header = match Header::decode(&buf[offset..size]) {
             Ok((header, _)) => header,
@@ -255,6 +269,7 @@ impl Connection {
         let mut size = self.inner.in_size.borrow_mut();
 
         let read = stream.read(&mut buf[*offset..])?;
+        trace!("read {read} bytes");
 
         *size += read;
 
