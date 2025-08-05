@@ -153,44 +153,38 @@ impl<K: Pod<DecodesTo = K>, V: Pod<DecodesTo = V>> Pod for PairList<K, V> {
     type DecodesTo = Self;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
-        // At least need space for n_items
-        if data.len() < 4 {
-            return Err(spa::pod::Error::NoSpace);
-        }
+        let builder = spa::pod::builder::Builder::new(data);
 
-        data[0..4].copy_from_slice(&(self.data.len() as u32).to_ne_bytes());
-        let mut pos = 4;
+        let out = builder
+            .push_struct(|sb| {
+                let mut sb = sb.push_int(self.data.len() as i32);
 
-        for (k, v) in self.data.iter() {
-            pos += k.encode(&mut data[pos..])?;
-            pos += v.encode(&mut data[pos..])?;
-        }
+                for item in &self.data {
+                    sb = sb.push_pod(&item.0);
+                    sb = sb.push_pod(&item.1);
+                }
 
-        Ok(pos)
+                sb
+            })
+            .build()?;
+
+        Ok(out.len())
     }
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
-        if data.len() < 4 {
-            return Err(spa::pod::Error::Invalid);
-        }
+        let mut parser = spa::pod::parser::Parser::new(data);
 
-        let n_items = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        parser.pop_struct(|sp| {
+            let n_items = sp.pop_int()?;
+            let mut items = Vec::with_capacity(n_items as usize);
 
-        let mut n = 0;
-        let mut pos = 4;
-        let mut res = Vec::with_capacity(n_items as usize);
+            for _ in 0..n_items {
+                let key = sp.pop_pod::<K>()?;
+                let value = sp.pop_pod::<V>()?;
+                items.push((key, value));
+            }
 
-        while n < n_items {
-            n += 1;
-
-            let (k, size) = K::decode(&data[pos..])?;
-            pos += size;
-            let (v, size) = V::decode(&data[pos..])?;
-            pos += size;
-
-            res.push((k, v));
-        }
-
-        Ok((Self { data: res }, pos))
+            Ok(Self { data: items })
+        })
     }
 }

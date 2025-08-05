@@ -200,15 +200,16 @@ impl Connection {
             )
         })?;
 
-        if body_size != header.size as usize {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!(
-                    "Mismatched message size({}) and body size({})",
-                    header.size, body_size
-                ),
-            ));
-        }
+        // TODO: uncomment once we know footer size
+        //if body_size != header.size as usize {
+        //    return Err(std::io::Error::new(
+        //        std::io::ErrorKind::InvalidData,
+        //        format!(
+        //            "Mismatched message size({}) and body size({})",
+        //            header.size, body_size
+        //        ),
+        //    ));
+        //}
 
         *offset += marshal::HEADER_LEN + header.size as usize;
 
