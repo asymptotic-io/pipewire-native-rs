@@ -117,7 +117,7 @@ impl Pod for Header {
         }
 
         let id = u32::from_ne_bytes(data[0..4].try_into().unwrap());
-        let word = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        let word = u32::from_ne_bytes(data[4..8].try_into().unwrap());
         let opcode = (word >> 24) as u8;
         let size = word & ((1 << 24) - 1);
         let seq = u32::from_ne_bytes(data[8..12].try_into().unwrap());
