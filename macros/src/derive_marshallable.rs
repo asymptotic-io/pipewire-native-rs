@@ -21,15 +21,13 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
 
     let data_ident: Ident = parse_quote!(data);
 
-    let mut encodes = vec![];
-    let mut decodes = vec![];
+    let mut variant_names = vec![];
+    let mut variant_types = vec![];
+    let mut discriminants = vec![];
 
     let mut discriminant: Expr = parse_quote!(0);
 
-    /* Each line pushes the field into to the StructBuilder */
     for v in data.variants {
-        let variant_name = v.ident;
-
         discriminant = if let Some(d) = v.discriminant {
             d.1
         } else {
@@ -40,17 +38,9 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
         let variant_inner = v.fields.iter().next().unwrap();
         let variant_inner_type = &variant_inner.ty;
 
-        encodes.push(quote! {
-            Self::#variant_name(o) => o.encode(#data_ident),
-        });
-
-        decodes.push(quote! {
-            if opcode == #discriminant {
-                return #variant_inner_type::decode(#data_ident).map(|(o, s)| {
-                    (Self::#variant_name(o), s)
-                })
-            }
-        });
+        variant_names.push(v.ident);
+        variant_types.push(variant_inner_type.clone());
+        discriminants.push(discriminant.clone());
 
         discriminant = Expr::from(ExprBinary {
             attrs: vec![],
@@ -64,7 +54,9 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
         impl #generics crate::protocol::marshal::Marshallable for #ident {
             fn encode(&self, data: &mut [u8]) -> Result<usize, pipewire_native_spa::pod::Error> {
                 match self {
-                    #(#encodes)*
+                #(
+                    Self::#variant_names(o) => o.encode(#data_ident),
+                )*
                 }
             }
 
@@ -72,7 +64,13 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
             where
                 Self:Sized
             {
-                #(#decodes)*
+                #(
+                    if opcode == #discriminants {
+                        return #variant_types::decode(#data_ident).map(|(o, s)| {
+                            (Self::#variant_names(o), s)
+                        })
+                    }
+                )*
 
                 Err(pipewire_native_spa::pod::Error::Invalid)
             }
