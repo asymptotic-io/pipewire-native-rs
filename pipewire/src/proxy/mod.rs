@@ -20,9 +20,7 @@ pub trait HasProxy: Any {
     // type Methods;
     // type Events;
 
-    fn type_() -> ObjectType
-    where
-        Self: Sized;
+    fn type_(&self) -> ObjectType;
 
     fn version() -> u32
     where

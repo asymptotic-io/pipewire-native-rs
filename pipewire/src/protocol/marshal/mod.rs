@@ -7,6 +7,8 @@ pub(crate) mod core;
 use pipewire_native_macros as macros;
 use pipewire_native_spa::{self as spa, pod::Pod};
 
+pub(crate) const HEADER_LEN: usize = 16;
+
 pub(crate) trait Marshallable {
     fn opcode(&self) -> u8;
 
@@ -38,13 +40,13 @@ impl<T: Marshallable> Pod for Message<T> {
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
         // Header + at least one byte for data
-        if data.len() < 17 {
+        if data.len() < HEADER_LEN + 1 {
             return Err(spa::pod::Error::NoSpace);
         }
 
-        let payload_size = self.object.encode(&mut data[16..])?;
+        let payload_size = self.object.encode(&mut data[HEADER_LEN..])?;
         let footer_size = if let Some(footer) = &self.footer {
-            footer.encode(&mut data[16 + payload_size..])?
+            footer.encode(&mut data[HEADER_LEN + payload_size..])?
         } else {
             0
         };
@@ -57,11 +59,11 @@ impl<T: Marshallable> Pod for Message<T> {
 
         header.encode(data)?;
 
-        Ok(16 + size)
+        Ok(HEADER_LEN + size)
     }
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
-        if data.len() < 16 {
+        if data.len() < HEADER_LEN {
             return Err(spa::pod::Error::Invalid);
         }
 
@@ -131,5 +133,64 @@ impl Pod for Header {
             },
             16,
         ))
+    }
+}
+
+// Container for an arbitrary list of pairs (dict, or hashmaps) that we want to be able to
+// serialise into a struct in the form:
+//
+//  Struct(
+//      Int: n_items
+//      (K: key
+//       V: value)*
+//  )
+#[derive(Debug)]
+pub(crate) struct PairList<K: Pod<DecodesTo = K>, V: Pod<DecodesTo = V>> {
+    pub(crate) data: Vec<(K, V)>,
+}
+
+impl<K: Pod<DecodesTo = K>, V: Pod<DecodesTo = V>> Pod for PairList<K, V> {
+    type DecodesTo = Self;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
+        // At least need space for n_items
+        if data.len() < 4 {
+            return Err(spa::pod::Error::NoSpace);
+        }
+
+        data[0..4].copy_from_slice(&(self.data.len() as u32).to_ne_bytes());
+        let mut pos = 4;
+
+        for (k, v) in self.data.iter() {
+            pos += k.encode(&mut data[pos..])?;
+            pos += v.encode(&mut data[pos..])?;
+        }
+
+        Ok(pos)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
+        if data.len() < 4 {
+            return Err(spa::pod::Error::Invalid);
+        }
+
+        let n_items = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+
+        let mut n = 0;
+        let mut pos = 4;
+        let mut res = Vec::with_capacity(n_items as usize);
+
+        while n < n_items {
+            n += 1;
+
+            let (k, size) = K::decode(&data[pos..])?;
+            pos += size;
+            let (v, size) = V::decode(&data[pos..])?;
+            pos += size;
+
+            res.push((k, v));
+        }
+
+        Ok((Self { data: res }, pos))
     }
 }

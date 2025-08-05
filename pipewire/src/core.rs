@@ -56,14 +56,20 @@ refcounted! {
 
 impl Core {
     pub(crate) fn new(context: &Context, properties: Properties) -> std::io::Result<Self> {
+        debug!("Creating new core");
+
         let this = Self {
             inner: Rc::new(InnerCore::new(context, properties)),
         };
 
         // Reserve id 0 because we are id 0
-        let _ = this.inner.proxies.borrow_mut().reserve();
+        let id = this.inner.proxies.borrow_mut().reserve();
         let core_proxy = Proxy::new_weak(0, &this);
         this.inner.proxy.borrow_mut().replace(core_proxy.clone());
+        this.inner
+            .proxies
+            .borrow_mut()
+            .insert_at(id, Box::new(this.clone()));
 
         let id = this.inner.proxies.borrow_mut().reserve();
         let client = proxy::client::Client::new(id);
@@ -131,17 +137,38 @@ impl Core {
             .expect("Context should outlive core")
     }
 
+    pub(crate) fn find_proxy_type(&self, id: Id) -> Option<types::ObjectType> {
+        self.inner.proxies.borrow().get(id).map(|o| o.type_())
+    }
+
+    pub(crate) fn find_proxy<T: HasProxy + Refcounted>(&self, id: Id) -> Option<Proxy<T>> {
+        self.inner
+            .proxies
+            .borrow()
+            .get(id)
+            .and_then(|o| o.downcast_proxy::<T>())
+    }
+
     pub fn add_listener(&self, events: CoreEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
-    pub fn methods(&self) -> Rc<RefCell<CoreMethods<Core>>> {
+    pub fn sync(&self) -> std::io::Result<()> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, sync, 0)
+    }
+
+    pub(crate) fn methods(&self) -> Rc<RefCell<CoreMethods<Core>>> {
         self.inner.methods.clone()
+    }
+
+    pub(crate) fn events(&self) -> Arc<Mutex<spa::hook::HookList<CoreEvents>>> {
+        self.inner.hooks.clone()
     }
 }
 
 impl HasProxy for Core {
-    fn type_() -> types::ObjectType {
+    fn type_(&self) -> types::ObjectType {
         types::interface::CORE
     }
 
@@ -189,7 +216,7 @@ pub struct CoreMethods<T: HasProxy + Refcounted> {
 }
 
 pub struct CoreEvents {
-    pub info: Option<Box<dyn FnMut(CoreInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&CoreInfo<'_>)>>,
     pub done: Option<Box<dyn FnMut(Id, u32)>>,
     pub error: Option<Box<dyn FnMut(Id, u32, u32, &str)>>,
     pub(crate) ping: Option<Box<dyn FnMut(Id, u32)>>,
@@ -202,8 +229,6 @@ pub struct CoreEvents {
 
 impl InnerCore {
     fn new(context: &Context, mut properties: Properties) -> Self {
-        debug!("Creating new core");
-
         properties.add_dict(&context.properties());
 
         // TODO: Create mempool
@@ -217,7 +242,9 @@ impl InnerCore {
             client,
             proxy: RefCell::new(None),
             proxies: RefCell::new(IdMap::new()),
-            methods: Rc::new(RefCell::new(protocol::marshal::core::methods(connection))),
+            methods: Rc::new(RefCell::new(protocol::marshal::core::marshal_methods(
+                connection,
+            ))),
             hooks: spa::hook::HookList::new(),
         }
     }

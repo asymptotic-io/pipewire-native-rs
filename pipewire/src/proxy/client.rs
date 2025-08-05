@@ -20,7 +20,7 @@ refcounted! {
 }
 
 impl HasProxy for Client {
-    fn type_() -> types::ObjectType {
+    fn type_(&self) -> types::ObjectType {
         types::interface::CLIENT
     }
 

@@ -4,7 +4,7 @@
 
 use std::{
     cell::RefCell,
-    io::Write,
+    io::{Read, Write},
     os::{fd::RawFd, unix::net::UnixStream},
     rc::{Rc, Weak},
     sync::{Arc, Mutex},
@@ -18,7 +18,7 @@ use crate::{
     refcounted, trace, Id,
 };
 
-use super::marshal::Marshallable;
+use super::marshal::{Header, Marshallable};
 
 default_topic!(log::topic::CONNECTION);
 
@@ -28,6 +28,11 @@ refcounted! {
     pub(crate) struct Connection {
         stream: RefCell<Option<UnixStream>>,
         hooks: Arc<Mutex<spa::hook::HookList<ConnectionEvents>>>,
+        // Data received
+        in_seq: RefCell<u32>,
+        in_buf: RefCell<Vec<u8>>,
+        in_size: RefCell<usize>,
+        in_offset: RefCell<usize>,
         // Data to send
         out_seq: RefCell<u32>,
         out_buf: RefCell<Vec<u8>>,
@@ -158,6 +163,104 @@ impl Connection {
 
         res
     }
+
+    pub(crate) fn next_message(&self) -> std::io::Result<Header> {
+        loop {
+            let (wanted_capacity, header) = self.parse_next()?;
+
+            if self.inner.in_buf.borrow().capacity() < wanted_capacity {
+                // Not enough space for header or message, make some space, try to fill some data,
+                // and then retry
+                self.inner.in_buf.borrow_mut().resize(wanted_capacity, 0);
+                self.read()?;
+            } else if let Some(header) = header {
+                // We had enough space, and got the header, so we should be good to have the caller
+                // try to decode the message too
+                return Ok(header);
+            } else {
+                // We had enough space, but don't have the data, let's try to read data into the
+                // buffer
+                self.read()?;
+            }
+        }
+    }
+
+    pub(crate) fn decode_message<T: Marshallable>(&self, header: &Header) -> std::io::Result<T> {
+        let buf = self.inner.in_buf.borrow_mut();
+        let mut size = self.inner.in_size.borrow_mut();
+        let mut offset = self.inner.in_offset.borrow_mut();
+
+        let start = *offset + marshal::HEADER_LEN;
+        let end = start + header.size as usize;
+
+        let (body, body_size) = T::decode(header.opcode, &buf[start..end]).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Could not decode message body: {e:?}"),
+            )
+        })?;
+
+        if body_size != header.size as usize {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Mismatched message size({}) and body size({})",
+                    header.size, body_size
+                ),
+            ));
+        }
+
+        *offset += marshal::HEADER_LEN + header.size as usize;
+
+        if *offset == *size {
+            // We've consumed all the data
+            *offset = 0;
+            *size = 0;
+        }
+
+        Ok(body)
+    }
+
+    fn parse_next(&self) -> std::io::Result<(usize, Option<Header>)> {
+        let size = *self.inner.in_size.borrow();
+        let offset = *self.inner.in_offset.borrow();
+
+        if size - offset < marshal::HEADER_LEN {
+            return Ok((marshal::HEADER_LEN, None));
+        }
+
+        let buf = self.inner.in_buf.borrow();
+        let header = match Header::decode(&buf[offset..size]) {
+            Ok((header, _)) => header,
+            Err(e) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Failed to parse message: {e:?}"),
+                ))
+            }
+        };
+
+        Ok((
+            offset + marshal::HEADER_LEN + header.size as usize,
+            Some(header),
+        ))
+    }
+
+    fn read(&self) -> std::io::Result<()> {
+        let mut stream_ref = self.inner.stream.borrow_mut();
+        let stream = stream_ref.as_mut().unwrap();
+        let mut buf = self.inner.in_buf.borrow_mut();
+        let offset = self.inner.in_offset.borrow_mut();
+        let mut size = self.inner.in_size.borrow_mut();
+
+        let read = stream.read(&mut buf[*offset..])?;
+
+        *size += read;
+
+        // TODO: control messages
+
+        Ok(())
+    }
 }
 
 impl InnerConnection {
@@ -165,6 +268,10 @@ impl InnerConnection {
         InnerConnection {
             stream: RefCell::new(stream),
             hooks: spa::hook::HookList::new(),
+            in_seq: RefCell::new(0),
+            in_buf: RefCell::new(vec![0; 16384]),
+            in_size: RefCell::new(0),
+            in_offset: RefCell::new(0),
             out_seq: RefCell::new(0),
             out_buf: RefCell::new(vec![0; 16384]),
             out_size: RefCell::new(0),

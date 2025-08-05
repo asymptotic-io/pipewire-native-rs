@@ -21,7 +21,7 @@ use crate::{
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
     proxy::HasProxy,
-    proxy_notify, refcounted, some_closure, trace, warn,
+    proxy_notify, refcounted, some_closure, trace, types, warn, Id,
 };
 
 default_topic!(log::topic::PROTOCOL);
@@ -152,7 +152,9 @@ impl Client {
         }
 
         if mask.contains(spa::flags::Io::IN) {
-            trace!("incoming data");
+            if let Err(err) = self.process_messages() {
+                self.on_connection_error(err, "failed to read messages");
+            }
         }
 
         if mask.contains(spa::flags::Io::OUT) || *self.inner.need_flush.borrow() {
@@ -184,6 +186,31 @@ impl Client {
                 }
             }
         }
+    }
+
+    fn process_messages(&self) -> std::io::Result<()> {
+        let core = self.core();
+        let header = self.inner.connection.next_message()?;
+        let object_type = match core.find_proxy_type(header.id as Id) {
+            Some(type_) => type_,
+            None => {
+                warn!(
+                    "Got message id:{} opcode:{} seq:{}",
+                    header.id, header.opcode, header.seq
+                );
+                return Ok(());
+            }
+        };
+
+        match object_type {
+            types::interface::CORE => {
+                let proxy = core.find_proxy::<Core>(header.id).unwrap();
+                super::marshal::core::demarshal_event(&self.inner.connection, &header, proxy)?;
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(())
     }
 
     fn on_connection_error(&self, err: std::io::Error, msg: &str) {
