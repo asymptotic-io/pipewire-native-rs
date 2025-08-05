@@ -29,7 +29,6 @@ refcounted! {
         stream: RefCell<Option<UnixStream>>,
         hooks: Arc<Mutex<spa::hook::HookList<ConnectionEvents>>>,
         // Data received
-        in_seq: RefCell<u32>,
         in_buf: RefCell<Vec<u8>>,
         in_size: RefCell<usize>,
         in_offset: RefCell<usize>,
@@ -288,7 +287,6 @@ impl InnerConnection {
         InnerConnection {
             stream: RefCell::new(stream),
             hooks: spa::hook::HookList::new(),
-            in_seq: RefCell::new(0),
             in_buf: RefCell::new(vec![0; 16384]),
             in_size: RefCell::new(0),
             in_offset: RefCell::new(0),

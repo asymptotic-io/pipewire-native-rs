@@ -44,6 +44,7 @@ refcounted! {
         connection: Connection,
         connected: RefCell<bool>,
         need_flush: RefCell<bool>,
+        last_in_seq: RefCell<u32>,
         source: RefCell<Option<Pin<Box<spa::interface::r#loop::LoopUtilsSource>>>>,
         listener: RefCell<Option<spa::hook::HookId>>,
     }
@@ -217,6 +218,8 @@ impl Client {
             _ => unreachable!(),
         }
 
+        self.inner.last_in_seq.replace(header.seq);
+
         Ok(())
     }
 
@@ -229,9 +232,10 @@ impl Client {
         }
 
         let core = &self.core();
+        let seq = *self.inner.last_in_seq.borrow();
         let res = err.raw_os_error().unwrap_or(err.kind() as i32).abs() as u32;
 
-        proxy_notify!(core, error, 0 /* TODO: recv_seq */, res, msg);
+        proxy_notify!(core, error, seq, res, msg);
     }
 
     fn connect_local_socket(
@@ -306,6 +310,7 @@ impl InnerClient {
             connection: Connection::new(None),
             connected: RefCell::new(false),
             need_flush: RefCell::new(false),
+            last_in_seq: RefCell::new(0),
             source: RefCell::new(None),
             listener: RefCell::new(None),
         }
