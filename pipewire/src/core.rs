@@ -211,7 +211,8 @@ pub struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) pong: Box<dyn FnMut(&Proxy<T>, Id, u32) -> std::io::Result<()>>,
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     // pub(crate) get_registry: fn(...)
-    pub(crate) create_object: Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &spa::dict::Dict)>,
+    pub(crate) create_object:
+        Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &spa::dict::Dict) -> std::io::Result<()>>,
     pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,
 }
 

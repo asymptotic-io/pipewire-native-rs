@@ -8,55 +8,27 @@ use pipewire_native_spa::{self as spa, pod::Pod};
 use crate::{
     closure,
     core::{Core, CoreChangeMask, CoreInfo, CoreMethods},
+    default_topic, log,
     protocol::{connection::Connection, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK},
     proxy::Proxy,
-    proxy_object_notify, Id,
+    proxy_object_notify, trace, Id,
 };
 
-use super::{Marshallable, PairList};
+use super::PairList;
 
-#[derive(Debug)]
+#[repr(u8)]
+#[derive(Debug, macros::Marshallable)]
 pub(crate) enum Methods {
-    Hello(Hello),
+    Hello(Hello) = 1,
     Sync(Sync),
     Pong(Pong),
-    Error(()),
-    GetRegistry(()),
-    CreateObject(()),
-    Destroy(()),
+    Error(ErrorMethod),
+    GetRegistry(GetRegistry),
+    CreateObject(CreateObject),
+    Destroy(Destroy),
 }
 
-impl Marshallable for Methods {
-    fn opcode(&self) -> u8 {
-        match self {
-            Self::Hello(_) => 1,
-            Self::Sync(_) => 2,
-            Self::Pong(_) => 3,
-            Self::Error(_) => 4,
-            Self::GetRegistry(_) => 5,
-            Self::CreateObject(_) => 6,
-            Self::Destroy(_) => 7,
-        }
-    }
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
-        match self {
-            Self::Hello(o) => o.encode(data),
-            Self::Sync(o) => o.encode(data),
-            Self::Pong(o) => o.encode(data),
-            _ => todo!(),
-        }
-    }
-
-    fn decode(opcode: u8, data: &[u8]) -> Result<(Self, usize), spa::pod::Error> {
-        match opcode {
-            1 => Hello::decode(data).map(|(o, s)| (Self::Hello(o), s)),
-            2 => Sync::decode(data).map(|(o, s)| (Self::Sync(o), s)),
-            3 => Pong::decode(data).map(|(o, s)| (Self::Pong(o), s)),
-            _ => todo!(),
-        }
-    }
-}
+default_topic!(log::topic::PROTOCOL);
 
 #[derive(Debug, macros::PodStruct)]
 pub(crate) struct Hello {
@@ -73,6 +45,33 @@ pub(crate) struct Sync {
 pub(crate) struct Pong {
     id: i32,
     seq: i32,
+}
+
+#[derive(Debug, macros::PodStruct)]
+pub(crate) struct ErrorMethod {
+    id: i32,
+    seq: i32,
+    res: i32,
+    message: String,
+}
+
+#[derive(Debug, macros::PodStruct)]
+pub(crate) struct GetRegistry {
+    version: i32,
+    new_id: i32,
+}
+
+#[derive(Debug, macros::PodStruct)]
+pub(crate) struct CreateObject {
+    factory_name: String,
+    type_: String,
+    version: i32,
+    props: PairList<String, String>,
+}
+
+#[derive(Debug, macros::PodStruct)]
+pub(crate) struct Destroy {
+    id: i32,
 }
 
 impl Methods {
@@ -105,21 +104,46 @@ impl Methods {
                     }),
                 )
             }),
-            error: closure!(connection, proxy, seq, res, message, { todo!() }),
+            error: closure!(connection, proxy, seq, res, message, {
+                connection.push(
+                    proxy.id(),
+                    Methods::Error(ErrorMethod {
+                        id: proxy.id() as i32,
+                        seq: seq as i32,
+                        res: res as i32,
+                        message: message.to_string(),
+                    }),
+                )
+            }),
             create_object: closure!(connection, proxy, factory_name, type_, version, props, {
-                todo!()
+                connection.push(
+                    proxy.id(),
+                    Methods::CreateObject(CreateObject {
+                        factory_name: factory_name.to_string(),
+                        type_: type_.to_string(),
+                        version: version as i32,
+                        props: PairList::new(
+                            props
+                                .items()
+                                .iter()
+                                .map(|(k, v)| (k.to_string(), v.to_string()))
+                                .collect(),
+                        ),
+                    }),
+                )
             }),
             destroy: closure!(connection, proxy, object, { todo!() }),
         }
     }
 }
 
-#[derive(Debug)]
+#[repr(u8)]
+#[derive(Debug, macros::Marshallable)]
 pub(crate) enum Events {
     Info(Info),
     Done(Done),
     Ping(Ping),
-    Error(Error),
+    Error(ErrorEvent),
     RemoveId(RemoveId),
     BoundId(BoundId),
     AddMem(AddMem),
@@ -151,7 +175,7 @@ pub(crate) struct Ping {
 }
 
 #[derive(Debug, macros::PodStruct)]
-pub(crate) struct Error {
+pub(crate) struct ErrorEvent {
     id: i32,
     seq: i32,
     res: i32,
@@ -181,51 +205,6 @@ pub(crate) struct BoundProps {
     props: PairList<String, String>,
 }
 
-impl Marshallable for Events {
-    fn opcode(&self) -> u8 {
-        match self {
-            Self::Info(_) => 0,
-            Self::Done(_) => 1,
-            Self::Ping(_) => 2,
-            Self::Error(_) => 3,
-            Self::RemoveId(_) => 4,
-            Self::BoundId(_) => 5,
-            Self::AddMem(_) => 6,
-            Self::BoundProps(_) => 7,
-        }
-    }
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
-        match self {
-            Self::Info(o) => o.encode(data),
-            Self::Done(o) => o.encode(data),
-            Self::Ping(o) => o.encode(data),
-            Self::Error(o) => o.encode(data),
-            Self::RemoveId(o) => o.encode(data),
-            Self::BoundId(o) => o.encode(data),
-            Self::AddMem(o) => o.encode(data),
-            Self::BoundProps(o) => o.encode(data),
-        }
-    }
-
-    fn decode(opcode: u8, data: &[u8]) -> Result<(Self, usize), spa::pod::Error>
-    where
-        Self: Sized,
-    {
-        match opcode {
-            0 => Info::decode(data).map(|(o, s)| (Self::Info(o), s)),
-            1 => Done::decode(data).map(|(o, s)| (Self::Done(o), s)),
-            2 => Ping::decode(data).map(|(o, s)| (Self::Ping(o), s)),
-            3 => Error::decode(data).map(|(o, s)| (Self::Error(o), s)),
-            4 => RemoveId::decode(data).map(|(o, s)| (Self::RemoveId(o), s)),
-            5 => BoundId::decode(data).map(|(o, s)| (Self::BoundId(o), s)),
-            6 => AddMem::decode(data).map(|(o, s)| (Self::AddMem(o), s)),
-            7 => BoundProps::decode(data).map(|(o, s)| (Self::BoundProps(o), s)),
-            _ => unreachable!(),
-        }
-    }
-}
-
 impl Events {
     pub(crate) fn demarshal(
         connection: &Connection,
@@ -233,6 +212,8 @@ impl Events {
         proxy: Proxy<Core>,
     ) -> std::io::Result<()> {
         let event = connection.decode_message::<Events>(header)?;
+
+        trace!("got event: {event:?}");
 
         match event {
             Events::Info(info) => {
