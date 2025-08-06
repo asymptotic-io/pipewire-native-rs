@@ -32,6 +32,12 @@ impl Properties {
         }
     }
 
+    pub fn new_vec(pairs: Vec<(String, String)>) -> Self {
+        Self {
+            map: HashMap::from_iter(pairs),
+        }
+    }
+
     pub fn new_dict(dict: &Dict) -> Self {
         let mut map = HashMap::new();
 
@@ -53,6 +59,10 @@ impl Properties {
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
         self.map.iter()
+    }
+
+    pub fn iter_str(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.map.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 
     pub fn dict(&self) -> Dict {
@@ -132,8 +142,12 @@ impl Properties {
         Ok(count)
     }
 
-    pub fn update_keys(&mut self, dict: &Dict, keys: Vec<&str>) {
-        for (k, v) in dict.items() {
+    pub fn update_keys<'a>(
+        &mut self,
+        dict: impl Iterator<Item = (&'a str, &'a str)>,
+        keys: Vec<&str>,
+    ) {
+        for (k, v) in dict {
             if keys.contains(&k) {
                 self.set(k, v.to_string());
             }

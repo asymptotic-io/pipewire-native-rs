@@ -96,7 +96,7 @@ impl Core {
                 if let Some(props) = info.props {
                     debug!("updating props {:?}", props);
                     this.context()
-                        .update_properties(props, vec!["default.clock.quantum-limit"]);
+                        .update_properties(&props, vec!["default.clock.quantum-limit"]);
                 }
             }),
             done: some_closure!(core_proxy, id, seq, {
@@ -202,7 +202,7 @@ pub struct CoreInfo<'a> {
     pub version: &'a str,
     pub name: &'a str,
     pub mask: CoreChangeMask,
-    pub props: Option<&'a spa::dict::Dict>,
+    pub props: Option<&'a Properties>,
 }
 
 pub struct CoreMethods<T: HasProxy + Refcounted> {
@@ -212,7 +212,7 @@ pub struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     // pub(crate) get_registry: fn(...)
     pub(crate) create_object:
-        Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &spa::dict::Dict) -> std::io::Result<()>>,
+        Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &Properties) -> std::io::Result<()>>,
     pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,
 }
 
@@ -225,7 +225,7 @@ pub struct CoreEvents {
     pub(crate) bound_id: Option<Box<dyn FnMut(Id, Id)>>,
     pub(crate) add_mem: Option<Box<dyn FnMut(Id, u32, RawFd, u32)>>,
     pub(crate) remove_mem: Option<Box<dyn FnMut(Id)>>,
-    pub(crate) bound_props: Option<Box<dyn FnMut(Id, Id, &spa::dict::Dict)>>,
+    pub(crate) bound_props: Option<Box<dyn FnMut(Id, Id, &Properties)>>,
 }
 
 impl InnerCore {

@@ -75,8 +75,11 @@ impl Context {
         self.inner.properties.borrow().dict()
     }
 
-    pub(crate) fn update_properties(&self, dict: &spa::dict::Dict, keys: Vec<&str>) {
-        self.inner.properties.borrow_mut().update_keys(dict, keys);
+    pub(crate) fn update_properties(&self, props: &Properties, keys: Vec<&str>) {
+        self.inner
+            .properties
+            .borrow_mut()
+            .update_keys(props.iter_str(), keys);
     }
 
     pub(crate) fn protocol(&self) -> &Protocol {

@@ -9,8 +9,12 @@ use std::sync::{Arc, Mutex};
 use bitflags::bitflags;
 use pipewire_native_spa as spa;
 
-use crate::proxy::{HasProxy, Proxy};
-use crate::{permission, refcounted, types, Id};
+use crate::{
+    permission,
+    properties::Properties,
+    proxy::{HasProxy, Proxy},
+    refcounted, types, Id, Refcounted,
+};
 
 refcounted! {
     pub struct Client {
@@ -49,7 +53,7 @@ bitflags! {
 pub struct ClientInfo<'a> {
     pub id: Id,
     pub mask: ClientChangeMask,
-    pub props: &'a spa::dict::Dict,
+    pub props: &'a Properties,
 }
 
 pub struct ClientEvents {

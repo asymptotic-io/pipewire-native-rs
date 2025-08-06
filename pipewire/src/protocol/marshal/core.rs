@@ -9,12 +9,15 @@ use crate::{
     closure,
     core::{Core, CoreChangeMask, CoreInfo, CoreMethods},
     default_topic, log,
+    properties::Properties,
     protocol::{connection::Connection, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK},
     proxy::Proxy,
     proxy_object_notify, trace, Id,
 };
 
 use super::PairList;
+
+default_topic!(log::topic::PROTOCOL);
 
 #[repr(u8)]
 #[derive(Debug, macros::Marshallable)]
@@ -27,8 +30,6 @@ pub(crate) enum Methods {
     CreateObject(CreateObject),
     Destroy(Destroy),
 }
-
-default_topic!(log::topic::PROTOCOL);
 
 #[derive(Debug, macros::PodStruct)]
 pub(crate) struct Hello {
@@ -124,7 +125,6 @@ impl Methods {
                         version: version as i32,
                         props: PairList::new(
                             props
-                                .items()
                                 .iter()
                                 .map(|(k, v)| (k.to_string(), v.to_string()))
                                 .collect(),
@@ -216,7 +216,7 @@ impl Events {
 
         match event {
             Events::Info(info) => {
-                let props = spa::dict::Dict::new(info.props.data);
+                let props = Properties::new_vec(info.props.data);
 
                 let core_info = CoreInfo {
                     id: info.id as Id,
@@ -257,7 +257,8 @@ impl Events {
                 todo!("Core::AddMem is not yet implemented");
             }
             Events::BoundProps(bound) => {
-                let props = spa::dict::Dict::new(bound.props.data);
+                let props = Properties::new_vec(bound.props.data);
+
                 proxy_object_notify!(
                     proxy,
                     bound_props,

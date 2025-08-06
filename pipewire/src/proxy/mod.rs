@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use pipewire_native_spa as spa;
 
-use crate::{refcounted, Refcounted, INVALID_ID};
+use crate::{properties::Properties, refcounted, Refcounted, INVALID_ID};
 
 use crate::{types::ObjectType, Id};
 
@@ -115,7 +115,7 @@ pub struct ProxyEvents {
     pub removed: Option<Box<dyn FnMut()>>,
     pub done: Option<Box<dyn FnMut(u32)>>,
     pub error: Option<Box<dyn FnMut(u32, u32, &str)>>,
-    pub bound_props: Option<Box<dyn FnMut(u32, &spa::dict::Dict)>>,
+    pub bound_props: Option<Box<dyn FnMut(u32, &Properties)>>,
 }
 
 impl<T: HasProxy + Refcounted> Proxy<T> {
