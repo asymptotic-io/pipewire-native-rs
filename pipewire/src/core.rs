@@ -14,13 +14,13 @@ use pipewire_native_spa as spa;
 
 use crate::{
     context::{Context, WeakContext},
-    debug, default_topic,
+    debug, default_topic, hasproxy_notify,
     id_map::IdMap,
     keys, log,
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
-    proxy_notify_dyn, proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
+    proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
 };
 
 default_topic!(log::topic::CORE);
@@ -105,7 +105,7 @@ impl Core {
                 let proxies = core.inner.proxies.borrow();
 
                 if let Some(object) = proxies.get(id) {
-                    proxy_notify_dyn!(object, done, seq);
+                    hasproxy_notify!(object, done, seq);
                 }
             }),
             error: None,

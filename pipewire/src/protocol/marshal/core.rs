@@ -8,7 +8,7 @@ use pipewire_native_spa::{self as spa, pod::Pod};
 use crate::{
     closure,
     core::{Core, CoreChangeMask, CoreInfo, CoreMethods},
-    default_topic, log,
+    default_topic, hasproxy_method_call, log,
     properties::Properties,
     protocol::{connection::Connection, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK},
     proxy::Proxy,
@@ -132,7 +132,14 @@ impl Methods {
                     }),
                 )
             }),
-            destroy: closure!(connection, proxy, object, { todo!() }),
+            destroy: closure!(connection, proxy, object, {
+                connection.push(
+                    proxy.id(),
+                    Methods::Destroy(Destroy {
+                        id: hasproxy_method_call!(object, id) as i32,
+                    }),
+                )
+            }),
         }
     }
 }

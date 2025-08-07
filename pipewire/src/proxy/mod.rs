@@ -65,21 +65,53 @@ macro_rules! proxy_object_notify {
     };
 }
 
-// To go from an object in dyn Proxy form to its proxy, we need to do some dyn Any shenanigans, so
-// let's hide that away in a macro as well.
+// To go from an object in dyn HasProxy form to the actual proxy itself, we need to do some dyn Any
+// shenanigans, so let's hide that away in a macro as well.
 #[macro_export]
-macro_rules! proxy_notify_dyn {
+macro_rules! hasproxy_method_call {
+    ($object:expr, $method:ident, $($args:tt),*) => {
+        {
+            let _type_id = ($object.as_ref() as &dyn std::any::Any).type_id();
+            if _type_id ==  std::any::TypeId::of::<$crate::core::Core>() {
+                let _proxy = $object.downcast_proxy::<$crate::core::Core>().unwrap();
+                _proxy.$method($($args),*)
+            } else if _type_id ==  std::any::TypeId::of::<$crate::proxy::client::Client>() {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+                _proxy.$method($($args),*)
+            } else {
+                unreachable!()
+            }
+        }
+    };
+    ($object:expr, $method:ident) => {
+        {
+            let _type_id = ($object.as_ref() as &dyn std::any::Any).type_id();
+            if _type_id ==  std::any::TypeId::of::<$crate::core::Core>() {
+                let _proxy = $object.downcast_proxy::<$crate::core::Core>().unwrap();
+                _proxy.$method()
+            } else if _type_id ==  std::any::TypeId::of::<$crate::proxy::client::Client>() {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+                _proxy.$method()
+            } else {
+                unreachable!()
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! hasproxy_notify {
     ($object:ident, $event:ident, $($args:tt),*) => {
         let _type_id = ($object as &dyn std::any::Any).type_id();
         if _type_id ==  std::any::TypeId::of::<$crate::core::Core>() {
             let _proxy = $object.downcast_proxy::<$crate::core::Core>().unwrap();
-            spa::emit_hook!(_proxy.events(), $event, $($args),*);
+            spa::emit_hook!(_proxy.events(), $event, $($args),*)
         } else if _type_id ==  std::any::TypeId::of::<$crate::proxy::client::Client>() {
             let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
-            spa::emit_hook!(_proxy.events(), $event, $($args),*);
+            spa::emit_hook!(_proxy.events(), $event, $($args),*)
         } else {
             unreachable!()
-        };
+        }
     };
 }
 
