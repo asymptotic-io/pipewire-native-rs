@@ -73,6 +73,7 @@ impl Core {
 
         let id = this.inner.objects.borrow_mut().reserve();
         let client = proxy::client::Client::new(&this, id);
+        let client_proxy = client.proxy();
         this.inner
             .objects
             .borrow_mut()
@@ -121,7 +122,8 @@ impl Core {
         });
 
         proxy_object_invoke!(core_proxy, hello, VERSION)?;
-        // update client properties
+
+        proxy_object_invoke!(client_proxy, update_properties, &this.inner.properties)?;
 
         this.inner
             .client
