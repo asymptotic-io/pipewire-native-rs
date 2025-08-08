@@ -153,6 +153,7 @@ pub(crate) enum Events {
     RemoveId(RemoveId),
     BoundId(BoundId),
     AddMem(AddMem),
+    RemoveMem(RemoveMem),
     BoundProps(BoundProps),
 }
 
@@ -201,6 +202,11 @@ pub(crate) struct BoundId {
 
 #[derive(Debug, macros::PodStruct)]
 pub(crate) struct AddMem {
+    // TODO
+}
+
+#[derive(Debug, macros::PodStruct)]
+pub(crate) struct RemoveMem {
     // TODO
 }
 
@@ -262,6 +268,9 @@ impl Events {
             }
             Events::AddMem(_) => {
                 todo!("Core::AddMem is not yet implemented");
+            }
+            Events::RemoveMem(_) => {
+                todo!("Core::RemoveMem is not yet implemented");
             }
             Events::BoundProps(bound) => {
                 let props = Properties::new_vec(bound.props.data);
