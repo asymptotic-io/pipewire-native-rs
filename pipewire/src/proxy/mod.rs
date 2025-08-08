@@ -110,6 +110,17 @@ macro_rules! hasproxy_notify {
             unreachable!("got unexpected proxy type {}", $object.type_())
         }
     };
+    ($object:ident, $event:ident) => {
+        if $object.type_() == $crate::types::interface::CORE {
+            let _proxy = $object.downcast_proxy::<$crate::core::Core>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event)
+        } else if $object.type_() == $crate::types::interface::CLIENT {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event)
+        } else {
+            unreachable!("got unexpected proxy type {}", $object.type_())
+        }
+    };
 }
 
 #[macro_export]
@@ -155,6 +166,11 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
     pub(crate) fn set_bound_id(&self, id: Id) {
         self.inner.bound_id.replace(id);
         spa::emit_hook!(self.inner.hooks, bound, id);
+    }
+
+    pub(crate) fn set_bound_props(&self, id: Id, props: &Properties) {
+        self.inner.bound_id.replace(id);
+        spa::emit_hook!(self.inner.hooks, bound_props, id, props);
     }
 
     pub(crate) fn add_listener(&self, events: ProxyEvents) {

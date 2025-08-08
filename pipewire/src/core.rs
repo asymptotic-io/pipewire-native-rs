@@ -14,7 +14,7 @@ use pipewire_native_spa as spa;
 
 use crate::{
     context::{Context, WeakContext},
-    debug, default_topic, hasproxy_notify,
+    debug, default_topic, hasproxy_method_call, hasproxy_notify,
     id_map::IdMap,
     keys, log,
     properties::Properties,
@@ -109,16 +109,49 @@ impl Core {
                     hasproxy_notify!(object, done, seq);
                 }
             }),
-            error: None,
+            error: some_closure!(core_proxy, id, seq, res, message, {
+                debug!("got error: {id} {seq} {res} {message}");
+                let core = core_proxy.object().unwrap();
+                let proxies = core.inner.objects.borrow();
+
+                if let Some(object) = proxies.get(id) {
+                    hasproxy_notify!(object, error, seq, res, message);
+                }
+            }),
             ping: some_closure!(core_proxy, id, seq, {
                 debug!("got ping: {id} {seq}");
                 let _ = proxy_object_invoke!(core_proxy, pong, id, seq);
             }),
-            remove_id: None,
-            bound_id: None,
-            add_mem: None,
-            remove_mem: None,
-            bound_props: None,
+            remove_id: some_closure!(core_proxy, id, {
+                debug!("got remove_id: {id}");
+                let core = core_proxy.object().unwrap();
+                let proxies = core.inner.objects.borrow();
+
+                if let Some(object) = proxies.get(id) {
+                    hasproxy_notify!(object, removed);
+                    core.inner.objects.borrow_mut().remove(id);
+                }
+            }),
+            bound_id: some_closure!(core_proxy, id, global_id, {
+                debug!("got bound_id: {id} {global_id}");
+                let core = core_proxy.object().unwrap();
+                let proxies = core.inner.objects.borrow();
+
+                if let Some(object) = proxies.get(id) {
+                    hasproxy_method_call!(object, set_bound_id, global_id);
+                }
+            }),
+            add_mem: None,    // TODO
+            remove_mem: None, // TODO
+            bound_props: some_closure!(core_proxy, id, global_id, props, {
+                debug!("got bound_props: {id} {global_id} {props:?}");
+                let core = core_proxy.object().unwrap();
+                let proxies = core.inner.objects.borrow();
+
+                if let Some(object) = proxies.get(id) {
+                    hasproxy_method_call!(object, set_bound_props, global_id, props);
+                }
+            }),
         });
 
         proxy_object_invoke!(core_proxy, hello, VERSION)?;
