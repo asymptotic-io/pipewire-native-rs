@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+pub(crate) mod client;
 pub(crate) mod core;
 
 use pipewire_native_macros as macros;

@@ -20,7 +20,7 @@ use crate::{
     core::{self, Core, WeakCore},
     debug, default_topic, keys, log,
     protocol::connection::{Connection, ConnectionEvents},
-    proxy::HasProxy,
+    proxy::{self, HasProxy},
     proxy_notify, refcounted, some_closure, trace, types, warn, Id,
 };
 
@@ -214,6 +214,10 @@ impl Client {
             types::interface::CORE => {
                 let proxy = core.find_proxy::<Core>(header.id).unwrap();
                 super::marshal::core::Events::demarshal(&self.inner.connection, &header, proxy)?;
+            }
+            types::interface::CLIENT => {
+                let proxy = core.find_proxy::<proxy::client::Client>(header.id).unwrap();
+                super::marshal::client::Events::demarshal(&self.inner.connection, &header, proxy)?;
             }
             _ => unreachable!(),
         }

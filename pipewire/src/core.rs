@@ -72,7 +72,7 @@ impl Core {
             .insert_at(id, Box::new(this.clone()));
 
         let id = this.inner.proxies.borrow_mut().reserve();
-        let client = proxy::client::Client::new(id);
+        let client = proxy::client::Client::new(&this, id);
         this.inner
             .proxies
             .borrow_mut()
@@ -135,6 +135,10 @@ impl Core {
             .context
             .upgrade()
             .expect("Context should outlive core")
+    }
+
+    pub(crate) fn connection(&self) -> protocol::connection::Connection {
+        self.inner.client.connection()
     }
 
     pub(crate) fn find_proxy_type(&self, id: Id) -> Option<types::ObjectType> {
