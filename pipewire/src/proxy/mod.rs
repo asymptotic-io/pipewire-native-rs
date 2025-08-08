@@ -121,21 +121,11 @@ macro_rules! proxy_notify {
 
 refcounted! {
     pub struct Proxy<T: HasProxy + Refcounted> {
-        object: ProxyObject<T>,
+        object: T::WeakRef,
         id: Id,
         bound_id: RefCell<Id>,
         hooks: Arc<Mutex<spa::hook::HookList<ProxyEvents>>>,
     }
-}
-
-// Allow storring a strong or weak reference inside the proxy. For client-side objects like the
-// core, a weak reference suffices so we don't create reference cycles between the object and its
-// proxy.
-//
-// For server-side objects, the proxy can hold a strong reference to the object as the owner.
-enum ProxyObject<T: Refcounted> {
-    Strong(T),
-    Weak(T::WeakRef),
 }
 
 pub struct ProxyEvents {
@@ -150,19 +140,7 @@ pub struct ProxyEvents {
 impl<T: HasProxy + Refcounted> Proxy<T> {
     pub(crate) fn new(id: Id, object: &T) -> Self {
         Self {
-            inner: Rc::new(InnerProxy::<T>::new(
-                id,
-                ProxyObject::Strong(object.clone()),
-            )),
-        }
-    }
-
-    pub(crate) fn new_weak(id: Id, object: &T) -> Self {
-        Self {
-            inner: Rc::new(InnerProxy::<T>::new(
-                id,
-                ProxyObject::Weak(object.downgrade()),
-            )),
+            inner: Rc::new(InnerProxy::<T>::new(id, object.downgrade())),
         }
     }
 
@@ -171,10 +149,7 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
     }
 
     pub fn object(&self) -> Option<T> {
-        match &self.inner.object {
-            ProxyObject::Strong(object) => Some(object.clone()),
-            ProxyObject::Weak(object) => Refcounted::upgrade(object),
-        }
+        Refcounted::upgrade(&self.inner.object)
     }
 
     pub(crate) fn set_bound_id(&self, id: Id) {
@@ -192,7 +167,7 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
 }
 
 impl<T: HasProxy + Refcounted> InnerProxy<T> {
-    fn new(id: Id, object: ProxyObject<T>) -> Self {
+    fn new(id: Id, object: T::WeakRef) -> Self {
         Self {
             object,
             id,

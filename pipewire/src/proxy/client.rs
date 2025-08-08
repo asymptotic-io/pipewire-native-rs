@@ -78,10 +78,7 @@ impl Client {
             inner: Rc::new(InnerClient::new(core)),
         };
 
-        this.inner
-            .proxy
-            .borrow_mut()
-            .replace(Proxy::new_weak(id, &this));
+        this.inner.proxy.borrow_mut().replace(Proxy::new(id, &this));
 
         this
     }

@@ -48,7 +48,7 @@ refcounted! {
         properties: Properties,
         client: protocol::client::Client,
         proxy: RefCell<Option<Proxy<Core>>>,
-        proxies: RefCell<IdMap<Box<dyn HasProxy>>>,
+        objects: RefCell<IdMap<Box<dyn HasProxy>>>,
         methods: Rc<RefCell<CoreMethods<Core>>>,
         hooks: Arc<Mutex<spa::hook::HookList<CoreEvents>>>,
     }
@@ -63,18 +63,18 @@ impl Core {
         };
 
         // Reserve id 0 because we are id 0
-        let id = this.inner.proxies.borrow_mut().reserve();
-        let core_proxy = Proxy::new_weak(0, &this);
+        let id = this.inner.objects.borrow_mut().reserve();
+        let core_proxy = Proxy::new(0, &this);
         this.inner.proxy.borrow_mut().replace(core_proxy.clone());
         this.inner
-            .proxies
+            .objects
             .borrow_mut()
             .insert_at(id, Box::new(this.clone()));
 
-        let id = this.inner.proxies.borrow_mut().reserve();
+        let id = this.inner.objects.borrow_mut().reserve();
         let client = proxy::client::Client::new(&this, id);
         this.inner
-            .proxies
+            .objects
             .borrow_mut()
             .insert_at(id, Box::new(client));
 
@@ -102,7 +102,7 @@ impl Core {
             done: some_closure!(core_proxy, id, seq, {
                 debug!("got done: {id} {seq}");
                 let core = core_proxy.object().unwrap();
-                let proxies = core.inner.proxies.borrow();
+                let proxies = core.inner.objects.borrow();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_notify!(object, done, seq);
@@ -142,12 +142,12 @@ impl Core {
     }
 
     pub(crate) fn find_proxy_type(&self, id: Id) -> Option<types::ObjectType> {
-        self.inner.proxies.borrow().get(id).map(|o| o.type_())
+        self.inner.objects.borrow().get(id).map(|o| o.type_())
     }
 
     pub(crate) fn find_proxy<T: HasProxy + Refcounted>(&self, id: Id) -> Option<Proxy<T>> {
         self.inner
-            .proxies
+            .objects
             .borrow()
             .get(id)
             .and_then(|o| o.downcast_proxy::<T>())
@@ -246,7 +246,7 @@ impl InnerCore {
             properties,
             client,
             proxy: RefCell::new(None),
-            proxies: RefCell::new(IdMap::new()),
+            objects: RefCell::new(IdMap::new()),
             methods: Rc::new(RefCell::new(protocol::marshal::core::Methods::marshal(
                 connection,
             ))),
