@@ -7,4 +7,5 @@ pub type ObjectType = &'static str;
 pub mod interface {
     pub const CLIENT: &str = "PipeWire:Interface:Client";
     pub const CORE: &str = "PipeWire:Interface:Core";
+    pub const REGISTRY: &str = "PipeWire:Interface:Registry";
 }

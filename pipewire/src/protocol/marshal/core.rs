@@ -11,7 +11,7 @@ use crate::{
     default_topic, hasproxy_method_call, log,
     properties::Properties,
     protocol::{connection::Connection, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK},
-    proxy::Proxy,
+    proxy::{self, HasProxy, Proxy},
     proxy_object_notify, trace, Id,
 };
 
@@ -115,6 +115,20 @@ impl Methods {
                         message: message.to_string(),
                     }),
                 )
+            }),
+            get_registry: closure!(connection, proxy, {
+                let core = proxy.object().unwrap();
+                let registry = proxy::registry::Registry::new(&core);
+
+                connection.push(
+                    proxy.id(),
+                    Methods::GetRegistry(GetRegistry {
+                        version: registry.version() as i32,
+                        new_id: registry.proxy().id() as i32,
+                    }),
+                )?;
+
+                Ok(registry)
             }),
             create_object: closure!(connection, proxy, factory_name, type_, version, props, {
                 connection.push(

@@ -14,6 +14,7 @@ use crate::{properties::Properties, refcounted, Refcounted, INVALID_ID};
 use crate::{types::ObjectType, Id};
 
 pub mod client;
+pub mod registry;
 
 pub trait HasProxy: Any {
     // See the invoke! and notify! macros below
@@ -22,9 +23,7 @@ pub trait HasProxy: Any {
 
     fn type_(&self) -> ObjectType;
 
-    fn version() -> u32
-    where
-        Self: Sized;
+    fn version(&self) -> u32;
 
     fn proxy(&self) -> Proxy<Self>
     where
@@ -53,7 +52,10 @@ impl dyn HasProxy {
 macro_rules! proxy_object_invoke {
     ($proxy:ident, $method:ident, $($args:tt)*) => {
         ($proxy.object().unwrap().methods().borrow_mut().$method)(&$proxy, $($args)*)
-    }
+    };
+    ($proxy:ident, $method:ident) => {
+        ($proxy.object().unwrap().methods().borrow_mut().$method)(&$proxy)
+    };
 }
 
 #[macro_export]
@@ -77,6 +79,9 @@ macro_rules! hasproxy_method_call {
             } else if $object.type_() == $crate::types::interface::CLIENT {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
                 _proxy.$method($($args),*)
+            } else if $object.type_() == $crate::types::interface::REGISTRY {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::registry::Registry>().unwrap();
+                _proxy.$method($($args),*)
             } else {
                 unreachable!("got unexpected proxy type {}", $object.type_())
             }
@@ -89,6 +94,9 @@ macro_rules! hasproxy_method_call {
                 _proxy.$method()
             } else if $object.type_() == $crate::types::interface::CLIENT {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+                _proxy.$method()
+            } else if $object.type_() == $crate::types::interface::REGISTRY {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::registry::Registry>().unwrap();
                 _proxy.$method()
             } else {
                 unreachable!("got unexpected proxy type {}", $object.type_())
@@ -106,6 +114,9 @@ macro_rules! hasproxy_notify {
         } else if $object.type_() == $crate::types::interface::CLIENT {
             let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
             spa::emit_hook!(_proxy.events(), $event, $($args),*)
+        } else if $object.type_() == $crate::types::interface::REGISTRY {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::registry::Registry>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event, $($args),*)
         } else {
             unreachable!("got unexpected proxy type {}", $object.type_())
         }
@@ -116,6 +127,9 @@ macro_rules! hasproxy_notify {
             spa::emit_hook!(_proxy.events(), $event)
         } else if $object.type_() == $crate::types::interface::CLIENT {
             let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event)
+        } else if $object.type_() == $crate::types::interface::REGISTRY {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::registry::Registry>().unwrap();
             spa::emit_hook!(_proxy.events(), $event)
         } else {
             unreachable!("got unexpected proxy type {}", $object.type_())

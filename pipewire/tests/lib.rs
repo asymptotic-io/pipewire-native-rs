@@ -7,6 +7,7 @@ use tempfile;
 
 use pipewire_native::{
     self as pipewire, context::Context, main_loop::MainLoop, properties::Properties,
+    proxy::registry::RegistryEvents, some_closure,
 };
 use pipewire_native_spa::dict::Dict;
 
@@ -61,7 +62,16 @@ fn test_lib() {
     let res = ml.update_timer(&mut timer_src, &timeout, None, false);
     assert!(res.is_ok());
 
-    core.sync().unwrap();
+    let registry = core.registry().unwrap();
+
+    registry.add_listener(RegistryEvents {
+        global: some_closure!(_registry <- registry, id, perms, type_, version, props, {
+            println!("new global id {id}: {type_}/{version} ({perms}): {{ {props:?} }}");
+        }),
+        global_remove: some_closure!(_registry <- registry, id, {
+            println!("global {id} removed");
+        }),
+    });
 
     ml.run();
 }

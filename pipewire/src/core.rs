@@ -71,13 +71,8 @@ impl Core {
             .borrow_mut()
             .insert_at(id, Box::new(this.clone()));
 
-        let id = this.inner.objects.borrow_mut().reserve();
-        let client = proxy::client::Client::new(&this, id);
+        let client = proxy::client::Client::new(&this);
         let client_proxy = client.proxy();
-        this.inner
-            .objects
-            .borrow_mut()
-            .insert_at(id, Box::new(client));
 
         this.inner.client.set_core(this.downgrade());
 
@@ -180,6 +175,17 @@ impl Core {
         self.inner.client.connection()
     }
 
+    pub(crate) fn next_proxy_id(&self) -> Id {
+        self.inner.objects.borrow_mut().reserve()
+    }
+
+    pub(crate) fn add_proxy<T: HasProxy + Refcounted>(&self, object: &T, id: Id) {
+        self.inner
+            .objects
+            .borrow_mut()
+            .insert_at(id, Box::new(object.clone()));
+    }
+
     pub(crate) fn find_proxy_type(&self, id: Id) -> Option<types::ObjectType> {
         self.inner.objects.borrow().get(id).map(|o| o.type_())
     }
@@ -201,6 +207,11 @@ impl Core {
         proxy_object_invoke!(proxy, sync, 0)
     }
 
+    pub fn registry(&self) -> std::io::Result<proxy::registry::Registry> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, get_registry)
+    }
+
     pub(crate) fn methods(&self) -> Rc<RefCell<CoreMethods<Core>>> {
         self.inner.methods.clone()
     }
@@ -215,7 +226,7 @@ impl HasProxy for Core {
         types::interface::CORE
     }
 
-    fn version() -> u32 {
+    fn version(&self) -> u32 {
         4
     }
 
@@ -253,7 +264,8 @@ pub struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
     pub(crate) pong: Box<dyn FnMut(&Proxy<T>, Id, u32) -> std::io::Result<()>>,
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
-    // pub(crate) get_registry: fn(...)
+    pub(crate) get_registry:
+        Box<dyn FnMut(&Proxy<T>) -> std::io::Result<proxy::registry::Registry>>,
     pub(crate) create_object:
         Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &Properties) -> std::io::Result<()>>,
     pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,

@@ -219,6 +219,16 @@ impl Client {
                 let proxy = core.find_proxy::<proxy::client::Client>(header.id).unwrap();
                 super::marshal::client::Events::demarshal(&self.inner.connection, &header, proxy)?;
             }
+            types::interface::REGISTRY => {
+                let proxy = core
+                    .find_proxy::<proxy::registry::Registry>(header.id)
+                    .unwrap();
+                super::marshal::registry::Events::demarshal(
+                    &self.inner.connection,
+                    &header,
+                    proxy,
+                )?;
+            }
             _ => unreachable!(),
         }
 

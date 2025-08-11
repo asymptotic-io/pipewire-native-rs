@@ -58,7 +58,7 @@ impl HasProxy for Client {
         types::interface::CLIENT
     }
 
-    fn version() -> u32 {
+    fn version(&self) -> u32 {
         3
     }
 
@@ -73,12 +73,14 @@ impl HasProxy for Client {
 }
 
 impl Client {
-    pub fn new(core: &Core, id: Id) -> Self {
+    pub fn new(core: &Core) -> Self {
         let this = Self {
             inner: Rc::new(InnerClient::new(core)),
         };
 
+        let id = core.next_proxy_id();
         this.inner.proxy.borrow_mut().replace(Proxy::new(id, &this));
+        core.add_proxy(&this, id);
 
         this
     }

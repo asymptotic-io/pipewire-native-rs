@@ -4,6 +4,7 @@
 
 pub(crate) mod client;
 pub(crate) mod core;
+pub(crate) mod registry;
 
 use pipewire_native_macros as macros;
 use pipewire_native_spa::{self as spa, pod::Pod};
