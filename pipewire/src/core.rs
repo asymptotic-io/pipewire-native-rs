@@ -141,8 +141,12 @@ impl Core {
                     hasproxy_method_call!(object, set_bound_id, global_id);
                 }
             }),
-            add_mem: None,    // TODO
-            remove_mem: None, // TODO
+            add_mem: some_closure!(_core_proxy <- core_proxy, _id, _type_, _fd, _flags, {
+                todo!("core.add_mem is not yet implemented")
+            }),
+            remove_mem: some_closure!(_core_proxy <- core_proxy, _id, {
+                todo!("core.remove_mem is not yet implemented")
+            }),
             bound_props: some_closure!(core_proxy, id, global_id, props, {
                 debug!("got bound_props: {id} {global_id} {props:?}");
                 let core = core_proxy.object().unwrap();
