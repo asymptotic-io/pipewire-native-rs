@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use bitflags::bitflags;
 use pipewire_native_spa as spa;
 
+use crate::proxy_object_invoke;
 use crate::{
     core::Core,
     permission,
@@ -20,6 +21,7 @@ use crate::{
 
 refcounted! {
     pub struct Registry {
+        core: Core,
         proxy: RefCell<Option<Proxy<Registry>>>,
         methods: Rc<RefCell<RegistryMethods<Registry>>>,
         hooks: Arc<Mutex<spa::hook::HookList<RegistryEvents>>>,
@@ -76,8 +78,17 @@ impl Registry {
         this
     }
 
+    pub(crate) fn core(&self) -> Core {
+        self.inner.core.clone()
+    }
+
     pub fn add_listener(&self, events: RegistryEvents) {
         self.inner.hooks.lock().unwrap().append(events);
+    }
+
+    pub fn bind(&self, id: Id, type_: &str, version: u32) -> std::io::Result<Box<dyn HasProxy>> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, bind, id, type_, version)
     }
 
     pub(crate) fn methods(&self) -> Rc<RefCell<RegistryMethods<Registry>>> {
@@ -92,6 +103,7 @@ impl Registry {
 impl InnerRegistry {
     fn new(core: &Core) -> Self {
         Self {
+            core: core.clone(),
             proxy: RefCell::new(None),
             methods: Rc::new(RefCell::new(protocol::marshal::registry::Methods::marshal(
                 core.connection(),

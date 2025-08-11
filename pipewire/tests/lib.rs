@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 use tempfile;
 
 use pipewire_native::{
     self as pipewire, context::Context, main_loop::MainLoop, properties::Properties,
-    proxy::registry::RegistryEvents, some_closure,
+    proxy::registry::RegistryEvents, some_closure, types,
 };
 use pipewire_native_spa::dict::Dict;
 
@@ -64,9 +64,19 @@ fn test_lib() {
 
     let registry = core.registry().unwrap();
 
+    let objects = Rc::new(RefCell::new(vec![]));
+
     registry.add_listener(RegistryEvents {
-        global: some_closure!(_registry <- registry, id, perms, type_, version, props, {
+        global: some_closure!(registry, id, perms, type_, version, props, {
             println!("new global id {id}: {type_}/{version} ({perms}): {{ {props:?} }}");
+
+            match type_ {
+                types::interface::CLIENT => {
+                    let client = registry.bind(id, type_, version).unwrap();
+                    objects.borrow_mut().push(client);
+                }
+                _ => (),
+            }
         }),
         global_remove: some_closure!(_registry <- registry, id, {
             println!("global {id} removed");

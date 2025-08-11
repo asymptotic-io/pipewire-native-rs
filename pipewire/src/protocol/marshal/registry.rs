@@ -11,10 +11,11 @@ use crate::{
     properties::Properties,
     protocol::connection::Connection,
     proxy::{
+        self,
         registry::{Registry, RegistryMethods},
-        Proxy,
+        HasProxy, Proxy,
     },
-    proxy_object_notify, trace, Id,
+    proxy_object_notify, trace, types, Id,
 };
 
 use super::PairList;
@@ -44,14 +45,34 @@ pub(crate) struct Destroy {
 impl Methods {
     pub(crate) fn marshal(connection: Connection) -> RegistryMethods<Registry> {
         RegistryMethods {
-            bind: closure!(_connection <- connection, _proxy, _id, _type_, _version, {
-                // TODO: create a proxy of type_
-                // TODO: send a Registry::Bind method
-                todo!()
+            bind: closure!(connection, proxy, id, type_, version, {
+                let registry = proxy.object().unwrap();
+                let core = registry.core();
+
+                let new_object = match type_ {
+                    types::interface::CLIENT => proxy::client::Client::new(&core),
+                    _ => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Unsupported proxy type {type_}",
+                        ))
+                    }
+                };
+
+                connection.push(
+                    proxy.id(),
+                    Methods::Bind(Bind {
+                        id: id as i32,
+                        type_: type_.to_string(),
+                        version: version as i32,
+                        new_id: new_object.proxy().id() as i32,
+                    }),
+                )?;
+
+                Ok(Box::new(registry))
             }),
-            destroy: closure!(_connection <- connection, _proxy, _id, {
-                // TODO: destroy the proxy?
-                todo!()
+            destroy: closure!(connection, proxy, id, {
+                connection.push(proxy.id(), Methods::Destroy(Destroy { id: id as i32 }))
             }),
         }
     }
