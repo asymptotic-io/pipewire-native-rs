@@ -239,7 +239,7 @@ impl MainLoop {
         }
     }
 
-    pub(crate) fn get_support(&self) -> LoopSupport {
+    pub(crate) fn support(&self) -> LoopSupport {
         self.inner.support.clone()
     }
 }

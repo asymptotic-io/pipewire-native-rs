@@ -94,7 +94,7 @@ impl Context {
 impl InnerContext {
     fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
         // TODO: plugin loader interface
-        let support = main_loop.get_support();
+        let support = main_loop.support();
         let system = GLOBAL_SUPPORT
             .get()
             .expect("Global support should be initialised")
