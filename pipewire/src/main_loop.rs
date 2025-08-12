@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
 use pipewire_native_spa as spa;
+
 use spa::dict::Dict;
 use spa::flags;
 use spa::interface::ffi::{CControlHooks, CHook};
@@ -15,10 +16,10 @@ use std::os::fd::RawFd;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
-use crate::GLOBAL_SUPPORT;
 use crate::{debug, default_topic, log, trace};
+use crate::{Refcounted, GLOBAL_SUPPORT};
 
 default_topic!(log::topic::MAIN_LOOP);
 
@@ -48,7 +49,29 @@ pub(crate) struct LoopSupport {
 
 #[derive(Clone)]
 pub struct MainLoop {
+    // The imeplementation of stop() requires that we send a full clone of inner to loop.invoke(),
+    // because loop::InvokeFn has a 'static bound. Because of this, we cannot use refcounted!(),
+    // which wraps the inner in an Rc<>. We use an Arc<> for copy-ability, and implemented
+    // Refcounted by hand.
     inner: Arc<InnerMainLoop>,
+}
+
+pub struct WeakMainLoop {
+    inner: Weak<InnerMainLoop>,
+}
+
+impl Refcounted for MainLoop {
+    type WeakRef = WeakMainLoop;
+
+    fn downgrade(&self) -> Self::WeakRef {
+        WeakMainLoop {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
+    fn upgrade(this: &Self::WeakRef) -> Option<Self> {
+        this.inner.upgrade().map(|o| MainLoop { inner: o })
+    }
 }
 
 impl MainLoop {
