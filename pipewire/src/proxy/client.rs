@@ -15,7 +15,7 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{HasProxy, Proxy},
-    refcounted, types, Id, Refcounted,
+    proxy_object_invoke, refcounted, types, Id, Refcounted,
 };
 
 refcounted! {
@@ -87,6 +87,24 @@ impl Client {
 
     pub fn add_listener(&self, events: ClientEvents) {
         self.inner.hooks.lock().unwrap().append(events);
+    }
+
+    pub fn error(&self, id: u32, res: u32, message: &str) -> std::io::Result<()> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, error, id, res, message)
+    }
+
+    pub fn get_permissions(&self, index: u32, num: u32) -> std::io::Result<()> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, get_permissions, index, num)
+    }
+
+    pub fn update_permissions(
+        &self,
+        permissions: &[permission::Permission],
+    ) -> std::io::Result<()> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, update_permissions, permissions)
     }
 
     pub(crate) fn methods(&self) -> Rc<RefCell<ClientMethods<Client>>> {
