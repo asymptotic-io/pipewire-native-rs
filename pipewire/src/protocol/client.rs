@@ -10,7 +10,7 @@ use std::{
     },
     path::PathBuf,
     pin::Pin,
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use pipewire_native_spa as spa;

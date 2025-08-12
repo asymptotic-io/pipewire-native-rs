@@ -6,7 +6,7 @@ use std::{
     cell::RefCell,
     io::{Read, Write},
     os::{fd::RawFd, unix::net::UnixStream},
-    rc::{Rc, Weak},
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 

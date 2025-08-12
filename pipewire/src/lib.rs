@@ -133,18 +133,18 @@ macro_rules! refcounted {
         paste::paste! {
             #[derive(Clone)]
             $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
-                inner: Rc<[<Inner $name>] $(<$($generic),*>)?>,
+                inner: std::rc::Rc<[<Inner $name>] $(<$($generic),*>)?>,
             }
 
             #[derive(Clone)]
             pub struct [<Weak $name>] $(<$($generic $(: $bound)?),*>)? {
-                inner: Weak<[<Inner $name>] $(<$($generic>)?),*>,
+                inner: std::rc::Weak<[<Inner $name>] $(<$($generic>)?),*>,
             }
 
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
                 pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
-                        inner: Rc::downgrade(&self.inner),
+                        inner: std::rc::Rc::downgrade(&self.inner),
                     }
                 }
             }

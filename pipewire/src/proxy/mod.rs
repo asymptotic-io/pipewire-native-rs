@@ -4,7 +4,7 @@
 
 use std::any::Any;
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use pipewire_native_spa as spa;

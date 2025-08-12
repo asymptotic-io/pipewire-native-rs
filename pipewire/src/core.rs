@@ -5,7 +5,7 @@
 use std::{
     cell::RefCell,
     os::fd::RawFd,
-    rc::{Rc, Weak},
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 

@@ -6,10 +6,7 @@ pub(crate) mod client;
 pub(crate) mod connection;
 pub(crate) mod marshal;
 
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
+use std::{cell::RefCell, rc::Rc};
 
 use client::Client;
 

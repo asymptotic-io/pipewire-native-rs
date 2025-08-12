@@ -6,7 +6,7 @@ use std::{
     cell::RefCell,
     ffi::CStr,
     pin::Pin,
-    rc::{Rc, Weak},
+    rc::Rc,
     sync::{Arc, LazyLock},
 };
 
