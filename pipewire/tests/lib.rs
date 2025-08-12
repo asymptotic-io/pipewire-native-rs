@@ -9,7 +9,6 @@ use pipewire_native::{
     self as pipewire, context::Context, main_loop::MainLoop, properties::Properties,
     proxy::registry::RegistryEvents, some_closure, types,
 };
-use pipewire_native_spa::dict::Dict;
 
 #[allow(unused)]
 struct TestContext {
@@ -39,7 +38,7 @@ fn test_lib() {
     pipewire::init();
 
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
-    let ml = MainLoop::new(&Dict::new(v)).unwrap();
+    let ml = MainLoop::new(&Properties::new_vec(v)).unwrap();
 
     let context =
         Context::new(Arc::new(ml), Properties::new()).expect("Context creation should not fail");

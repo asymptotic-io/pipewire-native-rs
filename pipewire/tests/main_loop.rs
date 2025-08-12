@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
 use pipewire_native::main_loop::{MainLoop, MainLoopEvents};
-use pipewire_native_spa::dict::Dict;
+use pipewire_native::properties::Properties;
 use pipewire_native_spa::flags;
 
 use serial_test::serial;
@@ -32,7 +32,7 @@ fn test_mainloop(exec: MainLoopRun) {
     pipewire_native::init();
 
     let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
-    let ml = MainLoop::new(&Dict::new(v)).unwrap();
+    let ml = MainLoop::new(&Properties::new_vec(v)).unwrap();
 
     let fd = ml.get_fd();
     assert!(fd != 0);

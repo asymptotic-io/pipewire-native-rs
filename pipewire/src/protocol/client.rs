@@ -9,7 +9,6 @@ use std::{
         unix::net::UnixStream,
     },
     path::PathBuf,
-    pin::Pin,
     rc::Rc,
 };
 
@@ -18,7 +17,7 @@ use pipewire_native_spa as spa;
 use crate::{
     closure,
     core::{self, Core, WeakCore},
-    debug, default_topic, keys, log,
+    debug, default_topic, keys, log, main_loop,
     protocol::connection::{Connection, ConnectionEvents},
     proxy::{self, HasProxy},
     proxy_notify, refcounted, some_closure, trace, types, warn, Id,
@@ -45,7 +44,7 @@ refcounted! {
         connected: RefCell<bool>,
         need_flush: RefCell<bool>,
         last_in_seq: RefCell<u32>,
-        source: RefCell<Option<Pin<Box<spa::interface::r#loop::LoopUtilsSource>>>>,
+        source: RefCell<Option<main_loop::Source>>,
         listener: RefCell<Option<spa::hook::HookId>>,
     }
 }
@@ -137,7 +136,7 @@ impl Client {
 
         if let Some(source) = self.inner.source.borrow_mut().as_mut() {
             let main_loop = self.core().context().main_loop();
-            let _ = main_loop.update_io(source, source.mask | spa::flags::Io::OUT);
+            let _ = main_loop.update_io(source, source.mask() | spa::flags::Io::OUT);
         }
     }
 
@@ -185,7 +184,7 @@ impl Client {
                     let main_loop = self.core().context().main_loop();
                     let mut source_ref = self.inner.source.borrow_mut();
                     let source = source_ref.as_mut().unwrap();
-                    let _ = main_loop.update_io(source, source.mask & !spa::flags::Io::OUT);
+                    let _ = main_loop.update_io(source, source.mask() & !spa::flags::Io::OUT);
                 }
                 Err(err) => {
                     if err.raw_os_error() != Some(libc::EAGAIN) {

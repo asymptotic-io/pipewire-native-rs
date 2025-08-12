@@ -4,12 +4,8 @@
 
 use pipewire_native_spa as spa;
 
-use spa::dict::Dict;
 use spa::flags;
-use spa::interface::ffi::{CControlHooks, CHook};
-use spa::interface::r#loop::{
-    LoopUtilsSource, SourceEventFn, SourceIdleFn, SourceIoFn, SourceSignalFn, SourceTimerFn,
-};
+use spa::interface::r#loop::LoopUtilsSource;
 use spa::{emit_hook, hook::HookList};
 
 use std::os::fd::RawFd;
@@ -18,6 +14,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, Weak};
 
+use crate::properties::Properties;
 use crate::{debug, default_topic, log, trace};
 use crate::{Refcounted, GLOBAL_SUPPORT};
 
@@ -74,8 +71,28 @@ impl Refcounted for MainLoop {
     }
 }
 
+pub struct Source {
+    inner: Pin<Box<LoopUtilsSource>>,
+}
+
+impl Source {
+    pub fn mask(&self) -> spa::flags::Io {
+        self.inner.mask
+    }
+
+    fn from_loop_utils(source: Pin<Box<LoopUtilsSource>>) -> Self {
+        Source { inner: source }
+    }
+}
+
+pub type SourceEventFn = spa::interface::r#loop::SourceEventFn;
+pub type SourceIdleFn = spa::interface::r#loop::SourceIdleFn;
+pub type SourceIoFn = spa::interface::r#loop::SourceIoFn;
+pub type SourceSignalFn = spa::interface::r#loop::SourceSignalFn;
+pub type SourceTimerFn = spa::interface::r#loop::SourceTimerFn;
+
 impl MainLoop {
-    pub fn new(props: &Dict) -> Option<MainLoop> {
+    pub fn new(props: &Properties) -> Option<MainLoop> {
         let Some(l) = InnerMainLoop::new(props) else {
             return None;
         };
@@ -100,12 +117,8 @@ impl MainLoop {
     }
 
     // Loop control methods
-    pub fn get_fd(&self) -> u32 {
-        self.inner.support.loop_control.get_fd()
-    }
-
-    pub fn add_hook(&self, hook: &CHook, hooks: &CControlHooks, data: u64) {
-        self.inner.support.loop_control.add_hook(hook, hooks, data)
+    pub fn get_fd(&self) -> RawFd {
+        self.inner.support.loop_control.get_fd() as RawFd
     }
 
     pub fn enter(&self) {
@@ -163,50 +176,63 @@ impl MainLoop {
         mask: flags::Io,
         close: bool,
         func: Box<SourceIoFn>,
-    ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.support.loop_utils.add_io(fd, mask, close, func)
+    ) -> Option<Source> {
+        self.inner
+            .support
+            .loop_utils
+            .add_io(fd, mask, close, func)
+            .map(Source::from_loop_utils)
     }
 
-    pub fn update_io(
-        &self,
-        source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: flags::Io,
-    ) -> std::io::Result<i32> {
-        self.inner.support.loop_utils.update_io(source, mask)
+    pub fn update_io(&self, source: &mut Source, mask: flags::Io) -> std::io::Result<i32> {
+        self.inner
+            .support
+            .loop_utils
+            .update_io(&mut source.inner, mask)
     }
 
-    pub fn add_idle(
-        &self,
-        enabled: bool,
-        func: Box<SourceIdleFn>,
-    ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.support.loop_utils.add_idle(enabled, func)
+    pub fn add_idle(&self, enabled: bool, func: Box<SourceIdleFn>) -> Option<Source> {
+        self.inner
+            .support
+            .loop_utils
+            .add_idle(enabled, func)
+            .map(Source::from_loop_utils)
     }
 
-    pub fn enable_idle(
-        &self,
-        source: &mut Pin<Box<LoopUtilsSource>>,
-        enabled: bool,
-    ) -> std::io::Result<i32> {
+    pub fn enable_idle(&self, source: &mut Source, enabled: bool) -> std::io::Result<i32> {
         debug!("idle {enabled}");
-        self.inner.support.loop_utils.enable_idle(source, enabled)
+        self.inner
+            .support
+            .loop_utils
+            .enable_idle(&mut source.inner, enabled)
     }
 
-    pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.support.loop_utils.add_event(func)
+    pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Source> {
+        self.inner
+            .support
+            .loop_utils
+            .add_event(func)
+            .map(Source::from_loop_utils)
     }
 
-    pub fn signal_event(&self, source: &mut Pin<Box<LoopUtilsSource>>) -> std::io::Result<i32> {
-        self.inner.support.loop_utils.signal_event(source)
+    pub fn signal_event(&self, source: &mut Source) -> std::io::Result<i32> {
+        self.inner
+            .support
+            .loop_utils
+            .signal_event(&mut source.inner)
     }
 
-    pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.inner.support.loop_utils.add_timer(func)
+    pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Source> {
+        self.inner
+            .support
+            .loop_utils
+            .add_timer(func)
+            .map(Source::from_loop_utils)
     }
 
     pub fn update_timer(
         &self,
-        source: &mut Pin<Box<LoopUtilsSource>>,
+        source: &mut Source,
         value: &libc::timespec,
         interval: Option<&libc::timespec>,
         absolute: bool,
@@ -214,22 +240,19 @@ impl MainLoop {
         self.inner
             .support
             .loop_utils
-            .update_timer(source, value, interval, absolute)
+            .update_timer(&mut source.inner, value, interval, absolute)
     }
 
-    pub fn add_signal(
-        &self,
-        signal_number: i32,
-        func: Box<SourceSignalFn>,
-    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+    pub fn add_signal(&self, signal_number: i32, func: Box<SourceSignalFn>) -> Option<Source> {
         self.inner
             .support
             .loop_utils
             .add_signal(signal_number, func)
+            .map(Source::from_loop_utils)
     }
 
-    pub fn destroy_source(&self, source: Pin<Box<LoopUtilsSource>>) {
-        self.inner.support.loop_utils.destroy_source(source)
+    pub fn destroy_source(&self, source: Source) {
+        self.inner.support.loop_utils.destroy_source(source.inner)
     }
 
     pub fn set_name(&mut self, name: &str) {
@@ -260,7 +283,7 @@ impl Drop for InnerMainLoop {
 }
 
 impl InnerMainLoop {
-    pub fn new(props: &Dict) -> Option<InnerMainLoop> {
+    pub fn new(props: &Properties) -> Option<InnerMainLoop> {
         let support = GLOBAL_SUPPORT
             .get()
             .expect("Global support should be initialised");
@@ -289,7 +312,7 @@ impl InnerMainLoop {
                     .ok()
             })?;
 
-        let name = if let Some(n) = props.lookup("loop.name") {
+        let name = if let Some(n) = props.get("loop.name") {
             n.to_string()
         } else {
             "main.loop".to_string()
