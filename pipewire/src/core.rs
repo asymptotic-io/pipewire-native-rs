@@ -259,7 +259,7 @@ pub struct CoreInfo<'a> {
     pub props: Option<&'a Properties>,
 }
 
-pub struct CoreMethods<T: HasProxy + Refcounted> {
+pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) hello: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
     pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
     pub(crate) pong: Box<dyn FnMut(&Proxy<T>, Id, u32) -> std::io::Result<()>>,
