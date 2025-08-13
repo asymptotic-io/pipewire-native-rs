@@ -45,7 +45,7 @@ refcounted! {
         need_flush: RefCell<bool>,
         last_in_seq: RefCell<u32>,
         source: RefCell<Option<main_loop::Source>>,
-        listener: RefCell<Option<spa::hook::HookId>>,
+        hooks: RefCell<Option<spa::hook::HookId>>,
     }
 }
 
@@ -67,7 +67,7 @@ impl Client {
             start: None,
         });
 
-        this.inner.listener.borrow_mut().replace(listener);
+        this.inner.hooks.borrow_mut().replace(listener);
 
         this
     }
@@ -128,7 +128,7 @@ impl Client {
     fn on_destroy(&self) {
         self.inner
             .connection
-            .remove_listener(self.inner.listener.borrow().unwrap());
+            .remove_listener(self.inner.hooks.borrow().unwrap());
     }
 
     fn on_need_flush(&self) {
@@ -325,7 +325,7 @@ impl InnerClient {
             need_flush: RefCell::new(false),
             last_in_seq: RefCell::new(0),
             source: RefCell::new(None),
-            listener: RefCell::new(None),
+            hooks: RefCell::new(None),
         }
     }
 
