@@ -194,7 +194,7 @@ macro_rules! closure {
             })
         }
     };
-    ($name:ident <- $object:ident, $body:block) => {
+    ($name:ident <- $object:expr, $body:block) => {
         {
             let _weak = $object.downgrade();
             Box::new(move || {
@@ -203,7 +203,7 @@ macro_rules! closure {
             })
         }
     };
-    ($name:ident <- $object:ident, $($args:ident),*, $body:block) => {
+    ($name:ident <- $object:expr, $($args:ident),*, $body:block) => {
         {
             let _weak = $object.downgrade();
             Box::new(move |$($args),*| {
