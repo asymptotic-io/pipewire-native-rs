@@ -98,6 +98,17 @@ impl Client {
         self.connect_local_socket(props, done_cb)
     }
 
+    pub(crate) fn disconnect(&self) {
+        let _ = self.inner.source.take();
+        let _ = self.inner.stream.take();
+
+        self.inner.connection.disconnect();
+        self.inner.connected.replace(false);
+        self.inner.need_flush.replace(false);
+
+        self.inner.last_in_seq.replace(0);
+    }
+
     pub(crate) fn set_stream(&self, stream: UnixStream, close: bool) -> std::io::Result<()> {
         debug!("Setting fd on connection: {stream:?}");
 

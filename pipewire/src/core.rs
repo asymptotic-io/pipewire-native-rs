@@ -20,7 +20,7 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
-    proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
+    proxy_notify, proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
 };
 
 default_topic!(log::topic::CORE);
@@ -47,6 +47,7 @@ refcounted! {
         context: WeakContext,
         properties: Properties,
         client: protocol::client::Client,
+        destroyed: RefCell<bool>,
         proxy: RefCell<Option<Proxy<Core>>>,
         objects: RefCell<IdMap<Box<dyn HasProxy>>>,
         methods: Rc<RefCell<CoreMethods<Core>>>,
@@ -78,7 +79,35 @@ impl Core {
 
         core_proxy.add_listener(ProxyEvents {
             destroy: some_closure!(this, {
-                todo!("clean up proxies etc., or delegate to Drop");
+                debug!("core destroy");
+                let mut destroyed = this.inner.destroyed.borrow_mut();
+
+                if *destroyed {
+                    return;
+                }
+
+                *destroyed = true;
+
+                let mut objects = this.inner.objects.borrow_mut();
+                let client = objects.get(1).unwrap();
+
+                hasproxy_notify!(client, destroy);
+                objects.clear();
+
+                this.inner.client.disconnect();
+            }),
+            removed: some_closure!(this, {
+                debug!("core removed");
+                for o in this
+                    .inner
+                    .objects
+                    .borrow()
+                    .iter()
+                    .skip(1) // first object is core, so skip it
+                    .map(|(_id, object)| object)
+                {
+                    hasproxy_notify!(o, removed)
+                }
             }),
             ..Default::default()
         });
@@ -158,6 +187,11 @@ impl Core {
             .connect(Some(&this.inner.properties.dict()), None)?;
 
         Ok(this)
+    }
+
+    pub fn disconnect(&self) {
+        proxy_notify!(self, removed);
+        proxy_notify!(self, destroy);
     }
 
     pub(crate) fn context(&self) -> Context {
@@ -293,6 +327,7 @@ impl InnerCore {
             context: context.downgrade(),
             properties,
             client,
+            destroyed: RefCell::new(false),
             proxy: RefCell::new(None),
             objects: RefCell::new(IdMap::new()),
             methods: Rc::new(RefCell::new(protocol::marshal::core::Methods::marshal(

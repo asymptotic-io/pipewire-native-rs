@@ -2,12 +2,16 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use tempfile;
 
 use pipewire_native::{
-    self as pipewire, context::Context, main_loop::MainLoop, properties::Properties,
-    proxy::registry::RegistryEvents, some_closure, types,
+    self as pipewire,
+    context::Context,
+    main_loop::MainLoop,
+    properties::Properties,
+    proxy::{client::Client, registry::RegistryEvents, HasProxy, ProxyEvents},
+    some_closure, types,
 };
 
 #[allow(unused)]
@@ -37,7 +41,9 @@ fn test_lib() {
 
     pipewire::init();
 
-    let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
+    let objects = Rc::new(RefCell::new(HashMap::new()));
+
+    let v = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
     let ml = MainLoop::new(&Properties::new_vec(v)).unwrap();
 
     let context =
@@ -45,12 +51,26 @@ fn test_lib() {
 
     let core = context.connect(None).unwrap();
 
+    let objects_clone = objects.clone();
+    core.proxy().add_listener(ProxyEvents {
+        destroy: some_closure!(_core <- core, {
+            println!("core destroyed, clearing objects");
+            objects_clone.borrow_mut().clear();
+        }),
+        ..Default::default()
+    });
+
     let ml = context.main_loop();
 
-    let ml2 = ml.clone();
+    let ml_clone = ml.clone();
+    let core_clone = core.clone();
+    let objects_clone = objects.clone();
     let mut timer_src = ml
         .add_timer(Box::new(move |_expirations| {
-            ml2.quit();
+            assert_eq!(objects_clone.borrow().len(), 1);
+            core_clone.disconnect();
+            assert_eq!(objects_clone.borrow().len(), 0);
+            ml_clone.quit();
         }))
         .unwrap();
 
@@ -62,25 +82,41 @@ fn test_lib() {
     assert!(res.is_ok());
 
     let registry = core.registry().unwrap();
-
-    let objects = Rc::new(RefCell::new(vec![]));
+    let objects_clone_g = objects.clone();
+    let objects_clone_gr = objects.clone();
 
     registry.add_listener(RegistryEvents {
         global: some_closure!(registry, id, perms, type_, version, props, {
             println!("new global id {id}: {type_}/{version} ({perms}): {{ {props:?} }}");
 
-            match type_ {
+            let objects_clone_pr = objects_clone_g.clone();
+
+            let object = match type_ {
                 types::interface::CLIENT => {
                     let client = registry.bind(id, type_, version).unwrap();
-                    objects.borrow_mut().push(client);
+                    let proxy = client.downcast_proxy::<Client>().unwrap();
+
+                    proxy.add_listener(ProxyEvents {
+                        removed: some_closure!(proxy, {
+                            objects_clone_pr.borrow_mut().remove(&proxy.id());
+                        }),
+                        ..Default::default()
+                    });
+
+                    client
                 }
-                _ => (),
-            }
+                _ => return,
+            };
+
+            objects_clone_g.borrow_mut().insert(id, object);
         }),
         global_remove: some_closure!(_registry <- registry, id, {
             println!("global {id} removed");
+            let _ = objects_clone_gr.borrow_mut().remove(&id);
         }),
     });
 
     ml.run();
+
+    assert_eq!(objects.borrow().len(), 0);
 }

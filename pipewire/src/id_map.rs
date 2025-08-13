@@ -85,6 +85,10 @@ impl<T> IdMap<T> {
         self.objects[id as usize] = Item::Empty;
     }
 
+    pub(crate) fn clear(&mut self) {
+        self.objects.clear();
+    }
+
     pub(crate) fn get(&self, id: Id) -> Option<&T> {
         if (id as usize) < self.objects.len() {
             self.objects[id as usize].as_ref()

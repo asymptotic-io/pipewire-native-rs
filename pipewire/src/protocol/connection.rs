@@ -63,6 +63,21 @@ impl Connection {
         self.inner.stream.replace(Some(stream));
     }
 
+    pub(crate) fn disconnect(&self) {
+        self.inner.stream.replace(None);
+        self.clear_buffers();
+    }
+
+    fn clear_buffers(&self) {
+        self.inner.in_buf.borrow_mut().fill(0);
+        self.inner.in_size.replace(0);
+        self.inner.in_offset.replace(0);
+        self.inner.out_seq.replace(0);
+        self.inner.out_buf.borrow_mut().fill(0);
+        self.inner.out_size.replace(0);
+        self.inner.out_fds.borrow_mut().clear();
+    }
+
     pub(crate) fn add_listener(&self, events: ConnectionEvents) -> spa::hook::HookId {
         self.inner.hooks.lock().unwrap().append(events)
     }
