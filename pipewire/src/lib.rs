@@ -176,37 +176,19 @@ macro_rules! refcounted {
 
 #[macro_export]
 macro_rules! closure {
-    ($object:ident, $body:block) => {
+    ($object:ident $(, $($args:ident),*)?, $body:block) => {
         {
             let _weak = $object.downgrade();
-            Box::new(move || {
+            Box::new(move |$($($args),*)?| {
                 let $object = _weak.upgrade().unwrap();
                 $body
             })
         }
     };
-    ($object:ident, $($args:ident),*, $body:block) => {
+    ($name:ident <- $object:expr $(, $($args:ident),*)?, $body:block) => {
         {
             let _weak = $object.downgrade();
-            Box::new(move |$($args),*| {
-                let $object = _weak.upgrade().unwrap();
-                $body
-            })
-        }
-    };
-    ($name:ident <- $object:expr, $body:block) => {
-        {
-            let _weak = $object.downgrade();
-            Box::new(move || {
-                let $name = _weak.upgrade().unwrap();
-                $body
-            })
-        }
-    };
-    ($name:ident <- $object:expr, $($args:ident),*, $body:block) => {
-        {
-            let _weak = $object.downgrade();
-            Box::new(move |$($args),*| {
+            Box::new(move |$($($args),*)?| {
                 let $name = _weak.upgrade().unwrap();
                 $body
             })
