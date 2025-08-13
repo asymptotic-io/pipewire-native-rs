@@ -48,6 +48,7 @@ pub struct ClientInfo<'a> {
     pub props: &'a Properties,
 }
 
+#[derive(Default)]
 pub struct ClientEvents {
     pub info: Option<Box<dyn FnMut(&ClientInfo<'_>)>>,
     pub permissions: Option<Box<dyn FnMut(u32, &[permission::Permission])>>,

@@ -80,11 +80,7 @@ impl Core {
             destroy: some_closure!(this, {
                 todo!("clean up proxies etc., or delegate to Drop");
             }),
-            bound: None,
-            removed: None,
-            done: None,
-            error: None,
-            bound_props: None,
+            ..Default::default()
         });
 
         this.add_listener(CoreEvents {
@@ -271,6 +267,7 @@ pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,
 }
 
+#[derive(Default)]
 pub struct CoreEvents {
     pub info: Option<Box<dyn FnMut(&CoreInfo<'_>)>>,
     pub done: Option<Box<dyn FnMut(Id, u32)>>,

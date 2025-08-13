@@ -41,6 +41,7 @@ bitflags! {
     }
 }
 
+#[derive(Default)]
 pub struct RegistryEvents {
     pub global: Option<Box<dyn FnMut(Id, permission::PermissionBits, &str, u32, &Properties)>>,
     pub global_remove: Option<Box<dyn FnMut(Id)>>,

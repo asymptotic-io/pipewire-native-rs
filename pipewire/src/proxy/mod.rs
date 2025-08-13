@@ -153,6 +153,7 @@ refcounted! {
     }
 }
 
+#[derive(Default)]
 pub struct ProxyEvents {
     pub destroy: Option<Box<dyn FnMut()>>,
     pub bound: Option<Box<dyn FnMut(Id)>>,
