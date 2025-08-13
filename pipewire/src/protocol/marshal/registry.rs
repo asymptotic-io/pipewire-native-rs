@@ -69,7 +69,7 @@ impl Methods {
                     }),
                 )?;
 
-                Ok(Box::new(registry))
+                Ok(Box::new(new_object))
             }),
             destroy: closure!(connection, proxy, id, {
                 connection.push(proxy.id(), Methods::Destroy(Destroy { id: id as i32 }))
