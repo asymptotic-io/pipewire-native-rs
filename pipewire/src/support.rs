@@ -36,7 +36,7 @@ struct Inner {
 const SUPPORTLIB: &str = "support/libspa-support";
 
 impl Support {
-    pub fn new() -> Support {
+    pub(super) fn new() -> Support {
         let do_dlclose = utils::read_env_bool("PIPEWIRE_DLCLOSE", false);
         let no_color = utils::read_env_bool("NO_COLOR", false);
         let no_config = utils::read_env_bool("PIPEWIRE_NO_CONFIG", false);
@@ -62,6 +62,21 @@ impl Support {
             log: None,
             system: None,
         }
+    }
+
+    #[allow(unused)]
+    pub(super) fn clear(&mut self) {
+        let mut inner = self.inner.lock().unwrap();
+
+        // Drop previously loaded interfaces
+        inner.support = spa::interface::Support::new();
+
+        // And drop the corresponding handles as we shouldn't have references to those
+        inner.handles.clear();
+
+        // And then the factories and plugins
+        inner.factories.clear();
+        inner.plugins.clear();
     }
 
     pub(super) fn init_log(&mut self) {
