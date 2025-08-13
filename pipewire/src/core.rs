@@ -78,7 +78,7 @@ impl Core {
         this.inner.client.set_core(this.downgrade());
 
         core_proxy.add_listener(ProxyEvents {
-            destroy: some_closure!(this, {
+            destroy: some_closure!([this] {
                 debug!("core destroy");
                 let mut destroyed = this.inner.destroyed.borrow_mut();
 
@@ -96,7 +96,7 @@ impl Core {
 
                 this.inner.client.disconnect();
             }),
-            removed: some_closure!(this, {
+            removed: some_closure!([this] {
                 debug!("core removed");
                 for o in this
                     .inner
@@ -113,14 +113,14 @@ impl Core {
         });
 
         this.add_listener(CoreEvents {
-            info: some_closure!(this, info, {
+            info: some_closure!([this] info, {
                 if let Some(props) = info.props {
                     debug!("updating props {:?}", props);
                     this.context()
                         .update_properties(&props, vec!["default.clock.quantum-limit"]);
                 }
             }),
-            done: some_closure!(core_proxy, id, seq, {
+            done: some_closure!([core_proxy] id, seq, {
                 debug!("got done: {id} {seq}");
                 let core = core_proxy.object().unwrap();
                 let proxies = core.inner.objects.borrow();
@@ -129,7 +129,7 @@ impl Core {
                     hasproxy_notify!(object, done, seq);
                 }
             }),
-            error: some_closure!(core_proxy, id, seq, res, message, {
+            error: some_closure!([core_proxy] id, seq, res, message, {
                 debug!("got error: {id} {seq} {res} {message}");
                 let core = core_proxy.object().unwrap();
                 let proxies = core.inner.objects.borrow();
@@ -138,11 +138,11 @@ impl Core {
                     hasproxy_notify!(object, error, seq, res, message);
                 }
             }),
-            ping: some_closure!(core_proxy, id, seq, {
+            ping: some_closure!([core_proxy] id, seq, {
                 debug!("got ping: {id} {seq}");
                 let _ = proxy_object_invoke!(core_proxy, pong, id, seq);
             }),
-            remove_id: some_closure!(core_proxy, id, {
+            remove_id: some_closure!([core_proxy] id, {
                 debug!("got remove_id: {id}");
                 let core = core_proxy.object().unwrap();
                 let proxies = core.inner.objects.borrow();
@@ -152,7 +152,7 @@ impl Core {
                     core.inner.objects.borrow_mut().remove(id);
                 }
             }),
-            bound_id: some_closure!(core_proxy, id, global_id, {
+            bound_id: some_closure!([core_proxy] id, global_id, {
                 debug!("got bound_id: {id} {global_id}");
                 let core = core_proxy.object().unwrap();
                 let proxies = core.inner.objects.borrow();
@@ -161,13 +161,13 @@ impl Core {
                     hasproxy_method_call!(object, set_bound_id, global_id);
                 }
             }),
-            add_mem: some_closure!(_core_proxy <- core_proxy, _id, _type_, _fd, _flags, {
+            add_mem: some_closure!([] _id, _type_, _fd, _flags, {
                 todo!("core.add_mem is not yet implemented")
             }),
-            remove_mem: some_closure!(_core_proxy <- core_proxy, _id, {
+            remove_mem: some_closure!([] _id, {
                 todo!("core.remove_mem is not yet implemented")
             }),
-            bound_props: some_closure!(core_proxy, id, global_id, props, {
+            bound_props: some_closure!([core_proxy] id, global_id, props, {
                 debug!("got bound_props: {id} {global_id} {props:?}");
                 let core = core_proxy.object().unwrap();
                 let proxies = core.inner.objects.borrow();

@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tempfile;
 
 use pipewire_native::{
-    self as pipewire,
+    self as pipewire, closure,
     context::Context,
     main_loop::MainLoop,
     properties::Properties,
@@ -51,26 +51,20 @@ fn test_lib() {
 
     let core = context.connect(None).unwrap();
 
-    let objects_clone = objects.clone();
     core.proxy().add_listener(ProxyEvents {
-        destroy: some_closure!(_core <- core, {
+        destroy: some_closure!([^(objects)] {
             println!("core destroyed, clearing objects");
-            objects_clone.borrow_mut().clear();
+            objects.borrow_mut().clear();
         }),
         ..Default::default()
     });
 
-    let ml = context.main_loop();
-
-    let ml_clone = ml.clone();
-    let core_clone = core.clone();
-    let objects_clone = objects.clone();
-    let mut timer_src = ml
-        .add_timer(Box::new(move |_expirations| {
-            assert_eq!(objects_clone.borrow().len(), 1);
-            core_clone.disconnect();
-            assert_eq!(objects_clone.borrow().len(), 0);
-            ml_clone.quit();
+    let mut timer_src = main_loop
+        .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
+            assert_eq!(objects.borrow().len(), 1);
+            core.disconnect();
+            assert_eq!(objects.borrow().len(), 0);
+            main_loop.quit();
         }))
         .unwrap();
 
@@ -78,18 +72,14 @@ fn test_lib() {
         tv_sec: 2,
         tv_nsec: 0,
     };
-    let res = ml.update_timer(&mut timer_src, &timeout, None, false);
+    let res = main_loop.update_timer(&mut timer_src, &timeout, None, false);
     assert!(res.is_ok());
 
     let registry = core.registry().unwrap();
-    let objects_clone_g = objects.clone();
-    let objects_clone_gr = objects.clone();
 
     registry.add_listener(RegistryEvents {
-        global: some_closure!(registry, id, perms, type_, version, props, {
+        global: some_closure!([registry ^(objects)] id, perms, type_, version, props, {
             println!("new global id {id}: {type_}/{version} ({perms}): {{ {props:?} }}");
-
-            let objects_clone_pr = objects_clone_g.clone();
 
             let object = match type_ {
                 types::interface::CLIENT => {
@@ -97,8 +87,8 @@ fn test_lib() {
                     let proxy = client.downcast_proxy::<Client>().unwrap();
 
                     proxy.add_listener(ProxyEvents {
-                        removed: some_closure!(proxy, {
-                            objects_clone_pr.borrow_mut().remove(&proxy.id());
+                        removed: some_closure!([proxy ^(objects)] {
+                            objects.borrow_mut().remove(&proxy.id());
                         }),
                         ..Default::default()
                     });
@@ -108,15 +98,15 @@ fn test_lib() {
                 _ => return,
             };
 
-            objects_clone_g.borrow_mut().insert(id, object);
+            objects.borrow_mut().insert(id, object);
         }),
-        global_remove: some_closure!(_registry <- registry, id, {
+        global_remove: some_closure!([^(objects)] id, {
             println!("global {id} removed");
-            let _ = objects_clone_gr.borrow_mut().remove(&id);
+            let _ = objects.borrow_mut().remove(&id);
         }),
     });
 
-    ml.run();
+    main_loop.run();
 
     assert_eq!(objects.borrow().len(), 0);
 }

@@ -45,7 +45,7 @@ pub(crate) struct Destroy {
 impl Methods {
     pub(crate) fn marshal(connection: Connection) -> RegistryMethods<Registry> {
         RegistryMethods {
-            bind: closure!(connection, proxy, id, type_, version, {
+            bind: closure!([connection] proxy, id, type_, version, {
                 let registry = proxy.object().unwrap();
                 let core = registry.core();
 
@@ -71,7 +71,7 @@ impl Methods {
 
                 Ok(Box::new(new_object))
             }),
-            destroy: closure!(connection, proxy, id, {
+            destroy: closure!([connection] proxy, id, {
                 connection.push(proxy.id(), Methods::Destroy(Destroy { id: id as i32 }))
             }),
         }

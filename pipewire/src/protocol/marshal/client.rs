@@ -56,7 +56,7 @@ pub(crate) struct UpdatePermissions {
 impl Methods {
     pub(crate) fn marshal(connection: Connection) -> ClientMethods<Client> {
         ClientMethods {
-            error: closure!(connection, proxy, id, res, message, {
+            error: closure!([connection] proxy, id, res, message, {
                 connection.push(
                     proxy.id(),
                     Methods::Error(Error {
@@ -66,7 +66,7 @@ impl Methods {
                     }),
                 )
             }),
-            update_properties: closure!(connection, proxy, props, {
+            update_properties: closure!([connection] proxy, props, {
                 connection.push(
                     proxy.id(),
                     Methods::UpdateProperties(UpdateProperties {
@@ -79,7 +79,7 @@ impl Methods {
                     }),
                 )
             }),
-            get_permissions: closure!(connection, proxy, idx, num, {
+            get_permissions: closure!([connection] proxy, idx, num, {
                 connection.push(
                     proxy.id(),
                     Methods::GetPermissions(GetPermissions {
@@ -88,7 +88,7 @@ impl Methods {
                     }),
                 )
             }),
-            update_permissions: closure!(connection, proxy, permissions, {
+            update_permissions: closure!([connection] proxy, permissions, {
                 let permissions = PairList::new(
                     permissions
                         .iter()

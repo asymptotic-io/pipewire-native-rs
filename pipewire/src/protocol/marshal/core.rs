@@ -78,7 +78,7 @@ pub(crate) struct Destroy {
 impl Methods {
     pub(crate) fn marshal(connection: Connection) -> CoreMethods<Core> {
         CoreMethods {
-            hello: closure!(connection, proxy, version, {
+            hello: closure!([connection] proxy, version, {
                 connection.push(
                     proxy.id(),
                     Methods::Hello(Hello {
@@ -86,7 +86,7 @@ impl Methods {
                     }),
                 )
             }),
-            sync: closure!(connection, proxy, id, {
+            sync: closure!([connection] proxy, id, {
                 let seq = ASYNC_SEQ_BIT | (connection.next_seq() & ASYNC_SEQ_MASK);
                 connection.push(
                     proxy.id(),
@@ -96,7 +96,7 @@ impl Methods {
                     }),
                 )
             }),
-            pong: closure!(connection, proxy, id, seq, {
+            pong: closure!([connection] proxy, id, seq, {
                 connection.push(
                     proxy.id(),
                     Methods::Pong(Pong {
@@ -105,7 +105,7 @@ impl Methods {
                     }),
                 )
             }),
-            error: closure!(connection, proxy, seq, res, message, {
+            error: closure!([connection] proxy, seq, res, message, {
                 connection.push(
                     proxy.id(),
                     Methods::Error(ErrorMethod {
@@ -116,7 +116,7 @@ impl Methods {
                     }),
                 )
             }),
-            get_registry: closure!(connection, proxy, {
+            get_registry: closure!([connection] proxy, {
                 let core = proxy.object().unwrap();
                 let registry = proxy::registry::Registry::new(&core);
 
@@ -130,7 +130,7 @@ impl Methods {
 
                 Ok(registry)
             }),
-            create_object: closure!(connection, proxy, factory_name, type_, version, props, {
+            create_object: closure!([connection] proxy, factory_name, type_, version, props, {
                 connection.push(
                     proxy.id(),
                     Methods::CreateObject(CreateObject {
@@ -146,7 +146,7 @@ impl Methods {
                     }),
                 )
             }),
-            destroy: closure!(connection, proxy, object, {
+            destroy: closure!([connection] proxy, object, {
                 connection.push(
                     proxy.id(),
                     Methods::Destroy(Destroy {

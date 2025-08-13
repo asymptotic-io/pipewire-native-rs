@@ -176,23 +176,23 @@ macro_rules! refcounted {
 
 #[macro_export]
 macro_rules! closure {
-    ($object:ident $(, $($args:ident),*)?, $body:block) => {
-        {
-            let _weak = $object.downgrade();
-            Box::new(move |$($($args),*)?| {
-                let $object = _weak.upgrade().unwrap();
-                $body
-            })
+    ([$($names:ident <- $objects:ident),* $(^($($clones:ident),+))? $(^mut($($mut_clones:ident),+))?] $($($args:ident),* ,)? $body:block) => {
+        paste::paste! {
+            {
+                $(let [<_weak $names>] = $objects.downgrade();)*
+                $($(let [<_cloned $clones>] = $clones.clone();)+)?
+                $($(let mut [< _cloned $mut_clones >] = $mut_clones.clone();)+)?
+                Box::new(move |$($($args),*)?| {
+                    $(let $names = [<_weak $names>].upgrade().unwrap();)*
+                    $($(let $clones = &[< _cloned $clones >];)+)?
+                    $($(let $mut_clones = &mut [< _cloned $mut_clones >];)+)?
+                    $body
+                })
+            }
         }
     };
-    ($name:ident <- $object:expr $(, $($args:ident),*)?, $body:block) => {
-        {
-            let _weak = $object.downgrade();
-            Box::new(move |$($($args),*)?| {
-                let $name = _weak.upgrade().unwrap();
-                $body
-            })
-        }
+    ([$($objects:ident),* $(^($($clones:ident),+))? $(^mut($($mut_clones:ident),+))?] $($($args:ident),* ,)? $body:block) => {
+        $crate::closure!([$($objects <- $objects),* $(^($($clones),+))? $(^mut($($mut_clones),+))?] $($($args),*,)? $body)
     };
 }
 
