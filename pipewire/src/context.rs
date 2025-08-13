@@ -27,7 +27,7 @@ default_topic!(log::topic::CONTEXT);
 
 refcounted! {
     pub struct Context {
-        main_loop: Arc<MainLoop>,
+        main_loop: MainLoop,
         properties: RefCell<Properties>,
         conf: Properties,
         // In the C implementation, this is a list, but in practice there is only native-protocol
@@ -55,8 +55,8 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 });
 
 impl Context {
-    pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
-        let inner = InnerContext::new(main_loop, properties)?;
+    pub fn new(main_loop: &MainLoop, properties: Properties) -> std::io::Result<Self> {
+        let inner = InnerContext::new(main_loop.clone(), properties)?;
         let context = Context {
             inner: Rc::new(inner),
         };
@@ -67,7 +67,7 @@ impl Context {
         Ok(context)
     }
 
-    pub fn main_loop(&self) -> Arc<MainLoop> {
+    pub fn main_loop(&self) -> MainLoop {
         self.inner.main_loop.clone()
     }
 
@@ -92,7 +92,7 @@ impl Context {
 }
 
 impl InnerContext {
-    fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
+    fn new(main_loop: MainLoop, properties: Properties) -> std::io::Result<Self> {
         // TODO: plugin loader interface
         let support = main_loop.support();
         let system = GLOBAL_SUPPORT

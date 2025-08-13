@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tempfile;
 
 use pipewire_native::{
@@ -11,7 +11,7 @@ use pipewire_native::{
     main_loop::MainLoop,
     properties::Properties,
     proxy::{client::Client, registry::RegistryEvents, HasProxy, ProxyEvents},
-    some_closure, types,
+    some_closure, types, Refcounted,
 };
 
 #[allow(unused)]
@@ -44,10 +44,10 @@ fn test_lib() {
     let objects = Rc::new(RefCell::new(HashMap::new()));
 
     let v = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
-    let ml = MainLoop::new(&Properties::new_vec(v)).unwrap();
+    let main_loop = MainLoop::new(&Properties::new_vec(v)).unwrap();
 
     let context =
-        Context::new(Arc::new(ml), Properties::new()).expect("Context creation should not fail");
+        Context::new(&main_loop, Properties::new()).expect("Context creation should not fail");
 
     let core = context.connect(None).unwrap();
 

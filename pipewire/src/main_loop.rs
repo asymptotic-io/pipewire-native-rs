@@ -71,6 +71,12 @@ impl Refcounted for MainLoop {
     }
 }
 
+impl WeakMainLoop {
+    pub fn upgrade(&self) -> Option<MainLoop> {
+        self.inner.upgrade().map(|inner| MainLoop { inner })
+    }
+}
+
 pub struct Source {
     inner: Pin<Box<LoopUtilsSource>>,
 }
