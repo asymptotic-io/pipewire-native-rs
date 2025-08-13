@@ -140,7 +140,10 @@ macro_rules! hasproxy_notify {
 #[macro_export]
 macro_rules! proxy_notify {
     ($object:ident, $event:ident, $($args:tt),*) => {
-        spa::emit_hook!($object.proxy().events(), $event, $($args),*);
+        spa::emit_hook!($object.proxy().events(), $event, $($args),*)
+    };
+    ($object:ident, $event:ident) => {
+        spa::emit_hook!($object.proxy().events(), $event)
     };
 }
 
