@@ -188,7 +188,7 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
         spa::emit_hook!(self.inner.hooks, bound_props, id, props);
     }
 
-    pub(crate) fn add_listener(&self, events: ProxyEvents) {
+    pub fn add_listener(&self, events: ProxyEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
