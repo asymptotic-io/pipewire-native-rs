@@ -18,7 +18,10 @@ use crate::{
     refcounted, trace, Id,
 };
 
-use super::marshal::{Header, Marshallable};
+use super::marshal::{
+    message::{ClientFooter, Header, Message},
+    Marshallable,
+};
 
 default_topic!(log::topic::CONNECTION);
 
@@ -92,8 +95,8 @@ impl Connection {
         object: T,
     ) -> std::io::Result<()> {
         let seq = *self.inner.out_seq.borrow();
-        let message = marshal::Message {
-            header: marshal::Header {
+        let message = Message {
+            header: Header {
                 id,
                 opcode: object.opcode(),
                 seq,
@@ -101,7 +104,7 @@ impl Connection {
                 n_fds: 0, // TOOO
             },
             object,
-            footer: None, // TODO
+            footer: ClientFooter::new(),
         };
 
         let mut buf = self.inner.out_buf.borrow_mut();

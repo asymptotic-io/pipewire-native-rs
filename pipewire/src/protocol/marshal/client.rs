@@ -127,7 +127,7 @@ pub(crate) struct Permissions {
 impl Events {
     pub(crate) fn demarshal(
         connection: &Connection,
-        header: &super::Header,
+        header: &super::message::Header,
         proxy: Proxy<Client>,
     ) -> std::io::Result<()> {
         let event = connection.decode_message::<Events>(header)?;

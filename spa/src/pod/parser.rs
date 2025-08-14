@@ -17,6 +17,10 @@ impl<'a> Parser<'a> {
         Parser { data, pos: 0 }
     }
 
+    pub fn available(&self) -> usize {
+        self.data.len() - self.pos
+    }
+
     pub fn pop_pod<U: Pod>(&mut self) -> Result<<U as Pod>::DecodesTo, Error> {
         let (res, size) = U::decode(&self.data[self.pos..])?;
 

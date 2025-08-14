@@ -4,10 +4,12 @@
 
 pub(crate) mod client;
 pub(crate) mod core;
+pub(crate) mod message;
 pub(crate) mod registry;
 
-use pipewire_native_macros as macros;
 use pipewire_native_spa::{self as spa, pod::Pod};
+
+use message::{Header, Message};
 
 pub(crate) const HEADER_LEN: usize = 16;
 
@@ -20,24 +22,7 @@ pub(crate) trait Marshallable {
         Self: Sized;
 }
 
-pub(crate) struct Message<T: Marshallable> {
-    pub(crate) header: Header,
-    pub(crate) object: T,
-    pub(crate) footer: Option<Footer>,
-}
-
-pub(crate) struct Header {
-    pub(crate) id: u32,
-    pub(crate) opcode: u8,
-    pub(crate) size: u32, // actually 24 bytes
-    pub(crate) seq: u32,
-    pub(crate) n_fds: u32,
-}
-
-#[derive(macros::PodStruct)]
-pub(crate) struct Footer {}
-
-impl<T: Marshallable> Pod for Message<T> {
+impl<T: Marshallable, F: Pod<DecodesTo = F>> Pod for Message<T, F> {
     type DecodesTo = Self;
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
@@ -47,11 +32,7 @@ impl<T: Marshallable> Pod for Message<T> {
         }
 
         let payload_size = self.object.encode(&mut data[HEADER_LEN..])?;
-        let footer_size = if let Some(footer) = &self.footer {
-            footer.encode(&mut data[HEADER_LEN + payload_size..])?
-        } else {
-            0
-        };
+        let footer_size = self.footer.encode(&mut data[HEADER_LEN + payload_size..])?;
 
         let size = payload_size + footer_size;
         let header = Header {
@@ -73,12 +54,7 @@ impl<T: Marshallable> Pod for Message<T> {
         let size = header.size as usize;
         let (object, payload_size) = T::decode(header.opcode, &data[header_size..])?;
 
-        let (footer, footer_size) = if size > header_size + payload_size {
-            let (f, s) = Footer::decode(&data[header_size + payload_size..size])?;
-            (Some(f), s)
-        } else {
-            (None, 0)
-        };
+        let (footer, footer_size) = F::decode(&data[header_size + payload_size..size])?;
 
         if size != header_size + payload_size + footer_size {
             Ok((
