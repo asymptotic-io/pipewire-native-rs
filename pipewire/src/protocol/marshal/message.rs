@@ -10,7 +10,7 @@ use super::Marshallable;
 pub(crate) struct Message<T: Marshallable, F: spa::pod::Pod> {
     pub(crate) header: Header,
     pub(crate) object: T,
-    pub(crate) footer: F,
+    pub(crate) footer: Option<F>,
 }
 
 pub(crate) struct Header {
@@ -64,15 +64,17 @@ impl spa::pod::Pod for CoreFooter {
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
         let mut builder = spa::pod::builder::Builder::new(data);
 
-        for p in &self.payload {
-            builder = match p {
-                CoreFooterPayload::Generation(g) => {
-                    builder
-                        .push_int(0) // opcode for Core Generation
-                        .push_pod(g)
-                }
-            };
-        }
+        builder = builder.push_struct(|mut sb| {
+            for p in &self.payload {
+                sb = match p {
+                    CoreFooterPayload::Generation(g) => {
+                        sb.push_id(spa::pod::types::Id(0u32)).push_pod(g)
+                    }
+                };
+            }
+
+            sb
+        });
 
         let out = builder.build()?;
 
@@ -80,23 +82,26 @@ impl spa::pod::Pod for CoreFooter {
     }
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
-        let mut footer = CoreFooter::new();
         let mut parser = spa::pod::parser::Parser::new(data);
 
-        while parser.available() > 0 {
-            let opcode = parser.pop_int()?;
-            let payload = match opcode {
-                0 => {
-                    let g = parser.pop_pod::<CoreGeneration>()?;
-                    CoreFooterPayload::Generation(g)
-                }
-                _ => return Err(spa::pod::Error::Invalid),
-            };
+        parser.pop_struct(|sp| {
+            let mut footer = CoreFooter::new();
 
-            footer.payload.push(payload);
-        }
+            while sp.available() > 0 {
+                let opcode = sp.pop_id::<u32>()?;
+                let payload = match opcode.0 {
+                    0 => {
+                        let g = sp.pop_pod::<CoreGeneration>()?;
+                        CoreFooterPayload::Generation(g)
+                    }
+                    _ => return Err(spa::pod::Error::Invalid),
+                };
 
-        Ok((footer, data.len()))
+                footer.payload.push(payload);
+            }
+
+            Ok(footer)
+        })
     }
 }
 
@@ -106,15 +111,17 @@ impl spa::pod::Pod for ClientFooter {
     fn encode(&self, data: &mut [u8]) -> Result<usize, spa::pod::Error> {
         let mut builder = spa::pod::builder::Builder::new(data);
 
-        for p in &self.payload {
-            builder = match p {
-                ClientFooterPayload::Generation(g) => {
-                    builder
-                        .push_int(0) // opcode for Client Generation
-                        .push_pod(g)
-                }
-            };
-        }
+        builder = builder.push_struct(|mut sb| {
+            for p in &self.payload {
+                sb = match p {
+                    ClientFooterPayload::Generation(g) => {
+                        sb.push_id(spa::pod::types::Id(0u32)).push_pod(g)
+                    }
+                };
+            }
+
+            sb
+        });
 
         let out = builder.build()?;
 
@@ -122,22 +129,25 @@ impl spa::pod::Pod for ClientFooter {
     }
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
-        let mut footer = ClientFooter::new();
         let mut parser = spa::pod::parser::Parser::new(data);
 
-        while parser.available() > 0 {
-            let opcode = parser.pop_int()?;
-            let payload = match opcode {
-                0 => {
-                    let g = parser.pop_pod::<ClientGeneration>()?;
-                    ClientFooterPayload::Generation(g)
-                }
-                _ => return Err(spa::pod::Error::Invalid),
-            };
+        parser.pop_struct(|sp| {
+            let mut footer = ClientFooter::new();
 
-            footer.payload.push(payload);
-        }
+            while sp.available() > 0 {
+                let opcode = sp.pop_id::<u32>()?;
+                let payload = match opcode.0 {
+                    0 => {
+                        let g = sp.pop_pod::<ClientGeneration>()?;
+                        ClientFooterPayload::Generation(g)
+                    }
+                    _ => return Err(spa::pod::Error::Invalid),
+                };
 
-        Ok((footer, data.len()))
+                footer.payload.push(payload);
+            }
+
+            Ok(footer)
+        })
     }
 }

@@ -10,7 +10,9 @@ use crate::{
     core::{Core, CoreChangeMask, CoreInfo, CoreMethods},
     default_topic, hasproxy_method_call, log,
     properties::Properties,
-    protocol::{connection::Connection, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK},
+    protocol::{
+        connection::Connection, marshal::message::CoreFooter, ASYNC_SEQ_BIT, ASYNC_SEQ_MASK,
+    },
     proxy::{self, HasProxy, Proxy},
     proxy_object_notify, trace, Id,
 };
@@ -237,7 +239,7 @@ impl Events {
         header: &super::Header,
         proxy: Proxy<Core>,
     ) -> std::io::Result<()> {
-        let event = connection.decode_message::<Events>(header)?;
+        let (event, _) = connection.decode_message::<Events, CoreFooter>(header)?;
 
         trace!("got event: {event:?}");
 

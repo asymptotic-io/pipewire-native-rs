@@ -32,7 +32,12 @@ impl<T: Marshallable, F: Pod<DecodesTo = F>> Pod for Message<T, F> {
         }
 
         let payload_size = self.object.encode(&mut data[HEADER_LEN..])?;
-        let footer_size = self.footer.encode(&mut data[HEADER_LEN + payload_size..])?;
+
+        let footer_size = if let Some(footer) = &self.footer {
+            footer.encode(&mut data[HEADER_LEN + payload_size..])?
+        } else {
+            0
+        };
 
         let size = payload_size + footer_size;
         let header = Header {
@@ -54,7 +59,12 @@ impl<T: Marshallable, F: Pod<DecodesTo = F>> Pod for Message<T, F> {
         let size = header.size as usize;
         let (object, payload_size) = T::decode(header.opcode, &data[header_size..])?;
 
-        let (footer, footer_size) = F::decode(&data[header_size + payload_size..size])?;
+        let (footer, footer_size) = if size > header_size + payload_size {
+            let (f, s) = F::decode(&data[header_size + payload_size..size])?;
+            (Some(f), s)
+        } else {
+            (None, 0)
+        };
 
         if size != header_size + payload_size + footer_size {
             Ok((

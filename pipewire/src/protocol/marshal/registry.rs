@@ -9,7 +9,7 @@ use crate::{
     closure, default_topic, log,
     permission::PermissionBits,
     properties::Properties,
-    protocol::connection::Connection,
+    protocol::{connection::Connection, marshal::message::CoreFooter},
     proxy::{
         self,
         registry::{Registry, RegistryMethods},
@@ -104,7 +104,7 @@ impl Events {
         header: &super::Header,
         proxy: Proxy<Registry>,
     ) -> std::io::Result<()> {
-        let event = connection.decode_message::<Events>(header)?;
+        let (event, _) = connection.decode_message::<Events, CoreFooter>(header)?;
 
         trace!("got event: {event:?}");
 

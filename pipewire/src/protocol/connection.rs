@@ -95,7 +95,7 @@ impl Connection {
         object: T,
     ) -> std::io::Result<()> {
         let seq = *self.inner.out_seq.borrow();
-        let message = Message {
+        let message: Message<T, ClientFooter> = Message {
             header: Header {
                 id,
                 opcode: object.opcode(),
@@ -104,7 +104,7 @@ impl Connection {
                 n_fds: 0, // TOOO
             },
             object,
-            footer: ClientFooter::new(),
+            footer: None,
         };
 
         let mut buf = self.inner.out_buf.borrow_mut();
@@ -214,7 +214,10 @@ impl Connection {
         }
     }
 
-    pub(crate) fn decode_message<T: Marshallable>(&self, header: &Header) -> std::io::Result<T> {
+    pub(crate) fn decode_message<T: Marshallable, F: Pod<DecodesTo = F>>(
+        &self,
+        header: &Header,
+    ) -> std::io::Result<(T, Option<F>)> {
         let buf = self.inner.in_buf.borrow_mut();
         let mut size = self.inner.in_size.borrow_mut();
         let mut offset = self.inner.in_offset.borrow_mut();
@@ -229,16 +232,27 @@ impl Connection {
             )
         })?;
 
-        // TODO: uncomment once we know footer size
-        //if body_size != header.size as usize {
-        //    return Err(std::io::Error::new(
-        //        std::io::ErrorKind::InvalidData,
-        //        format!(
-        //            "Mismatched message size({}) and body size({})",
-        //            header.size, body_size
-        //        ),
-        //    ));
-        //}
+        let (footer, footer_size) = if body_size < header.size as usize {
+            let (f, fs) = F::decode(&buf[start + body_size..]).map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Could not decode message footer: {e:?}"),
+                )
+            })?;
+            (Some(f), fs)
+        } else {
+            (None, 0)
+        };
+
+        if body_size + footer_size != header.size as usize {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "Mismatched message size({}) and body size({}) + footer_size({})",
+                    header.size, body_size, footer_size
+                ),
+            ));
+        }
 
         *offset += marshal::HEADER_LEN + header.size as usize;
 
@@ -248,7 +262,7 @@ impl Connection {
             *size = 0;
         }
 
-        Ok(body)
+        Ok((body, footer))
     }
 
     fn parse_next(&self) -> std::io::Result<(usize, Option<Header>)> {
