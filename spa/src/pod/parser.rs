@@ -102,13 +102,13 @@ impl<'a> Parser<'a> {
     where
         F: FnOnce(&mut Parser) -> Result<T, Error>,
     {
-        if self.data.len() < 8 {
+        if self.available() < 8 {
             return Err(Error::Invalid);
         }
 
         let size =
             u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
-        if self.data.len() < 8 + size {
+        if self.available() < 8 + size {
             return Err(Error::Invalid);
         }
 
@@ -133,13 +133,13 @@ impl<'a> Parser<'a> {
     where
         K: ParamObject,
     {
-        if self.data.len() < 16 {
+        if self.available() < 16 {
             return Err(Error::Invalid);
         }
 
         let size =
             u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
-        if self.data.len() < 8 + size {
+        if self.available() < 8 + size {
             return Err(Error::Invalid);
         }
 
@@ -190,19 +190,19 @@ impl<'a> ObjectParser<'a> {
         ObjectParser { data, pos: 0 }
     }
 
-    pub fn done(&self) -> bool {
-        self.data.len() - self.pos == 0
+    pub fn available(&self) -> usize {
+        self.data.len() - self.pos
     }
 
     pub fn pop_property<K>(&mut self) -> Result<Option<(K, PropertyFlags, RawPod<'a>)>, Error>
     where
         K: TryFrom<u32> + ParamObject,
     {
-        if self.data.len() - self.pos == 0 {
+        if self.available() == 0 {
             return Ok(None);
         }
 
-        if self.data.len() - self.pos < 16 {
+        if self.available() < 16 {
             return Err(Error::Invalid);
         }
 
