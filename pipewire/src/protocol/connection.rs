@@ -12,14 +12,12 @@ use std::{
 
 use pipewire_native_spa::{self as spa, pod::Pod};
 
-use crate::{
-    debug, default_topic, log,
-    protocol::{marshal, ASYNC_SEQ_MASK},
-    refcounted, trace, Id,
-};
+use crate::{debug, default_topic, log, protocol::ASYNC_SEQ_MASK, refcounted, trace, Id};
 
 use super::marshal::{
+    self,
     message::{ClientFooter, Header, Message},
+    message::{ClientFooterPayload, ClientGeneration, CoreFooter, CoreFooterPayload},
     Marshallable,
 };
 
@@ -35,11 +33,13 @@ refcounted! {
         in_buf: RefCell<Vec<u8>>,
         in_size: RefCell<usize>,
         in_offset: RefCell<usize>,
+        last_recv_generation: RefCell<i64>,
         // Data to send
         out_seq: RefCell<u32>,
         out_buf: RefCell<Vec<u8>>,
         out_size: RefCell<usize>,
         out_fds: RefCell<Vec<RawFd>>,
+        last_sent_generation: RefCell<i64>,
     }
 }
 
@@ -75,10 +75,12 @@ impl Connection {
         self.inner.in_buf.borrow_mut().fill(0);
         self.inner.in_size.replace(0);
         self.inner.in_offset.replace(0);
+        self.inner.last_recv_generation.replace(0);
         self.inner.out_seq.replace(0);
         self.inner.out_buf.borrow_mut().fill(0);
         self.inner.out_size.replace(0);
         self.inner.out_fds.borrow_mut().clear();
+        self.inner.last_sent_generation.replace(0);
     }
 
     pub(crate) fn add_listener(&self, events: ConnectionEvents) -> spa::hook::HookId {
@@ -95,7 +97,24 @@ impl Connection {
         object: T,
     ) -> std::io::Result<()> {
         let seq = *self.inner.out_seq.borrow();
-        let message: Message<T, ClientFooter> = Message {
+
+        let recv_generation = self.inner.last_recv_generation.borrow();
+        let mut sent_generation = self.inner.last_sent_generation.borrow_mut();
+
+        // TODO: support CoreGeneration as well when we implement server
+        let footer = if *recv_generation > *sent_generation {
+            *sent_generation = *recv_generation;
+            trace!("sending client generation {}", *recv_generation);
+            let mut footer = ClientFooter::new();
+            footer.push(ClientFooterPayload::Generation(ClientGeneration {
+                client_generation: *recv_generation,
+            }));
+            Some(footer)
+        } else {
+            None
+        };
+
+        let message = Message {
             header: Header {
                 id,
                 opcode: object.opcode(),
@@ -104,7 +123,7 @@ impl Connection {
                 n_fds: 0, // TOOO
             },
             object,
-            footer: None,
+            footer,
         };
 
         let mut buf = self.inner.out_buf.borrow_mut();
@@ -265,6 +284,20 @@ impl Connection {
         Ok((body, footer))
     }
 
+    // TODO: support CoreGeneration as well when we implement server
+    pub(crate) fn update_generation(&self, footer: &CoreFooter) {
+        for p in &footer.payloads {
+            match p {
+                CoreFooterPayload::Generation(g) => {
+                    trace!("updating core generation to {}", g.registry_generation);
+                    self.inner
+                        .last_recv_generation
+                        .replace(g.registry_generation);
+                }
+            }
+        }
+    }
+
     fn parse_next(&self) -> std::io::Result<(usize, Option<Header>)> {
         let size = *self.inner.in_size.borrow();
         let offset = *self.inner.in_offset.borrow();
@@ -322,10 +355,12 @@ impl InnerConnection {
             in_buf: RefCell::new(vec![0; 16384]),
             in_size: RefCell::new(0),
             in_offset: RefCell::new(0),
+            last_recv_generation: RefCell::new(0),
             out_seq: RefCell::new(0),
             out_buf: RefCell::new(vec![0; 16384]),
             out_size: RefCell::new(0),
             out_fds: RefCell::new(Vec::new()),
+            last_sent_generation: RefCell::new(0),
         }
     }
 }

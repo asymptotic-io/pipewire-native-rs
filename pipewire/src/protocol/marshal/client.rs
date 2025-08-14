@@ -130,7 +130,8 @@ impl Events {
         header: &super::message::Header,
         proxy: Proxy<Client>,
     ) -> std::io::Result<()> {
-        let (event, _) = connection.decode_message::<Events, CoreFooter>(header)?;
+        let (event, footer) = connection.decode_message::<Events, CoreFooter>(header)?;
+        footer.map(|f| connection.update_generation(&f));
 
         trace!("got event: {event:?}");
 

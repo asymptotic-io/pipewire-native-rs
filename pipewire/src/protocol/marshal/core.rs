@@ -236,10 +236,11 @@ pub(crate) struct BoundProps {
 impl Events {
     pub(crate) fn demarshal(
         connection: &Connection,
-        header: &super::Header,
+        header: &super::message::Header,
         proxy: Proxy<Core>,
     ) -> std::io::Result<()> {
-        let (event, _) = connection.decode_message::<Events, CoreFooter>(header)?;
+        let (event, footer) = connection.decode_message::<Events, CoreFooter>(header)?;
+        footer.map(|f| connection.update_generation(&f));
 
         trace!("got event: {event:?}");
 

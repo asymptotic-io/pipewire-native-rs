@@ -101,10 +101,11 @@ pub(crate) struct GlobalRemove {
 impl Events {
     pub(crate) fn demarshal(
         connection: &Connection,
-        header: &super::Header,
+        header: &super::message::Header,
         proxy: Proxy<Registry>,
     ) -> std::io::Result<()> {
-        let (event, _) = connection.decode_message::<Events, CoreFooter>(header)?;
+        let (event, footer) = connection.decode_message::<Events, CoreFooter>(header)?;
+        footer.map(|f| connection.update_generation(&f));
 
         trace!("got event: {event:?}");
 
