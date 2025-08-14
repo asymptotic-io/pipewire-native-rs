@@ -284,15 +284,28 @@ impl Connection {
         Ok((body, footer))
     }
 
+    pub(crate) fn decode_core_message<T: Marshallable>(
+        &self,
+        header: &Header,
+    ) -> std::io::Result<T> {
+        let (object, footer) = self.decode_message(header)?;
+
+        self.update_generation(footer.as_ref());
+
+        Ok(object)
+    }
+
     // TODO: support CoreGeneration as well when we implement server
-    pub(crate) fn update_generation(&self, footer: &CoreFooter) {
-        for p in &footer.payloads {
-            match p {
-                CoreFooterPayload::Generation(g) => {
-                    trace!("updating core generation to {}", g.registry_generation);
-                    self.inner
-                        .last_recv_generation
-                        .replace(g.registry_generation);
+    pub fn update_generation(&self, footer: Option<&CoreFooter>) {
+        if let Some(footer) = footer {
+            for p in &footer.payloads {
+                match p {
+                    CoreFooterPayload::Generation(g) => {
+                        trace!("updating core generation to {}", g.registry_generation);
+                        self.inner
+                            .last_recv_generation
+                            .replace(g.registry_generation);
+                    }
                 }
             }
         }
