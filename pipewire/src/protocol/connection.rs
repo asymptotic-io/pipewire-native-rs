@@ -6,13 +6,14 @@ use std::{
     cell::RefCell,
     io::{Read, Write},
     os::{fd::RawFd, unix::net::UnixStream},
-    rc::Rc,
     sync::{Arc, Mutex},
 };
 
 use pipewire_native_spa::{self as spa, pod::Pod};
 
-use crate::{debug, default_topic, log, protocol::ASYNC_SEQ_MASK, refcounted, trace, Id};
+use crate::{
+    debug, default_topic, log, new_refcounted, protocol::ASYNC_SEQ_MASK, refcounted, trace, Id,
+};
 
 use super::marshal::{
     self,
@@ -54,7 +55,7 @@ impl Connection {
     pub(crate) fn new(stream: Option<UnixStream>) -> Self {
         debug!("Creating new connection to {stream:?}");
         Self {
-            inner: Rc::new(InnerConnection::new(stream)),
+            inner: new_refcounted(InnerConnection::new(stream)),
         }
     }
 

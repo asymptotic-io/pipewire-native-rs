@@ -124,6 +124,10 @@ pub trait Refcounted: Clone {
     fn downgrade(&self) -> Self::WeakRef;
 }
 
+pub fn new_refcounted<T>(inner: T) -> std::sync::Arc<T> {
+    std::sync::Arc::new(inner)
+}
+
 #[macro_export]
 macro_rules! refcounted {
     (
@@ -136,18 +140,26 @@ macro_rules! refcounted {
         paste::paste! {
             #[derive(Clone)]
             $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
-                inner: std::rc::Rc<[<Inner $name>] $(<$($generic),*>)?>,
+                inner: std::sync::Arc<[<Inner $name>] $(<$($generic),*>)?>,
             }
+
+            // We implement Send to allow usage with our main loop, and expect the user to
+            // explicitly ensure single-thread access
+            unsafe impl $(<$($generic $(: $bound)?),*>)? Send for $name $(<$($generic),*>)? {}
 
             #[derive(Clone)]
             pub struct [<Weak $name>] $(<$($generic $(: $bound)?),*>)? {
-                inner: std::rc::Weak<[<Inner $name>] $(<$($generic>)?),*>,
+                inner: std::sync::Weak<[<Inner $name>] $(<$($generic>)?),*>,
             }
+
+            // We implement Send to allow usage with our main loop, and expect the user to
+            // explicitly ensure single-thread access
+            unsafe impl $(<$($generic $(: $bound)?),*>)? Send for [<Weak $name>] $(<$($generic),*>)? {}
 
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
                 pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
-                        inner: std::rc::Rc::downgrade(&self.inner),
+                        inner: std::sync::Arc::downgrade(&self.inner),
                     }
                 }
             }

@@ -11,8 +11,11 @@ use std::{
 };
 
 use crate::interface::r#loop::*;
-use crate::interface::{self, ffi::CInterface};
 use crate::{flags, interface::ffi::CSource};
+use crate::{
+    interface::{self, ffi::CInterface},
+    support::ffi::r#loop::SendRawPointerMut,
+};
 
 use crate::support::ffi::c_string;
 
@@ -405,6 +408,7 @@ impl LoopUtilsCIface {
     ) -> *mut CSource {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
+        let data = SendRawPointerMut(data);
 
         let Some(io_mask) = flags::Io::from_bits(mask) else {
             return std::ptr::null_mut();
@@ -414,7 +418,10 @@ impl LoopUtilsCIface {
             fd,
             io_mask,
             close,
-            Box::new(move |fd, mask| func(data, fd, mask)),
+            Box::new(move |fd, mask| {
+                let data = &data;
+                func(data.0, fd, mask)
+            }),
         ) {
             Some(s) => s,
             None => return std::ptr::null_mut(),
@@ -451,8 +458,15 @@ impl LoopUtilsCIface {
     ) -> *mut CSource {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
+        let data = SendRawPointerMut(data);
 
-        let source = match loop_utils.add_idle(enabled, Box::new(move || func(data))) {
+        let source = match loop_utils.add_idle(
+            enabled,
+            Box::new(move || {
+                let data = &data;
+                func(data.0)
+            }),
+        ) {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
@@ -484,8 +498,12 @@ impl LoopUtilsCIface {
     ) -> *mut CSource {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
+        let data = SendRawPointerMut(data);
 
-        let source = match loop_utils.add_event(Box::new(move |count| func(data, count))) {
+        let source = match loop_utils.add_event(Box::new(move |count| {
+            let data = &data;
+            func(data.0, count)
+        })) {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
@@ -517,8 +535,12 @@ impl LoopUtilsCIface {
     ) -> *mut CSource {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
+        let data = SendRawPointerMut(data);
 
-        let source = match loop_utils.add_event(Box::new(move |exp| func(data, exp))) {
+        let source = match loop_utils.add_event(Box::new(move |exp| {
+            let data = &data;
+            func(data.0, exp)
+        })) {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
@@ -563,10 +585,15 @@ impl LoopUtilsCIface {
     ) -> *mut CSource {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
+        let data = SendRawPointerMut(data);
 
-        let source = match loop_utils
-            .add_signal(signal_number, Box::new(move |signum| func(data, signum)))
-        {
+        let source = match loop_utils.add_signal(
+            signal_number,
+            Box::new(move |signum| {
+                let data = &data;
+                func(data.0, signum)
+            }),
+        ) {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };

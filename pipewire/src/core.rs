@@ -16,7 +16,7 @@ use crate::{
     context::{Context, WeakContext},
     debug, default_topic, hasproxy_method_call, hasproxy_notify,
     id_map::IdMap,
-    keys, log,
+    keys, log, new_refcounted,
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
@@ -60,7 +60,7 @@ impl Core {
         debug!("Creating new core");
 
         let this = Self {
-            inner: Rc::new(InnerCore::new(context, properties)),
+            inner: new_refcounted(InnerCore::new(context, properties)),
         };
 
         // Reserve id 0 because we are id 0

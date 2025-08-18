@@ -9,14 +9,13 @@ use std::sync::{Arc, Mutex};
 use bitflags::bitflags;
 use pipewire_native_spa as spa;
 
-use crate::proxy_object_invoke;
 use crate::{
     core::Core,
-    permission,
+    new_refcounted, permission,
     properties::Properties,
     protocol,
     proxy::{HasProxy, Proxy},
-    refcounted, types, Id, Refcounted,
+    proxy_object_invoke, refcounted, types, Id, Refcounted,
 };
 
 refcounted! {
@@ -69,7 +68,7 @@ impl HasProxy for Registry {
 impl Registry {
     pub fn new(core: &Core) -> Self {
         let this = Self {
-            inner: Rc::new(InnerRegistry::new(core)),
+            inner: new_refcounted(InnerRegistry::new(core)),
         };
 
         let id = core.next_proxy_id();

@@ -16,8 +16,8 @@ pub struct Source {
     pub rmask: u32,
 }
 
-pub type SourceFn = dyn FnMut(&Source) + 'static;
-pub type InvokeFn = dyn FnMut(bool, u32, &[u8]) -> i32 + 'static;
+pub type SourceFn = dyn FnMut(&Source) + Send + 'static;
+pub type InvokeFn = dyn FnMut(bool, u32, &[u8]) -> i32 + Send + 'static;
 
 pub struct LoopImpl {
     pub inner: Pin<Box<dyn Any>>,
@@ -152,11 +152,11 @@ impl Interface for LoopControlImpl {
     }
 }
 
-pub type SourceIoFn = dyn FnMut(RawFd, u32) + 'static;
-pub type SourceIdleFn = dyn FnMut() + 'static;
-pub type SourceEventFn = dyn FnMut(u64) + 'static;
-pub type SourceTimerFn = dyn FnMut(u64) + 'static;
-pub type SourceSignalFn = dyn FnMut(i32) + 'static;
+pub type SourceIoFn = dyn FnMut(RawFd, u32) + Send + 'static;
+pub type SourceIdleFn = dyn FnMut() + Send + 'static;
+pub type SourceEventFn = dyn FnMut(u64) + Send + 'static;
+pub type SourceTimerFn = dyn FnMut(u64) + Send + 'static;
+pub type SourceSignalFn = dyn FnMut(i32) + Send + 'static;
 
 pub enum LoopUtilsSourceCb {
     Io(Box<SourceIoFn>),

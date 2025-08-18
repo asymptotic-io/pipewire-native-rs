@@ -25,6 +25,12 @@ pub mod common;
 pub mod control;
 pub mod utils;
 
+struct SendRawPointer(*const c_void);
+struct SendRawPointerMut(*mut c_void);
+
+unsafe impl Send for SendRawPointer {}
+unsafe impl Send for SendRawPointerMut {}
+
 type CInvokeFunc = extern "C" fn(
     loop_: *const CLoop,
     async_: bool,
@@ -319,19 +325,25 @@ impl LoopImplIface {
         user_data: *mut c_void,
     ) -> c_int {
         let loop_impl = Self::c_to_loop_impl(object);
+        let object = SendRawPointer(object);
+        let user_data = SendRawPointerMut(user_data);
 
         let res = loop_impl.invoke(
             seq,
             unsafe { std::slice::from_raw_parts(data as *const u8, size) },
             block,
             Box::new(move |async_, seq, data| {
+                // Shenanigans to let the closure type be Send
+                let object = &object;
+                let user_data = &user_data;
+
                 func(
-                    object as *mut CLoop,
+                    object.0 as *mut CLoop,
                     async_,
                     seq,
                     data.as_ptr() as *const c_void,
                     data.len(),
-                    user_data,
+                    user_data.0,
                 )
             }),
         );

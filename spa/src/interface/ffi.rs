@@ -61,6 +61,8 @@ pub struct CLoop {
     pub iface: CInterface,
 }
 
+unsafe impl Send for CLoop {}
+
 #[repr(C)]
 #[derive(Clone)]
 pub struct CSource {
@@ -76,5 +78,7 @@ pub struct CSource {
     pub rmask: u32,
     pub priv_: *mut c_void,
 }
+
+unsafe impl Send for CSource {}
 
 pub type CSourceFunc = extern "C" fn(source: *mut CSource);

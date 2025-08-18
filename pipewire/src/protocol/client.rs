@@ -9,7 +9,6 @@ use std::{
         unix::net::UnixStream,
     },
     path::PathBuf,
-    rc::Rc,
 };
 
 use pipewire_native_spa as spa;
@@ -17,7 +16,7 @@ use pipewire_native_spa as spa;
 use crate::{
     closure,
     core::{self, Core, WeakCore},
-    debug, default_topic, keys, log, main_loop,
+    debug, default_topic, keys, log, main_loop, new_refcounted,
     protocol::connection::{Connection, ConnectionEvents},
     proxy::{self, HasProxy},
     proxy_notify, refcounted, some_closure, trace, types, warn, Id,
@@ -53,7 +52,7 @@ impl Client {
     pub(crate) fn new() -> Self {
         debug!("Creating new client");
         let this = Self {
-            inner: Rc::new(InnerClient::new()),
+            inner: new_refcounted(InnerClient::new()),
         };
 
         let listener = this.inner.connection.add_listener(ConnectionEvents {

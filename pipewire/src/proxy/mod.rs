@@ -4,12 +4,11 @@
 
 use std::any::Any;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use pipewire_native_spa as spa;
 
-use crate::{properties::Properties, refcounted, Refcounted};
+use crate::{new_refcounted, properties::Properties, refcounted, Refcounted};
 
 use crate::{types::ObjectType, Id};
 
@@ -141,7 +140,7 @@ pub struct ProxyEvents {
 impl<T: HasProxy + Refcounted> Proxy<T> {
     pub(crate) fn new(id: Id, object: &T) -> Self {
         Self {
-            inner: Rc::new(InnerProxy::<T>::new(id, object.downgrade())),
+            inner: new_refcounted(InnerProxy::<T>::new(id, object.downgrade())),
         }
     }
 

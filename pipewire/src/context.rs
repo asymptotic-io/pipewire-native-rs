@@ -6,13 +6,12 @@ use std::{
     cell::RefCell,
     ffi::CStr,
     pin::Pin,
-    rc::Rc,
     sync::{Arc, LazyLock},
 };
 
 use crate::{
-    conf, core::Core, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties,
-    protocol::Protocol, refcounted, GLOBAL_SUPPORT,
+    conf, core::Core, debug, default_topic, keys, log, main_loop::MainLoop, new_refcounted,
+    properties::Properties, protocol::Protocol, refcounted, GLOBAL_SUPPORT,
 };
 
 use pipewire_native_spa::{
@@ -58,7 +57,7 @@ impl Context {
     pub fn new(main_loop: &MainLoop, properties: Properties) -> std::io::Result<Self> {
         let inner = InnerContext::new(main_loop.clone(), properties)?;
         let context = Context {
-            inner: Rc::new(inner),
+            inner: new_refcounted(inner),
         };
 
         // Provide (weak) reference to inner descendants that need it

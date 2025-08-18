@@ -11,7 +11,7 @@ use pipewire_native_spa as spa;
 
 use crate::{
     core::Core,
-    permission,
+    new_refcounted, permission,
     properties::Properties,
     protocol,
     proxy::{HasProxy, Proxy},
@@ -76,7 +76,7 @@ impl HasProxy for Client {
 impl Client {
     pub fn new(core: &Core) -> Self {
         let this = Self {
-            inner: Rc::new(InnerClient::new(core)),
+            inner: new_refcounted(InnerClient::new(core)),
         };
 
         let id = core.next_proxy_id();

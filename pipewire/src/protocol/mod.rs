@@ -6,11 +6,14 @@ pub(crate) mod client;
 pub(crate) mod connection;
 pub(crate) mod marshal;
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
 
 use client::Client;
 
-use crate::{context::WeakContext, debug, default_topic, log, properties::Properties, refcounted};
+use crate::{
+    context::WeakContext, debug, default_topic, log, new_refcounted, properties::Properties,
+    refcounted,
+};
 
 default_topic!(log::topic::PROTOCOL);
 
@@ -28,7 +31,7 @@ impl Protocol {
     pub(crate) fn new(name: &str) -> Self {
         debug!("Creating new protocol object");
         Self {
-            inner: Rc::new(InnerProtocol::new(name)),
+            inner: new_refcounted(InnerProtocol::new(name)),
         }
     }
 

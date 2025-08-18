@@ -12,11 +12,11 @@ use std::os::fd::RawFd;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use crate::properties::Properties;
-use crate::{debug, default_topic, log, trace};
-use crate::{Refcounted, GLOBAL_SUPPORT};
+use crate::GLOBAL_SUPPORT;
+use crate::{debug, default_topic, log, new_refcounted, refcounted, trace};
 
 default_topic!(log::topic::MAIN_LOOP);
 
@@ -44,39 +44,6 @@ pub(crate) struct LoopSupport {
     pub(crate) loop_control: Arc<Pin<Box<spa::interface::r#loop::LoopControlImpl>>>,
 }
 
-#[derive(Clone)]
-pub struct MainLoop {
-    // The imeplementation of stop() requires that we send a full clone of inner to loop.invoke(),
-    // because loop::InvokeFn has a 'static bound. Because of this, we cannot use refcounted!(),
-    // which wraps the inner in an Rc<>. We use an Arc<> for copy-ability, and implemented
-    // Refcounted by hand.
-    inner: Arc<InnerMainLoop>,
-}
-
-pub struct WeakMainLoop {
-    inner: Weak<InnerMainLoop>,
-}
-
-impl Refcounted for MainLoop {
-    type WeakRef = WeakMainLoop;
-
-    fn downgrade(&self) -> Self::WeakRef {
-        WeakMainLoop {
-            inner: Arc::downgrade(&self.inner),
-        }
-    }
-
-    fn upgrade(this: &Self::WeakRef) -> Option<Self> {
-        this.inner.upgrade().map(|o| MainLoop { inner: o })
-    }
-}
-
-impl WeakMainLoop {
-    pub fn upgrade(&self) -> Option<MainLoop> {
-        self.inner.upgrade().map(|inner| MainLoop { inner })
-    }
-}
-
 pub struct Source {
     inner: Pin<Box<LoopUtilsSource>>,
 }
@@ -97,6 +64,17 @@ pub type SourceIoFn = spa::interface::r#loop::SourceIoFn;
 pub type SourceSignalFn = spa::interface::r#loop::SourceSignalFn;
 pub type SourceTimerFn = spa::interface::r#loop::SourceTimerFn;
 
+refcounted! {
+    pub struct MainLoop {
+        support: LoopSupport,
+        // This is an atomic because it is hard to convince Rust that this will only be mutated on one
+        // thread (i.e. the one on which run() is called
+        running: AtomicBool,
+        name: String,
+        hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
+    }
+}
+
 impl MainLoop {
     pub fn new(props: &Properties) -> Option<MainLoop> {
         let Some(l) = InnerMainLoop::new(props) else {
@@ -105,7 +83,9 @@ impl MainLoop {
 
         debug!("Creating main loop");
 
-        Some(MainLoop { inner: Arc::new(l) })
+        Some(MainLoop {
+            inner: new_refcounted(l),
+        })
     }
 
     pub fn run(&self) {
@@ -271,15 +251,6 @@ impl MainLoop {
     pub(crate) fn support(&self) -> LoopSupport {
         self.inner.support.clone()
     }
-}
-
-struct InnerMainLoop {
-    support: LoopSupport,
-    // This is an atomic because it is hard to convince Rust that this will only be mutated on one
-    // thread (i.e. the one on which run() is called
-    running: AtomicBool,
-    name: String,
-    hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
 }
 
 impl Drop for InnerMainLoop {
