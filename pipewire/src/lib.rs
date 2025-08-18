@@ -25,6 +25,9 @@ pub mod types;
 mod support;
 mod utils;
 
+// pub use so users of closure! don't need to import paste themselves
+pub use paste::paste;
+
 pub type Id = u32;
 pub const INVALID_ID: Id = Id::MAX;
 
@@ -177,7 +180,7 @@ macro_rules! refcounted {
 #[macro_export]
 macro_rules! closure {
     ([$($names:ident <- $objects:ident),* $(^($($clones:ident),+))? $(^mut($($mut_clones:ident),+))?] $($($args:ident),* ,)? $body:block) => {
-        paste::paste! {
+        $crate::paste! {
             {
                 $(let [<_weak $names>] = $objects.downgrade();)*
                 $($(let [<_cloned $clones>] = $clones.clone();)+)?
