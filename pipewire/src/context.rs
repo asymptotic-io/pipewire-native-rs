@@ -173,13 +173,21 @@ impl InnerContext {
     }
 
     fn load_conf(&mut self) -> std::io::Result<()> {
-        let conf_prefix = std::env::var("PIPEWIRE_CONFIG_PREFIX")
-            .ok()
-            .or_else(|| self.properties.borrow().get(keys::CONFIG_PREFIX).cloned());
+        let conf_prefix = std::env::var("PIPEWIRE_CONFIG_PREFIX").ok().or_else(|| {
+            self.properties
+                .borrow()
+                .get(keys::CONFIG_PREFIX)
+                .map(String::from)
+        });
 
         let conf_name = std::env::var("PIPEWIRE_CONFIG_NAME")
             .ok()
-            .or_else(|| self.properties.borrow().get(keys::CONFIG_NAME).cloned())
+            .or_else(|| {
+                self.properties
+                    .borrow()
+                    .get(keys::CONFIG_NAME)
+                    .map(String::from)
+            })
             .and_then(|s| if s == "client-rt.conf" { None } else { Some(s) })
             .unwrap_or("client.conf".to_string());
 

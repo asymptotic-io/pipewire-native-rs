@@ -10,6 +10,6 @@ pub mod param;
 pub mod pod;
 pub mod support;
 
-pub fn atob(s: &String) -> bool {
+pub fn atob(s: &str) -> bool {
     s == "true" || s == "1"
 }

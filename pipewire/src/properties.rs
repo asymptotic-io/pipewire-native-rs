@@ -82,8 +82,8 @@ impl Properties {
         self.map.remove(key)
     }
 
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.map.get(key)
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.map.get(key).map(|s| s.as_str())
     }
 
     pub fn get_u32(&self, key: &str) -> Option<u32> {
