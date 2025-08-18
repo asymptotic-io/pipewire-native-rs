@@ -137,7 +137,7 @@ impl Connection {
                     break;
                 }
                 Err(spa::pod::Error::NoSpace) => {
-                    let capacity = buf.capacity();
+                    let capacity = buf.len();
                     if capacity > MAX_MESSAGE_SIZE {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::InvalidInput,
@@ -203,13 +203,17 @@ impl Connection {
     pub(crate) fn next_message(&self) -> std::io::Result<Header> {
         loop {
             let (wanted_capacity, header) = self.parse_next()?;
+            trace!(
+                "we need {wanted_capacity}, got header: {}",
+                header.is_some()
+            );
 
-            if self.inner.in_buf.borrow().capacity() < wanted_capacity {
+            if self.inner.in_buf.borrow().len() < wanted_capacity {
                 // Not enough space for header or message, make some space, try to fill some data,
                 // and then retry
                 trace!(
                     "expanding capacity from {} -> {}",
-                    self.inner.in_buf.borrow().capacity(),
+                    self.inner.in_buf.borrow().len(),
                     wanted_capacity
                 );
                 self.inner.in_buf.borrow_mut().resize(wanted_capacity, 0);
@@ -342,11 +346,10 @@ impl Connection {
         let mut stream_ref = self.inner.stream.borrow_mut();
         let stream = stream_ref.as_mut().unwrap();
         let mut buf = self.inner.in_buf.borrow_mut();
-        let offset = self.inner.in_offset.borrow_mut();
         let mut size = self.inner.in_size.borrow_mut();
 
-        let read = stream.read(&mut buf[*offset..])?;
-        trace!("read {read} bytes");
+        let read = stream.read(&mut buf[*size..])?;
+        trace!("read {read} bytes at {size}");
 
         // TODO: control messages
 
