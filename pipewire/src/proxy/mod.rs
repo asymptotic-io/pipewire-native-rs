@@ -31,6 +31,14 @@ pub trait HasProxy: Any {
 }
 
 impl dyn HasProxy {
+    pub fn downcast<T: HasProxy + Refcounted>(&self) -> Option<T> {
+        if let Some(object) = (self as &dyn Any).downcast_ref::<T>() {
+            Some(object.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn downcast_proxy<T: HasProxy + Refcounted>(&self) -> Option<Proxy<T>> {
         if let Some(object) = (self as &dyn Any).downcast_ref::<T>() {
             Some(object.proxy())
