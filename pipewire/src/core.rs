@@ -145,11 +145,11 @@ impl Core {
             remove_id: some_closure!([core_proxy] id, {
                 debug!("got remove_id: {id}");
                 let core = core_proxy.object().unwrap();
-                let proxies = core.inner.objects.borrow();
+                let mut proxies = core.inner.objects.borrow_mut();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_notify!(object, removed);
-                    core.inner.objects.borrow_mut().remove(id);
+                    proxies.remove(id);
                 }
             }),
             bound_id: some_closure!([core_proxy] id, global_id, {
