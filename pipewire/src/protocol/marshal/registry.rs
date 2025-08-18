@@ -54,7 +54,7 @@ impl Methods {
                     _ => {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::InvalidData,
-                            "Unsupported proxy type {type_}",
+                            format!("Unsupported proxy type {type_}"),
                         ))
                     }
                 };
