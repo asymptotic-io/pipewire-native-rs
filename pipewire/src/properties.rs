@@ -57,11 +57,7 @@ impl Properties {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
-        self.map.iter()
-    }
-
-    pub fn iter_str(&self) -> impl Iterator<Item = (&str, &str)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
         self.map.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 

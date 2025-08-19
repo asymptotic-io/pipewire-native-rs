@@ -78,7 +78,7 @@ impl Context {
         self.inner
             .properties
             .borrow_mut()
-            .update_keys(props.iter_str(), keys);
+            .update_keys(props.iter(), keys);
     }
 
     pub(crate) fn protocol(&self) -> &Protocol {
