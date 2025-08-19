@@ -1,0 +1,14 @@
+[package]
+name = "pipewire-native-tools"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "pw-browse"
+path = "browse/main.rs"
+
+[dependencies]
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+pipewire = { package = "pipewire-native", path = "../pipewire" }
+ratatui = "0.29.0"
