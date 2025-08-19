@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+#![warn(missing_docs)]
+#![doc = include_str!("../../README.md")]
+
 use std::sync::OnceLock;
 
 use pipewire_native_spa as spa;
@@ -26,16 +29,22 @@ mod refcounted;
 mod support;
 mod utils;
 
+#[doc(inline)]
 pub use refcounted::*;
 
 // pub use so users of closure! don't need to import paste themselves
 pub use paste::paste;
 
+/// Represents an object identifier
 pub type Id = u32;
-pub const INVALID_ID: Id = Id::MAX;
+
+#[allow(unused)]
+pub(crate) const INVALID_ID: Id = Id::MAX;
 
 pub(crate) static GLOBAL_SUPPORT: OnceLock<Support> = OnceLock::new();
 
+/// Must be called before using any other API from this crate. Initialises global support libraries
+/// and sets up logging.
 pub fn init() {
     GLOBAL_SUPPORT.get_or_init(|| {
         let mut support = Support::new();
