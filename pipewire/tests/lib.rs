@@ -37,7 +37,7 @@ fn start_pipewire() -> TestContext {
 
 #[derive(Clone)]
 struct Objects {
-    objects: Arc<RefCell<HashMap<Id, Box<dyn HasProxy>>>>,
+    map: Arc<RefCell<HashMap<Id, Box<dyn HasProxy>>>>,
 }
 
 unsafe impl Send for Objects {}
@@ -49,7 +49,7 @@ fn test_lib() {
     pipewire::init();
 
     let objects = Objects {
-        objects: Arc::new(RefCell::new(HashMap::new())),
+        map: Arc::new(RefCell::new(HashMap::new())),
     };
 
     let v = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
@@ -63,16 +63,16 @@ fn test_lib() {
     core.proxy().add_listener(ProxyEvents {
         destroy: some_closure!([^(objects)] {
             println!("core destroyed, clearing objects");
-            objects.objects.borrow_mut().clear();
+            objects.map.borrow_mut().clear();
         }),
         ..Default::default()
     });
 
     let mut timer_src = main_loop
         .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
-            assert_eq!(objects.objects.borrow().len(), 1);
+            assert_eq!(objects.map.borrow().len(), 1);
             core.disconnect();
-            assert_eq!(objects.objects.borrow().len(), 0);
+            assert_eq!(objects.map.borrow().len(), 0);
             main_loop.quit();
         }))
         .unwrap();
@@ -97,7 +97,7 @@ fn test_lib() {
 
                     proxy.add_listener(ProxyEvents {
                         removed: some_closure!([proxy ^(objects)] {
-                            objects.objects.borrow_mut().remove(&proxy.id());
+                            objects.map.borrow_mut().remove(&proxy.id());
                         }),
                         ..Default::default()
                     });
@@ -107,15 +107,15 @@ fn test_lib() {
                 _ => return,
             };
 
-            objects.objects.borrow_mut().insert(id, object);
+            objects.map.borrow_mut().insert(id, object);
         }),
         global_remove: some_closure!([^(objects)] id, {
             println!("global {id} removed");
-            let _ = objects.objects.borrow_mut().remove(&id);
+            let _ = objects.map.borrow_mut().remove(&id);
         }),
     });
 
     main_loop.run();
 
-    assert_eq!(objects.objects.borrow().len(), 0);
+    assert_eq!(objects.map.borrow().len(), 0);
 }
