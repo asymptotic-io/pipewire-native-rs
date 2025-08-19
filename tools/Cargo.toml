@@ -11,4 +11,4 @@ path = "browse/main.rs"
 color-eyre = "0.6.5"
 crossterm = "0.29.0"
 pipewire = { package = "pipewire-native", path = "../pipewire" }
-ratatui = "0.29.0"
+ratatui = { version = "0.29.0", features = [ "unstable-rendered-line-info" ] }
