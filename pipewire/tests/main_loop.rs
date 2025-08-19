@@ -74,8 +74,9 @@ fn test_mainloop(exec: MainLoopRun) {
     let res = ml.enable_idle(&mut idle_src, true);
     assert!(res.is_ok());
 
-    let mle = MainLoopEvents::new(Box::new(listener_callback));
-    ml.add_listener(mle);
+    ml.add_listener(MainLoopEvents {
+        destroy: Some(Box::new(listener_callback)),
+    });
 
     // Validate that our callbacks have not been called yet (should only happen on run())
     let cb = CALLBACKS.lock().unwrap();

@@ -20,19 +20,10 @@ use crate::{debug, default_topic, log, new_refcounted, properties::Properties, r
 default_topic!(log::topic::MAIN_LOOP);
 
 pub struct MainLoopEvents {
-    destroy: Option<Box<dyn FnMut()>>,
-}
-
-impl MainLoopEvents {
-    pub fn new(destroy_cb: Box<dyn FnMut()>) -> Self {
-        Self {
-            destroy: Some(destroy_cb),
-        }
-    }
+    pub destroy: Option<Box<dyn FnMut()>>,
 }
 
 unsafe impl Send for MainLoopEvents {}
-unsafe impl Sync for MainLoopEvents {}
 
 #[derive(Clone)]
 pub(crate) struct LoopSupport {
