@@ -21,7 +21,7 @@ use pipewire::{
 };
 
 pub struct State {
-    main_loop: MainLoop,
+    pub main_loop: MainLoop,
     _context: Context,
     core: Core,
     registry: Registry,

@@ -31,6 +31,11 @@ fn main() -> Result<()> {
         terminal.draw(|frame| {
             let mut lines = vec![];
 
+            state
+                .main_loop
+                .lock()
+                .expect("main loop lock should not fail");
+
             for (id, (client, props)) in state.clients.borrow().iter() {
                 lines.push(Line::from(format!(
                     "Client #{}: {}",
@@ -38,6 +43,11 @@ fn main() -> Result<()> {
                     props.get(keys::APP_NAME).unwrap_or("unknown"),
                 )));
             }
+
+            state
+                .main_loop
+                .unlock()
+                .expect("main loop unlock should not fail");
 
             let para = Paragraph::new(Text::from(lines))
                 .block(Block::default().title("pw-browse").borders(Borders::ALL));
