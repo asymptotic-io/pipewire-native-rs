@@ -166,12 +166,15 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
         .expect("main loop lock should not fail");
 
     let clients = pw_state.clients.borrow();
+    let mut entries = clients.iter().collect::<Vec<_>>();
+    entries.sort_by_key(|e| e.0);
+
     let n = clients.len();
 
-    for (idx, (id, (client, props))) in clients.iter().enumerate() {
+    for (idx, (id, (client, props))) in entries.iter().enumerate() {
         let span = Span::from(format!(
             "#{}: {}",
-            client.proxy().bound_id().unwrap_or(*id),
+            client.proxy().bound_id().unwrap_or(**id),
             props.get(keys::APP_NAME).unwrap_or("unknown"),
         ));
 
@@ -179,7 +182,7 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
             if (ui_state.pane == Pane::Objects && ui_state.position as usize % n == idx)
                 || (ui_state.pane == Pane::Details && ui_state.last_position as usize % n == idx)
             {
-                selected = *id;
+                selected = idx;
                 span.style(selection_style.clone())
             } else {
                 span
@@ -191,8 +194,12 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
 
     let mut detail_lines = vec![];
 
-    if let Some(entry) = clients.get(&selected).or_else(|| clients.values().next()) {
-        for (key, value) in entry.1.iter() {
+    if let Some(entry) = entries.get(selected) {
+        let mut props = entry.1 .1.iter().collect::<Vec<_>>();
+
+        props.sort_by_key(|e| e.0);
+
+        for (key, value) in props.iter() {
             detail_lines.push(Line::from(vec![
                 Span::from(key.to_string()).blue(),
                 Span::from(" ".to_string()).blue(),
