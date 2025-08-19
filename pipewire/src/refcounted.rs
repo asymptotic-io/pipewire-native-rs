@@ -68,17 +68,18 @@ pub(crate) fn new_refcounted<T>(inner: T) -> std::sync::Arc<T> {
 /// }
 /// ```
 ///
-/// The macro creates structures in this pattern, and implements the `[Refcounted]` trait on the
-/// generated types.
+/// The macro creates structures in this pattern, and implements the [`super::Refcounted`] trait on
+/// the generated types.
 macro_rules! refcounted {
     (
         // FIXME: bounds can be non-types, so we probably need something that munches tts
-        $(#[$(attrs:meta)+])?
+        $(#[$($attrs:meta)*])?
         $visibility:vis struct $name:ident $(<$($generic:ident $(: $bound:ty)?),*>)? {
             $($body:tt)*
         }
     ) => {
         paste::paste! {
+            $(#[$($attrs)*])?
             #[derive(Clone)]
             $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
                 inner: std::sync::Arc<[<Inner $name>] $(<$($generic),*>)?>,
