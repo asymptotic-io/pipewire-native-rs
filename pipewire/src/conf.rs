@@ -158,7 +158,11 @@ fn read_file(path: &PathBuf, properties: &mut Properties) -> std::io::Result<()>
     }
 }
 
-pub fn load(prefix: Option<&str>, name: &str, properties: &mut Properties) -> std::io::Result<()> {
+pub(crate) fn load(
+    prefix: Option<&str>,
+    name: &str,
+    properties: &mut Properties,
+) -> std::io::Result<()> {
     debug!("Trying to load config file: {prefix:?}/{name}");
 
     if !is_valid_name(name) {
