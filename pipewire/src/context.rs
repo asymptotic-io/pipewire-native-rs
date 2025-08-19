@@ -70,12 +70,12 @@ impl Context {
         Ok(context)
     }
 
-    /// Retrieves the [`MainLoop`] associated with this context.
+    /// Retrieves the [MainLoop] associated with this context.
     pub fn main_loop(&self) -> MainLoop {
         self.inner.main_loop.clone()
     }
 
-    /// Retrieves the [`Properties`] associated with this context.
+    /// Retrieves the [Properties] associated with this context.
     pub fn properties(&self) -> Properties {
         self.inner.properties.borrow().clone()
     }
@@ -96,7 +96,7 @@ impl Context {
     }
 
     /// Attemps to create a connection to the PipeWire server. The connection is represented by the
-    /// returned [`Core`], which can then be used for further interaction with the PipeWire server.
+    /// returned [Core], which can then be used for further interaction with the PipeWire server.
     pub fn connect(&self, properties: Option<Properties>) -> std::io::Result<Core> {
         Core::new(self, properties.unwrap_or(Properties::new()))
     }

@@ -19,7 +19,9 @@ use crate::{debug, default_topic, log, new_refcounted, properties::Properties, r
 
 default_topic!(log::topic::MAIN_LOOP);
 
+/// Main loop events
 pub struct MainLoopEvents {
+    /// The main loop was destroyed.
     pub destroy: Option<Box<dyn FnMut()>>,
 }
 
@@ -34,11 +36,13 @@ pub(crate) struct LoopSupport {
     pub(crate) loop_control: Arc<Pin<Box<spa::interface::r#loop::LoopControlImpl>>>,
 }
 
+/// An event source on the mainloop.
 pub struct Source {
     inner: Pin<Box<LoopUtilsSource>>,
 }
 
 impl Source {
+    /// Mask representing current set of even types the source is interested in.
     pub fn mask(&self) -> spa::flags::Io {
         self.inner.mask
     }
@@ -48,13 +52,27 @@ impl Source {
     }
 }
 
+/// Callback for events triggered by [MainLoop::signal_event]
 pub type SourceEventFn = spa::interface::r#loop::SourceEventFn;
+/// Callback for events triggered by [MainLoop] idle events.
 pub type SourceIdleFn = spa::interface::r#loop::SourceIdleFn;
+/// Callback for events triggered by [MainLoop] I/O events.
 pub type SourceIoFn = spa::interface::r#loop::SourceIoFn;
+/// Callback for events triggered by signals on the [MainLoop].
 pub type SourceSignalFn = spa::interface::r#loop::SourceSignalFn;
+/// Callback for timer events on the [MainLoop].
 pub type SourceTimerFn = spa::interface::r#loop::SourceTimerFn;
 
 refcounted! {
+    /// An event loop implementation. This event loop is used for communication with PipeWire, and
+    /// provides a number of primitives for integration with applications and any other event loops
+    /// or event sources they might have.
+    ///
+    /// Many of these primitives are quite low-level, and it is also possible to use the main loop
+    /// only for PipeWire-related events. This can be done by creating the [MainLoop] and invoking
+    /// [MainLoop::run] on a separate thread. In this case, it is important to make sure that any
+    /// access to common data structures is protected from concurrent access. The [MainLoop::lock]
+    /// and [MainLoop::unlock] methods provide such a mechanism.
     pub struct MainLoop {
         support: LoopSupport,
         // This is an atomic because it is hard to convince Rust that this will only be mutated on one
@@ -66,6 +84,7 @@ refcounted! {
 }
 
 impl MainLoop {
+    /// Create a new main loop.
     pub fn new(props: &Properties) -> Option<MainLoop> {
         let Some(l) = InnerMainLoop::new(props) else {
             return None;
@@ -78,6 +97,8 @@ impl MainLoop {
         })
     }
 
+    /// Run the main loop. This takes over executation of the current thread until [MainLoop::quit]
+    /// is invoked.
     pub fn run(&self) {
         if self
             .inner
@@ -106,6 +127,7 @@ impl MainLoop {
         self.inner.support.loop_control.leave();
     }
 
+    /// Terminate execution of the main loop.
     pub fn quit(&self) {
         debug!("quit");
 
@@ -123,64 +145,87 @@ impl MainLoop {
             .invoke(1, &[], false, Box::new(stop));
     }
 
+    /// Add a listener for main loop events.
     pub fn add_listener(&self, events: MainLoopEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
     // Loop control methods
+    // TODO: decide how we want to expose these, if at all
+    #[doc(hidden)]
     pub fn get_fd(&self) -> RawFd {
         self.inner.support.loop_control.get_fd() as RawFd
     }
 
+    #[doc(hidden)]
     pub fn enter(&self) {
         trace!("enter");
         self.inner.support.loop_control.enter()
     }
 
+    #[doc(hidden)]
     pub fn leave(&self) {
         trace!("leave");
         self.inner.support.loop_control.leave()
     }
 
-    pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<i32> {
+    /// Run one iteration of the loop, returning if no events occurred in `timeout` time. A value
+    /// of `None` signifies an infinite timeout.
+    pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
         trace!("iterate");
-        self.inner.support.loop_control.iterate(timeout)
+        self.inner.support.loop_control.iterate(timeout)?;
+        Ok(())
     }
 
+    #[doc(hidden)]
     pub fn check(&self) -> std::io::Result<i32> {
         self.inner.support.loop_control.check()
     }
 
-    pub fn lock(&self) -> std::io::Result<i32> {
+    /// Take the main loop lock, preventing it from running until the lock is released. The main
+    /// loop takes this lock in each of its iterations.
+    pub fn lock(&self) -> std::io::Result<()> {
         trace!("lock");
-        self.inner.support.loop_control.lock()
+        self.inner.support.loop_control.lock()?;
+        Ok(())
     }
 
-    pub fn unlock(&self) -> std::io::Result<i32> {
+    /// Release the main loop lock, allowing it to run again.
+    pub fn unlock(&self) -> std::io::Result<()> {
         trace!("unlock");
-        self.inner.support.loop_control.unlock()
+        self.inner.support.loop_control.unlock()?;
+        Ok(())
     }
 
+    /// Get the time corresponding to the specified timeout, which can be used with
+    /// [MainLoop::wait].
     pub fn get_time(&self, timeout: std::time::Duration) -> std::io::Result<libc::timespec> {
         self.inner.support.loop_control.get_time(timeout)
     }
 
-    pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<i32> {
+    /// Wait until the specified time or until signalled.
+    pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<()> {
         debug!("wait");
-        self.inner.support.loop_control.wait(abstime)
+        self.inner.support.loop_control.wait(abstime)?;
+        Ok(())
     }
 
-    pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<i32> {
+    /// Signal any threads waiting with [MainLoop::wait] to wake up.
+    pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<()> {
         debug!("signal");
-        self.inner.support.loop_control.signal(wait_for_accept)
+        self.inner.support.loop_control.signal(wait_for_accept)?;
+        Ok(())
     }
 
-    pub fn accept(&self) -> std::io::Result<i32> {
+    /// Acknowledge a [MainLoop::signal] with `wait_for_accept: true`, allowing that thread to
+    /// proceed.
+    pub fn accept(&self) -> std::io::Result<()> {
         debug!("accept");
-        self.inner.support.loop_control.accept()
+        self.inner.support.loop_control.accept()?;
+        Ok(())
     }
 
-    // Loop utils
+    /// Add an I/O event source using the given `fd`.
     pub fn add_io(
         &self,
         fd: RawFd,
@@ -195,6 +240,7 @@ impl MainLoop {
             .map(Source::from_loop_utils)
     }
 
+    /// Update the set of events of interest (given by `mask`).
     pub fn update_io(&self, source: &mut Source, mask: flags::Io) -> std::io::Result<i32> {
         self.inner
             .support
@@ -202,6 +248,7 @@ impl MainLoop {
             .update_io(&mut source.inner, mask)
     }
 
+    /// Add an idle event source (called after each iteration of the main loop).
     pub fn add_idle(&self, enabled: bool, func: Box<SourceIdleFn>) -> Option<Source> {
         self.inner
             .support
@@ -210,6 +257,7 @@ impl MainLoop {
             .map(Source::from_loop_utils)
     }
 
+    /// Enable or disable an idle event source.
     pub fn enable_idle(&self, source: &mut Source, enabled: bool) -> std::io::Result<i32> {
         debug!("idle {enabled}");
         self.inner
@@ -218,6 +266,7 @@ impl MainLoop {
             .enable_idle(&mut source.inner, enabled)
     }
 
+    /// Add a source which can be triggered using [Self::signal_event].
     pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Source> {
         self.inner
             .support
@@ -226,6 +275,7 @@ impl MainLoop {
             .map(Source::from_loop_utils)
     }
 
+    /// Signal a source added with [Self::add_event].
     pub fn signal_event(&self, source: &mut Source) -> std::io::Result<i32> {
         self.inner
             .support
@@ -233,6 +283,7 @@ impl MainLoop {
             .signal_event(&mut source.inner)
     }
 
+    /// Add a timer source.
     pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Source> {
         self.inner
             .support
@@ -241,6 +292,7 @@ impl MainLoop {
             .map(Source::from_loop_utils)
     }
 
+    /// Update the timer interval of a timer source.
     pub fn update_timer(
         &self,
         source: &mut Source,
@@ -254,6 +306,7 @@ impl MainLoop {
             .update_timer(&mut source.inner, value, interval, absolute)
     }
 
+    /// Add a source triggered by UNIX signals.
     pub fn add_signal(&self, signal_number: i32, func: Box<SourceSignalFn>) -> Option<Source> {
         self.inner
             .support
@@ -262,10 +315,12 @@ impl MainLoop {
             .map(Source::from_loop_utils)
     }
 
+    /// Remove and destroy an event source.
     pub fn destroy_source(&self, source: Source) {
         self.inner.support.loop_utils.destroy_source(source.inner)
     }
 
+    /// Set the main loop name.
     pub fn set_name(&mut self, name: &str) {
         debug!("main loop name {name}");
         if let Some(inner) = Arc::get_mut(&mut self.inner) {

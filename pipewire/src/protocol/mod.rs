@@ -23,6 +23,7 @@ const ASYNC_SEQ_MASK: u32 = ASYNC_SEQ_BIT - 1;
 refcounted! {
     pub(crate) struct Protocol {
         context: RefCell<Option<WeakContext>>,
+        #[allow(unused)]
         name: String,
     }
 }

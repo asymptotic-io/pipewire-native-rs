@@ -43,6 +43,7 @@ pub(crate) fn get_remote(props: Option<&spa::dict::Dict>) -> String {
 }
 
 refcounted! {
+    /// A singleton object representing the connection between the client and the PipeWire server.
     pub struct Core {
         context: WeakContext,
         properties: Properties,
@@ -189,6 +190,10 @@ impl Core {
         Ok(this)
     }
 
+    /// Disconnect connection with the PipeWire server. This will immediately trigger the `removed`
+    /// and `destroy` events on all tracked proxies. Callers should ensure that this will not
+    /// result in deadlocks with their own synchronisation primitives (for example, taking a lock
+    /// before disconnecting that is also taken in either of those callbacks).
     pub fn disconnect(&self) {
         proxy_notify!(self, removed);
         proxy_notify!(self, destroy);
@@ -228,15 +233,19 @@ impl Core {
             .and_then(|o| o.downcast_proxy::<T>())
     }
 
+    /// Listen for events on the core object.
     pub fn add_listener(&self, events: CoreEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
+    /// Trigger a `sync` message to the server, flushing all pending messages.
     pub fn sync(&self) -> std::io::Result<()> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, sync, 0)
     }
 
+    /// Retrieve a [Registry](proxy::registry::Registry). This can be used to query and track
+    /// objects exposed by the server.
     pub fn registry(&self) -> std::io::Result<proxy::registry::Registry> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, get_registry)
@@ -271,21 +280,32 @@ impl HasProxy for Core {
 }
 
 bitflags! {
+    /// Indicates what changes are being signalled in a [CoreEvents::info] event.
     #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct CoreChangeMask : u32 {
+        /// Properties changed.
         const PROPS = (1 << 0);
     }
 }
 
+/// Provides [Core]-related information in the [CoreEvents::info] event.
 pub struct CoreInfo<'a> {
+    /// Id of the core.
     pub id: u32,
+    /// Random cookie to identify this instance.
     pub cookie: u32,
+    /// User name of the user who started the core.
     pub user_name: &'a str,
+    /// Host name on which the core is running.
     pub host_name: &'a str,
+    /// Interface version of the core.
     pub version: &'a str,
+    /// Name of the core.
     pub name: &'a str,
+    /// Set of changes since the last call.
     pub mask: CoreChangeMask,
+    /// Properties of the core.
     pub props: Option<&'a Properties>,
 }
 
@@ -293,23 +313,32 @@ pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) hello: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
     pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
     pub(crate) pong: Box<dyn FnMut(&Proxy<T>, Id, u32) -> std::io::Result<()>>,
+    #[allow(unused)]
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     pub(crate) get_registry:
         Box<dyn FnMut(&Proxy<T>) -> std::io::Result<proxy::registry::Registry>>,
+    #[allow(unused)]
     pub(crate) create_object:
         Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &Properties) -> std::io::Result<()>>,
+    #[allow(unused)]
     pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,
 }
 
+/// Events that may be emitted by a [Core] proxy object.
 #[derive(Default)]
 pub struct CoreEvents {
+    /// Information about the core changed.
     pub info: Option<Box<dyn FnMut(&CoreInfo<'_>)>>,
+    /// A core operation was completed.
     pub done: Option<Box<dyn FnMut(Id, u32)>>,
+    /// An error occurred on the core.
     pub error: Option<Box<dyn FnMut(Id, u32, u32, &str)>>,
     pub(crate) ping: Option<Box<dyn FnMut(Id, u32)>>,
     pub(crate) remove_id: Option<Box<dyn FnMut(Id)>>,
     pub(crate) bound_id: Option<Box<dyn FnMut(Id, Id)>>,
+    #[allow(unused)]
     pub(crate) add_mem: Option<Box<dyn FnMut(Id, u32, RawFd, u32)>>,
+    #[allow(unused)]
     pub(crate) remove_mem: Option<Box<dyn FnMut(Id)>>,
     pub(crate) bound_props: Option<Box<dyn FnMut(Id, Id, &Properties)>>,
 }

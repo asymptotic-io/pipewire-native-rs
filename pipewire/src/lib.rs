@@ -12,13 +12,13 @@ use pipewire_native_spa as spa;
 use properties::Properties;
 use support::Support;
 
-/// The [`context::Context`] holds local client configuration and support libraries. It is the entry point
-/// to all other API.
+/// The [Context](context::Context) holds local client configuration and support libraries. It is
+/// the entry point to all other API.
 pub mod context;
-/// The [`core::Core`] object is the top-level singleton representing a connection to the PipeWire
-/// server. The [`core::Core`] can be used to query objects known to the PipeWire server via the
-/// [`proxy::registry::Registry`]. It can also be used to create objects on the server on behalf of this client
-/// (this functionality has not yet been implemented).
+/// The [Core](core::Core) object is the top-level singleton representing a connection to the
+/// PipeWire server. The [Core](core::Core) can be used to query objects known to the PipeWire
+/// server via the [Registry](proxy::registry::Registry). It can also be used to create objects on
+/// the server on behalf of this client (this functionality has not yet been implemented).
 pub mod core;
 /// Contains a number of well-known keys used in properties (such as application name, language,
 /// process ID, etc.).
@@ -29,7 +29,7 @@ pub mod main_loop;
 /// Sructures for representing permissions.
 pub mod permission;
 /// Properties represent a key-value structure for various object properties. While the internal
-/// representation is [`String`] pairs, helper methods are provided for interpreting values as
+/// representation is [String] pairs, helper methods are provided for interpreting values as
 /// various primitives.
 pub mod properties;
 /// Proxy objects that represent objects exposed by the PipeWire server. This is the primary means
@@ -41,7 +41,7 @@ pub mod types;
 mod conf;
 mod id_map;
 /// Logggng utilities for using the PipeWire logging system. Controlled via the `PIPEWIRE_DEBUG` and
-/// `PIPEWIRE_LOG*` environment variables, as well as [`context::Context`] properties.
+/// `PIPEWIRE_LOG*` environment variables, as well as [Context](context::Context) properties.
 mod log;
 mod protocol;
 mod refcounted;
@@ -147,6 +147,7 @@ pub fn init() {
     });
 }
 
+/// Utility macro to reduce closure-related boilerplate.
 #[macro_export]
 macro_rules! closure {
     ([$($names:ident <- $objects:ident),* $(^($($clones:ident),+))? $(^mut($($mut_clones:ident),+))?] $($($args:ident),* ,)? $body:block) => {
@@ -169,6 +170,7 @@ macro_rules! closure {
     };
 }
 
+/// Similar to [closure!], but returns a `Some(...)` for use with event callbacks.
 #[macro_export]
 macro_rules! some_closure {
     ($($args:tt)*) => { Some($crate::closure!($($args)*)) };

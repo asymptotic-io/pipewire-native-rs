@@ -19,6 +19,7 @@ use crate::{
 };
 
 refcounted! {
+    /// Proxy that represents a client that is connected to the server.
     pub struct Client {
         proxy: RefCell<Option<Proxy<Client>>>,
         methods: Rc<RefCell<ClientMethods<Client>>>,
@@ -35,22 +36,31 @@ pub(crate) struct ClientMethods<T: HasProxy + Refcounted> {
 }
 
 bitflags! {
+    /// A bit mask of changes signalled in the [ClientEvents::info] event.
     #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct ClientChangeMask : u32 {
+        /// Client properties changed.
         const PROPS = (1 << 0);
     }
 }
 
+/// Client information that is provided in a [ClientEvents::info] event.
 pub struct ClientInfo<'a> {
+    /// The ID of the client.
     pub id: Id,
+    /// What changed since the last call.
     pub mask: ClientChangeMask,
+    /// The client's properties.
     pub props: &'a Properties,
 }
 
+/// Client events that can be subscribed to.
 #[derive(Default)]
 pub struct ClientEvents {
+    /// Client information became available, or changed.
     pub info: Option<Box<dyn FnMut(&ClientInfo<'_>)>>,
+    /// Client permissions, notified due to a [Client::permissions()] call.
     pub permissions: Option<Box<dyn FnMut(u32, &[permission::Permission])>>,
 }
 
@@ -74,7 +84,7 @@ impl HasProxy for Client {
 }
 
 impl Client {
-    pub fn new(core: &Core) -> Self {
+    pub(crate) fn new(core: &Core) -> Self {
         let this = Self {
             inner: new_refcounted(InnerClient::new(core)),
         };
@@ -86,20 +96,24 @@ impl Client {
         this
     }
 
+    /// Register for notifications of client events.
     pub fn add_listener(&self, events: ClientEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
+    /// Signal an error to the client.
     pub fn error(&self, id: u32, res: u32, message: &str) -> std::io::Result<()> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, error, id, res, message)
     }
 
-    pub fn get_permissions(&self, index: u32, num: u32) -> std::io::Result<()> {
+    /// Retrieve permissions of a client.
+    pub fn permissions(&self, index: u32, num: u32) -> std::io::Result<()> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, get_permissions, index, num)
     }
 
+    /// Update permissions of a client.
     pub fn update_permissions(
         &self,
         permissions: &[permission::Permission],

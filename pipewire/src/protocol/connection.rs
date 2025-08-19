@@ -44,6 +44,7 @@ refcounted! {
     }
 }
 
+#[allow(unused)]
 pub(crate) struct ConnectionEvents {
     pub(crate) destroy: Option<Box<dyn FnMut()>>,
     pub(crate) error: Option<Box<dyn FnMut(u32)>>,

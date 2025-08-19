@@ -44,6 +44,7 @@ impl<T> IdMap<T> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn insert(&mut self, object: T) -> Id {
         let item = self.objects.iter().enumerate().find(|(_, o)| o.is_empty());
 

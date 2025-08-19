@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use bitflags::bitflags;
 use pipewire_native_spa as spa;
 
 use crate::{
@@ -19,6 +18,8 @@ use crate::{
 };
 
 refcounted! {
+    /// The registry object allows clients to enumerate and interact with objects. For more
+    /// details, see the [Proxy](super::Proxy) documentation.
     pub struct Registry {
         core: Core,
         proxy: RefCell<Option<Proxy<Registry>>>,
@@ -29,20 +30,17 @@ refcounted! {
 
 pub(crate) struct RegistryMethods<T: HasProxy + Refcounted> {
     pub bind: Box<dyn FnMut(&Proxy<T>, Id, &str, u32) -> std::io::Result<Box<dyn HasProxy>>>,
+    #[allow(unused)]
     pub destroy: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
 }
 
-bitflags! {
-    #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct RegistryChangeMask : u32 {
-        const PROPS = (1 << 0);
-    }
-}
-
+/// Events that might be emitted by a [Registry].
 #[derive(Default)]
 pub struct RegistryEvents {
+    /// A global object was exported by the server. The object may be tracked using
+    /// [Registry::bind()].
     pub global: Option<Box<dyn FnMut(Id, permission::PermissionBits, &str, u32, &Properties)>>,
+    /// A global was removed by the server.
     pub global_remove: Option<Box<dyn FnMut(Id)>>,
 }
 
@@ -66,7 +64,7 @@ impl HasProxy for Registry {
 }
 
 impl Registry {
-    pub fn new(core: &Core) -> Self {
+    pub(crate) fn new(core: &Core) -> Self {
         let this = Self {
             inner: new_refcounted(InnerRegistry::new(core)),
         };
@@ -82,10 +80,13 @@ impl Registry {
         self.inner.core.clone()
     }
 
+    /// Register to be notified of events on the registry.
     pub fn add_listener(&self, events: RegistryEvents) {
         self.inner.hooks.lock().unwrap().append(events);
     }
 
+    /// "Bind" to a given object, creating a proxy for it that can be used for method calls and
+    /// event notifications.
     pub fn bind(&self, id: Id, type_: &str, version: u32) -> std::io::Result<Box<dyn HasProxy>> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, bind, id, type_, version)

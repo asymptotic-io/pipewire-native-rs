@@ -6,8 +6,8 @@
 /// without leaking data. This is accomplished by distinguising between "strong references" (cause
 /// the object to exist) and "weak referenes" (which do not prevent the object from being freed).
 ///
-/// There is a [`super::refcounted!`] macro to make declaring such types easier. A new strong reference
-/// can cheaply be created using the `[Clone]` trait.
+/// There is a [refcounted!()](super::refcounted!) macro to make declaring such types easier. A new
+/// strong reference can cheaply be created using the [Clone] trait.
 ///
 /// Example usage:
 ///
@@ -29,8 +29,8 @@
 /// });
 /// ```
 ///
-/// The `[closure!]` macro can be used to reduce the boilerplate of going through the
-/// `downgrade()`/`upgrade()` cycle, especially for values that need to be sent into multiple
+/// The [closure!](crate::closure!) macro can be used to reduce the boilerplate of going through
+/// the `downgrade()`/`upgrade()` cycle, especially for values that need to be sent into multiple
 /// closures.
 pub trait Refcounted: Clone {
     /// The type of a weak reference to the object
@@ -45,7 +45,7 @@ pub trait Refcounted: Clone {
 
     /// Create a weak reference to the object. This reference does not impact the object's
     /// lifecycle, and merely allows us the option to try to retrieve the object using
-    /// [`Self::upgrade()`].
+    /// [Self::upgrade()].
     fn downgrade(&self) -> Self::WeakRef;
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn new_refcounted<T>(inner: T) -> std::sync::Arc<T> {
 /// }
 /// ```
 ///
-/// The macro creates structures in this pattern, and implements the [`crate::Refcounted`] trait on
+/// The macro creates structures in this pattern, and implements the [crate::Refcounted] trait on
 /// the generated types.
 macro_rules! refcounted {
     (
@@ -100,7 +100,7 @@ macro_rules! refcounted {
             unsafe impl $(<$($generic $(: $bound)?),*>)? Send for [<Weak $name>] $(<$($generic),*>)? {}
 
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
-                /// Helper method to generate a weak reference. See also: [`crate::Refcounted`].
+                /// Helper method to generate a weak reference. See also: [crate::Refcounted].
                 pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
                         inner: std::sync::Arc::downgrade(&self.inner),
@@ -110,7 +110,7 @@ macro_rules! refcounted {
 
             impl $(<$($generic $(: $bound)?),*>)? [<Weak $name>] $(<$($generic),*>)? {
                 /// Helper method to convert a weak reference to a strong reference. See also:
-                /// `[crate::Refcounted]`.
+                /// [crate::Refcounted].
                 pub fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
                     self.inner.upgrade().map(|inner| $name { inner })
                 }
