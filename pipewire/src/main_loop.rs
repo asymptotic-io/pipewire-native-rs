@@ -14,9 +14,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use crate::properties::Properties;
 use crate::GLOBAL_SUPPORT;
-use crate::{debug, default_topic, log, new_refcounted, refcounted, trace};
+use crate::{debug, default_topic, log, new_refcounted, properties::Properties, refcounted, trace};
 
 default_topic!(log::topic::MAIN_LOOP);
 
@@ -89,13 +88,48 @@ impl MainLoop {
     }
 
     pub fn run(&self) {
-        debug!("run");
-        InnerMainLoop::run(&self.inner);
+        if self
+            .inner
+            .running
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+        {
+            return;
+        }
+
+        self.inner.support.loop_control.enter();
+
+        while self.inner.running.load(Ordering::Relaxed) {
+            if let Err(res) = self
+                .inner
+                .support
+                .loop_control
+                .iterate(Some(std::time::Duration::MAX))
+            {
+                if res.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+            }
+        }
+
+        self.inner.support.loop_control.leave();
     }
 
     pub fn quit(&self) {
         debug!("quit");
-        InnerMainLoop::quit(&self.inner);
+
+        let this = self.clone();
+
+        let stop = move |_block: bool, _seq: u32, _data: &[u8]| {
+            this.inner.running.store(false, Ordering::Relaxed);
+            0
+        };
+
+        let _ = self
+            .inner
+            .support
+            .loop_
+            .invoke(1, &[], false, Box::new(stop));
     }
 
     pub fn add_listener(&self, events: MainLoopEvents) {
@@ -310,42 +344,5 @@ impl InnerMainLoop {
 
     fn destroy(&self) {
         emit_hook!(self.hooks, destroy);
-    }
-
-    fn run(this: &Arc<Self>) {
-        if this
-            .running
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
-        {
-            return;
-        }
-
-        this.support.loop_control.enter();
-
-        while this.running.load(Ordering::Relaxed) {
-            if let Err(res) = this
-                .support
-                .loop_control
-                .iterate(Some(std::time::Duration::MAX))
-            {
-                if res.kind() == std::io::ErrorKind::Interrupted {
-                    continue;
-                }
-            }
-        }
-
-        this.support.loop_control.leave();
-    }
-
-    fn quit(this: &Arc<Self>) {
-        let this_ = this.clone();
-
-        let stop = move |_block: bool, _seq: u32, _data: &[u8]| {
-            this_.running.store(false, Ordering::Relaxed);
-            0
-        };
-
-        let _ = this.support.loop_.invoke(1, &[], false, Box::new(stop));
     }
 }
