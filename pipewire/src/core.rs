@@ -2,10 +2,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-/// The [`Core`] object is the top-level singleton representing a connection to the PipeWire
-/// server. The [`Core`] can be used to query objects known to the PipeWire server via the
-/// [`Registry`]. It can also be used to create objects on the server on behalf of this client
-/// (this functionality has not yet been implemented).
 use std::{
     cell::RefCell,
     os::fd::RawFd,

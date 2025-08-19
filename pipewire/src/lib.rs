@@ -23,9 +23,6 @@ pub mod core;
 /// Contains a number of well-known keys used in properties (such as application name, language,
 /// process ID, etc.).
 pub mod keys;
-/// Logggng utilities for using the PipeWire logging system. Controlled via the `PIPEWIRE_DEBUG` and
-/// `PIPEWIRE_LOG*` environment variables, as well as [`context::Context`] properties.
-pub mod log;
 /// Provides an event loop for the library to communicate with the PipeWire server, as well as
 /// primitives to managed mutually exclusive access to shared data structures.
 pub mod main_loop;
@@ -43,6 +40,9 @@ pub mod types;
 
 mod conf;
 mod id_map;
+/// Logggng utilities for using the PipeWire logging system. Controlled via the `PIPEWIRE_DEBUG` and
+/// `PIPEWIRE_LOG*` environment variables, as well as [`context::Context`] properties.
+mod log;
 mod protocol;
 mod refcounted;
 mod support;

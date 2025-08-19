@@ -4,6 +4,7 @@
 
 use pipewire_native_spa as spa;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! cstr {
     ($str:expr) => {
@@ -11,6 +12,7 @@ macro_rules! cstr {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! define_topic {
     ($name:ident, $topic:literal) => {
@@ -63,6 +65,7 @@ pub(crate) mod topic {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! default_topic {
     ($name:expr) => {
@@ -72,6 +75,7 @@ macro_rules! default_topic {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! log_topic {
     ($level:expr, $topic:expr, $($args:tt)+) => {
@@ -87,6 +91,7 @@ macro_rules! log_topic {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! log_default {
     ($level:expr, $($args:tt)+) => {
@@ -94,6 +99,7 @@ macro_rules! log_default {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! error {
     ($($args:tt)+) => {
@@ -101,6 +107,7 @@ macro_rules! error {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! warn {
     ($($args:tt)+) => {
@@ -108,6 +115,7 @@ macro_rules! warn {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! info {
     ($($args:tt)+) => {
@@ -115,6 +123,7 @@ macro_rules! info {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! debug {
     ($($args:tt)+) => {
@@ -122,6 +131,7 @@ macro_rules! debug {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trace {
     ($($args:tt)+) => {
