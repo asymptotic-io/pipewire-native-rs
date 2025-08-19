@@ -177,7 +177,7 @@ fn test_properties_simple() {
 
     props.set("key1", format! {"{}", 1});
 
-    assert_eq!(props.get("key1"), Some(&"1".to_string()));
+    assert_eq!(props.get("key1"), Some("1"));
 
     for (k, v) in props.iter() {
         assert_eq!(k, "key1");
@@ -207,9 +207,9 @@ fn test_properties_json() {
     let props = Properties::new_string(conf).expect("config parsing should succeed");
 
     assert_eq!(props.dict().items().len(), 3);
-    assert_eq!(props.get("context.properties"), Some(&"{}".to_string()));
+    assert_eq!(props.get("context.properties"), Some("{}"));
     assert_eq!(
         props.get("context.objects"),
-        Some(&r#"[{"factory":"spa-node-factory"}]"#.to_string())
+        Some(r#"[{"factory":"spa-node-factory"}]"#)
     );
 }

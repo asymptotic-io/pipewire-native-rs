@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 use tempfile;
 
 use pipewire_native::{
@@ -11,7 +11,7 @@ use pipewire_native::{
     main_loop::MainLoop,
     properties::Properties,
     proxy::{client::Client, registry::RegistryEvents, HasProxy, ProxyEvents},
-    some_closure, types, Refcounted,
+    some_closure, types, Id,
 };
 
 #[allow(unused)]
@@ -35,13 +35,22 @@ fn start_pipewire() -> TestContext {
     }
 }
 
+#[derive(Clone)]
+struct Objects {
+    objects: Arc<RefCell<HashMap<Id, Box<dyn HasProxy>>>>,
+}
+
+unsafe impl Send for Objects {}
+
 #[test]
 fn test_lib() {
     let _test_context = start_pipewire();
 
     pipewire::init();
 
-    let objects = Rc::new(RefCell::new(HashMap::new()));
+    let objects = Objects {
+        objects: Arc::new(RefCell::new(HashMap::new())),
+    };
 
     let v = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
     let main_loop = MainLoop::new(&Properties::new_vec(v)).unwrap();
@@ -54,16 +63,16 @@ fn test_lib() {
     core.proxy().add_listener(ProxyEvents {
         destroy: some_closure!([^(objects)] {
             println!("core destroyed, clearing objects");
-            objects.borrow_mut().clear();
+            objects.objects.borrow_mut().clear();
         }),
         ..Default::default()
     });
 
     let mut timer_src = main_loop
         .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
-            assert_eq!(objects.borrow().len(), 1);
+            assert_eq!(objects.objects.borrow().len(), 1);
             core.disconnect();
-            assert_eq!(objects.borrow().len(), 0);
+            assert_eq!(objects.objects.borrow().len(), 0);
             main_loop.quit();
         }))
         .unwrap();
@@ -88,7 +97,7 @@ fn test_lib() {
 
                     proxy.add_listener(ProxyEvents {
                         removed: some_closure!([proxy ^(objects)] {
-                            objects.borrow_mut().remove(&proxy.id());
+                            objects.objects.borrow_mut().remove(&proxy.id());
                         }),
                         ..Default::default()
                     });
@@ -98,15 +107,15 @@ fn test_lib() {
                 _ => return,
             };
 
-            objects.borrow_mut().insert(id, object);
+            objects.objects.borrow_mut().insert(id, object);
         }),
         global_remove: some_closure!([^(objects)] id, {
             println!("global {id} removed");
-            let _ = objects.borrow_mut().remove(&id);
+            let _ = objects.objects.borrow_mut().remove(&id);
         }),
     });
 
     main_loop.run();
 
-    assert_eq!(objects.borrow().len(), 0);
+    assert_eq!(objects.objects.borrow().len(), 0);
 }
