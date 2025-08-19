@@ -3,7 +3,42 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 #![warn(missing_docs)]
-#![doc = include_str!("../../README.md")]
+
+//! This library provides a Rust-native API to the [PipeWire](https://pipewire.org) audio server.
+//! This includes a native implementation of the protocol, and FFI wrappers around the lower-level
+//! SPA libraries used by PipeWire itself (which we try not to expose in the public API).
+//!
+//! # Usage
+//!
+//! A typical client would use the following steps:
+//!
+//!   * Create a [MainLoop](main_loop::MainLoop), and run it
+//!   * Configure and create a [Context](context::Context), optionally specifying client-specific
+//!     configuration
+//!   * [Connect](context::Context::connect()) to the server, which provides a [Core](core::Core)
+//!   * Request a [Registry](proxy::registry::Registry) via the core
+//!   * Listen for [global events](proxy::registry::RegistryEvents)
+//!   * [Bind](proxy::registry::Registry::bind()) to the global objects you wish to interact with
+//!   * For each object you bind to, you will get a proxy object which has methods you can call on
+//!     the object, as well as events you can subscribe to with an `add_listener()` call.
+//!
+//! # Examples
+//!
+//! Example usage of the library can be found in the source repository. The simple client test in
+//! `tests/lib.rs` is a good starting point. The `pw-browse` utility in `tools/browse` can also
+//! serve as a guide for writing clients.
+//!
+//! # Thread-safety
+//!
+//! <div class="warning">
+//! Objects provided by this API are largely not thread-safe.
+//! </div>
+//!
+//! Other than the [MainLoop](main_loop::MainLoop), objects provided by the API are not-thread
+//! safe, and should not be accessed concurrently across threads. These objects are usually marked
+//! [Send] so they can be provided to the main loop, but the assumption is that any access is
+//! performed via mutual-exclusion with the main loop thread as discussed in they
+//! [main loop documentation](main_loop::MainLoop).
 
 use std::sync::OnceLock;
 

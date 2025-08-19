@@ -12,6 +12,24 @@ and the
 implementation. The goal is for these bindings to eventually be the official
 PipeWire Rust API.
 
-Being a work-in-progress, the API will likely change as we iterate. When things
-are more stable, a release will be made to [crates.io](https://crates.io) and
-[docs.rs](https://docs.rs).
+Being a work-in-progress, the API will likely change as we iterate.
+
+## Code structure
+
+At the top-level, we have a native implementation implementation of the
+[PipeWire native
+protocol](https://docs.pipewire.org/devel/page_native_protocol.html). This is
+then exposed via the API in `pipewire/`, the entrypoint for this crate.
+
+Similar to the C version, the `spa/` crate implements low-level primitives for
+the PipeWire library.
+
+There is a native implementation for some primitives, such as pod, for data
+serialisation/deserialisation. There are also associated traits and macros (in
+`macros/`) to reduce boilerplate.
+
+A hybrid strategy is used for SPA plugins (which provide basic features such as
+logging, event loops and a system call API). The SPA interfaces are exposed as
+Rust interfaces, for use by Rust code. The underlying implementations use the C
+plugin under the hood, with the option to be replaced by a Rust implementation
+in the future if desired.
