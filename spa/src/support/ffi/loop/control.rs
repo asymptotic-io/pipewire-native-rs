@@ -131,14 +131,26 @@ impl CLoopControlMethodsImpl {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        result_from(unsafe { ((*funcs).lock)(control_impl.iface.cb.data) })
+        unsafe {
+            if (*funcs).lock as *const c_void != std::ptr::null() {
+                result_from(((*funcs).lock)(control_impl.iface.cb.data))
+            } else {
+                Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+            }
+        }
     }
 
     fn unlock(this: &LoopControlImpl) -> std::io::Result<i32> {
         let control_impl = Self::from_control_methods(this);
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-        result_from(unsafe { ((*funcs).lock)(control_impl.iface.cb.data) })
+        unsafe {
+            if (*funcs).unlock as *const c_void != std::ptr::null() {
+                result_from(((*funcs).unlock)(control_impl.iface.cb.data))
+            } else {
+                Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+            }
+        }
     }
 
     fn get_time(this: &LoopControlImpl, timeout: Duration) -> std::io::Result<libc::timespec> {
