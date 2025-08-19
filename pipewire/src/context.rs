@@ -25,6 +25,8 @@ use pipewire_native_spa::{
 default_topic!(log::topic::CONTEXT);
 
 refcounted! {
+    /// Represents a top-level context for a client. This includes configuration (provided as
+    /// properties, and loaded from standard client configuration), and the main event loop.
     pub struct Context {
         main_loop: MainLoop,
         properties: RefCell<Properties>,
@@ -54,6 +56,8 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 });
 
 impl Context {
+    /// Creates a new context using the given main loop and properties. Communication with the
+    /// PipeWire server in subsequent API calls will happen on the given main loop.
     pub fn new(main_loop: &MainLoop, properties: Properties) -> std::io::Result<Self> {
         let inner = InnerContext::new(main_loop.clone(), properties)?;
         let context = Context {
@@ -66,11 +70,17 @@ impl Context {
         Ok(context)
     }
 
+    /// Retrieves the [`MainLoop`] associated with this context.
     pub fn main_loop(&self) -> MainLoop {
         self.inner.main_loop.clone()
     }
 
-    pub fn properties(&self) -> spa::dict::Dict {
+    /// Retrieves the [`Properties`] associated with this context.
+    pub fn properties(&self) -> Properties {
+        self.inner.properties.borrow().clone()
+    }
+
+    pub(crate) fn properties_dict(&self) -> spa::dict::Dict {
         self.inner.properties.borrow().dict()
     }
 
@@ -85,6 +95,8 @@ impl Context {
         &self.inner.protocol
     }
 
+    /// Attemps to create a connection to the PipeWire server. The connection is represented by the
+    /// returned [`Core`], which can then be used for further interaction with the PipeWire server.
     pub fn connect(&self, properties: Option<Properties>) -> std::io::Result<Core> {
         Core::new(self, properties.unwrap_or(Properties::new()))
     }

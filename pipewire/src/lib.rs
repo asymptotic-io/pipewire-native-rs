@@ -12,14 +12,33 @@ use pipewire_native_spa as spa;
 use properties::Properties;
 use support::Support;
 
+/// The [`context::Context`] holds local client configuration and support libraries. It is the entry point
+/// to all other API.
 pub mod context;
+/// The [`core::Core`] object is the top-level singleton representing a connection to the PipeWire
+/// server. The [`core::Core`] can be used to query objects known to the PipeWire server via the
+/// [`proxy::registry::Registry`]. It can also be used to create objects on the server on behalf of this client
+/// (this functionality has not yet been implemented).
 pub mod core;
+/// Contains a number of well-known keys used in properties (such as application name, language,
+/// process ID, etc.).
 pub mod keys;
+/// Logggng utilities for using the PipeWire logging system. Controlled via the `PIPEWIRE_DEBUG` and
+/// `PIPEWIRE_LOG*` environment variables, as well as [`context::Context`] properties.
 pub mod log;
+/// Provides an event loop for the library to communicate with the PipeWire server, as well as
+/// primitives to managed mutually exclusive access to shared data structures.
 pub mod main_loop;
+/// Sructures for representing permissions.
 pub mod permission;
+/// Properties represent a key-value structure for various object properties. While the internal
+/// representation is [`String`] pairs, helper methods are provided for interpreting values as
+/// various primitives.
 pub mod properties;
+/// Proxy objects that represent objects exposed by the PipeWire server. This is the primary means
+/// by which clients can interact with server-side objects.
 pub mod proxy;
+/// List of well-known types and interfaces shared by PipeWire server and clients.
 pub mod types;
 
 mod conf;
@@ -33,6 +52,7 @@ mod utils;
 pub use refcounted::*;
 
 // pub use so users of closure! don't need to import paste themselves
+#[doc(hidden)]
 pub use paste::paste;
 
 /// Represents an object identifier

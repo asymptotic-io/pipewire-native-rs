@@ -6,7 +6,7 @@
 /// without leaking data. This is accomplished by distinguising between "strong references" (cause
 /// the object to exist) and "weak referenes" (which do not prevent the object from being freed).
 ///
-/// There is a [`refcounted!`] macro to make declaring such types easier. A new strong reference
+/// There is a [`super::refcounted!`] macro to make declaring such types easier. A new strong reference
 /// can cheaply be created using the `[Clone]` trait.
 ///
 /// Example usage:
@@ -68,18 +68,18 @@ pub(crate) fn new_refcounted<T>(inner: T) -> std::sync::Arc<T> {
 /// }
 /// ```
 ///
-/// The macro creates structures in this pattern, and implements the [`super::Refcounted`] trait on
+/// The macro creates structures in this pattern, and implements the [`crate::Refcounted`] trait on
 /// the generated types.
 macro_rules! refcounted {
     (
         // FIXME: bounds can be non-types, so we probably need something that munches tts
-        $(#[$($attrs:meta)*])?
+        $(#[$($attrs:meta)*])*
         $visibility:vis struct $name:ident $(<$($generic:ident $(: $bound:ty)?),*>)? {
             $($body:tt)*
         }
     ) => {
         paste::paste! {
-            $(#[$($attrs)*])?
+            $(#[$($attrs)*])*
             #[derive(Clone)]
             $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
                 inner: std::sync::Arc<[<Inner $name>] $(<$($generic),*>)?>,
@@ -100,7 +100,7 @@ macro_rules! refcounted {
             unsafe impl $(<$($generic $(: $bound)?),*>)? Send for [<Weak $name>] $(<$($generic),*>)? {}
 
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
-                /// Helper method to generate a weak reference. See also: [`Refcounted`].
+                /// Helper method to generate a weak reference. See also: [`crate::Refcounted`].
                 pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
                         inner: std::sync::Arc::downgrade(&self.inner),
@@ -110,7 +110,7 @@ macro_rules! refcounted {
 
             impl $(<$($generic $(: $bound)?),*>)? [<Weak $name>] $(<$($generic),*>)? {
                 /// Helper method to convert a weak reference to a strong reference. See also:
-                /// [`Refcounted`].
+                /// `[crate::Refcounted]`.
                 pub fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
                     self.inner.upgrade().map(|inner| $name { inner })
                 }

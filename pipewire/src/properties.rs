@@ -9,6 +9,7 @@ use pipewire_native_spa::dict::Dict;
 use tinyjson::{JsonParseError, JsonValue};
 
 #[derive(Clone, Debug)]
+/// A structure containing a set of properties.
 pub struct Properties {
     // TODO: Make a Vec<spa::dict::ITem> here, so we can easily construct a Dict view of properties
     // at runtime, a-la pw_properties vs. spa_dict
@@ -21,24 +22,27 @@ impl Default for Properties {
     }
 }
 
-pub fn parse_bool(value: &String) -> bool {
+pub(crate) fn parse_bool(value: &String) -> bool {
     atob(value)
 }
 
 impl Properties {
+    /// Create a new, empty properties structure.
     pub fn new() -> Self {
         Self {
             map: HashMap::new(),
         }
     }
 
+    /// Create a new properties structure from a list of (key, value) tuples.
     pub fn new_vec(pairs: Vec<(String, String)>) -> Self {
         Self {
             map: HashMap::from_iter(pairs),
         }
     }
 
-    pub fn new_dict(dict: &Dict) -> Self {
+    #[allow(unused)]
+    pub(crate) fn new_dict(dict: &Dict) -> Self {
         let mut map = HashMap::new();
 
         for (k, v) in dict.items() {
@@ -48,6 +52,7 @@ impl Properties {
         Self { map }
     }
 
+    /// Create properties from a string representation of a JSON object.
     pub fn new_string(args: &str) -> Result<Self, String> {
         let mut p = Self::new();
 
@@ -57,11 +62,12 @@ impl Properties {
         }
     }
 
+    /// Provides an iterator of the (key, value) property pairs.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
         self.map.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 
-    pub fn dict(&self) -> Dict {
+    pub(crate) fn dict(&self) -> Dict {
         Dict::new(
             self.map
                 .iter()
@@ -70,39 +76,47 @@ impl Properties {
         )
     }
 
+    /// Sets the given `key` to the given `value`, overwriting a previous value if it exists.
     pub fn set(&mut self, key: &str, value: String) {
         self.map.insert(key.to_string(), value);
     }
 
+    /// Unset the value for the given `key`, if it exists.
     pub fn unset(&mut self, key: &str) -> Option<String> {
         self.map.remove(key)
     }
 
+    /// Retrieves the value for the given `key`, if it exists.
     pub fn get(&self, key: &str) -> Option<&str> {
         self.map.get(key).map(|s| s.as_str())
     }
 
+    /// Retrieves the value for the given `key`, if it exists, and interprets it as a [`u32`].
     pub fn get_u32(&self, key: &str) -> Option<u32> {
         self.get(key).and_then(|v| v.parse::<u32>().ok())
     }
 
+    /// Retrieves the value for the given `key`, if it exists, and interprets it as an [`i32`].
     pub fn get_i32(&self, key: &str) -> Option<i32> {
         self.get(key).and_then(|v| v.parse::<i32>().ok())
     }
 
+    /// Retrieves the value for the given `key`, if it exists, and interprets it as a [`u64`].
     pub fn get_u64(&self, key: &str) -> Option<u64> {
         self.get(key).and_then(|v| v.parse::<u64>().ok())
     }
 
+    /// Retrieves the value for the given `key`, if it exists, and interprets it as an [`i64`].
     pub fn get_i64(&self, key: &str) -> Option<i64> {
         self.get(key).and_then(|v| v.parse::<i64>().ok())
     }
 
+    /// Retrieves the value for the given `key`, if it exists, and interprets it as a [`bool`].
     pub fn get_bool(&self, key: &str) -> Option<bool> {
         self.get(key).map(pipewire_native_spa::atob)
     }
 
-    pub fn update_string(&mut self, args: &str) -> Result<u32, String> {
+    pub(crate) fn update_string(&mut self, args: &str) -> Result<u32, String> {
         let parsed: JsonValue = args.parse().map_err(|e: JsonParseError| e.to_string())?;
 
         if !parsed.is_object() {
@@ -138,7 +152,7 @@ impl Properties {
         Ok(count)
     }
 
-    pub fn update_keys<'a>(
+    pub(crate) fn update_keys<'a>(
         &mut self,
         dict: impl Iterator<Item = (&'a str, &'a str)>,
         keys: Vec<&str>,
@@ -150,7 +164,8 @@ impl Properties {
         }
     }
 
-    pub fn update_ignore(&mut self, dict: &Dict, ignore: Vec<&str>) {
+    #[allow(unused)]
+    pub(crate) fn update_ignore(&mut self, dict: &Dict, ignore: Vec<&str>) {
         for (k, v) in dict.items() {
             if ignore.contains(&k) {
                 continue;
@@ -160,7 +175,7 @@ impl Properties {
         }
     }
 
-    pub fn add_dict(&mut self, dict: &Dict) {
+    pub(crate) fn add_dict(&mut self, dict: &Dict) {
         for (k, v) in dict.items() {
             self.set(k, v.to_string());
         }

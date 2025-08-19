@@ -2,6 +2,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+/// The [`Core`] object is the top-level singleton representing a connection to the PipeWire
+/// server. The [`Core`] can be used to query objects known to the PipeWire server via the
+/// [`Registry`]. It can also be used to create objects on the server on behalf of this client
+/// (this functionality has not yet been implemented).
 use std::{
     cell::RefCell,
     os::fd::RawFd,
@@ -25,9 +29,9 @@ use crate::{
 
 default_topic!(log::topic::CORE);
 
-pub const VERSION: u32 = 3;
+const VERSION: u32 = 3;
 
-pub const DEFAULT_REMOTE: &str = "pipewire-0";
+const DEFAULT_REMOTE: &str = "pipewire-0";
 
 pub(crate) fn get_remote(props: Option<&spa::dict::Dict>) -> String {
     std::env::var("PIPEWIRE_REMOTE")
@@ -316,7 +320,7 @@ pub struct CoreEvents {
 
 impl InnerCore {
     fn new(context: &Context, mut properties: Properties) -> Self {
-        properties.add_dict(&context.properties());
+        properties.add_dict(&context.properties_dict());
 
         // TODO: Create mempool
 
