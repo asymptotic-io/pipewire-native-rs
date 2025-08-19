@@ -170,11 +170,10 @@ impl MainLoop {
     }
 
     /// Run one iteration of the loop, returning if no events occurred in `timeout` time. A value
-    /// of `None` signifies an infinite timeout.
-    pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
+    /// of `None` signifies an infinite timeout. Returns the number of iterations performed.
+    pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<i32> {
         trace!("iterate");
-        self.inner.support.loop_control.iterate(timeout)?;
-        Ok(())
+        self.inner.support.loop_control.iterate(timeout)
     }
 
     #[doc(hidden)]
