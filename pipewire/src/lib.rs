@@ -12,18 +12,21 @@ use support::Support;
 pub mod conf;
 pub mod context;
 pub mod core;
-mod id_map;
 pub mod keys;
 pub mod log;
 pub mod main_loop;
 pub mod permission;
 pub mod properties;
-mod protocol;
 pub mod proxy;
 pub mod types;
 
+mod id_map;
+mod protocol;
+mod refcounted;
 mod support;
 mod utils;
+
+pub use refcounted::*;
 
 // pub use so users of closure! don't need to import paste themselves
 pub use paste::paste;
@@ -113,80 +116,6 @@ pub fn init() {
 
         support
     });
-}
-
-pub trait Refcounted: Clone {
-    type WeakRef;
-
-    fn upgrade(this: &Self::WeakRef) -> Option<Self>
-    where
-        Self: Sized;
-    fn downgrade(&self) -> Self::WeakRef;
-}
-
-pub fn new_refcounted<T>(inner: T) -> std::sync::Arc<T> {
-    std::sync::Arc::new(inner)
-}
-
-#[macro_export]
-macro_rules! refcounted {
-    (
-        // FIXME: bounds can be non-types, so we probably need something that munches tts
-        $(#[$(attrs:meta)+])?
-        $visibility:vis struct $name:ident $(<$($generic:ident $(: $bound:ty)?),*>)? {
-            $($body:tt)*
-        }
-    ) => {
-        paste::paste! {
-            #[derive(Clone)]
-            $visibility struct $name $(<$($generic $(: $bound)?),*>)? {
-                inner: std::sync::Arc<[<Inner $name>] $(<$($generic),*>)?>,
-            }
-
-            // We implement Send to allow usage with our main loop, and expect the user to
-            // explicitly ensure single-thread access
-            unsafe impl $(<$($generic $(: $bound)?),*>)? Send for $name $(<$($generic),*>)? {}
-
-            #[derive(Clone)]
-            pub struct [<Weak $name>] $(<$($generic $(: $bound)?),*>)? {
-                inner: std::sync::Weak<[<Inner $name>] $(<$($generic>)?),*>,
-            }
-
-            // We implement Send to allow usage with our main loop, and expect the user to
-            // explicitly ensure single-thread access
-            unsafe impl $(<$($generic $(: $bound)?),*>)? Send for [<Weak $name>] $(<$($generic),*>)? {}
-
-            impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
-                pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
-                    [<Weak $name>] {
-                        inner: std::sync::Arc::downgrade(&self.inner),
-                    }
-                }
-            }
-
-            impl $(<$($generic $(: $bound)?),*>)? [<Weak $name>] $(<$($generic),*>)? {
-                pub fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
-                    self.inner.upgrade().map(|inner| $name { inner })
-                }
-            }
-
-            impl $(<$($generic $(: $bound)?),*>)? crate::Refcounted for $name $(<$($generic),*>)? {
-                type WeakRef = [<Weak $name>] $(<$($generic),*>)?;
-
-                fn upgrade(this: &Self::WeakRef) -> Option<Self> {
-                    this.upgrade()
-                }
-
-                fn downgrade(&self) -> Self::WeakRef {
-                    self.downgrade()
-                }
-            }
-
-            struct [<Inner $name>] $(<$($generic $(: $bound)?),*>)? {
-                $($body)*
-            }
-        }
-    }
 }
 
 #[macro_export]
