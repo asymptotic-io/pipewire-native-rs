@@ -100,6 +100,7 @@ macro_rules! refcounted {
             unsafe impl $(<$($generic $(: $bound)?),*>)? Send for [<Weak $name>] $(<$($generic),*>)? {}
 
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
+                #[doc(hidden)]
                 /// Helper method to generate a weak reference. See also: [crate::Refcounted].
                 pub fn downgrade(&self) -> [<Weak $name>] $(<$($generic),*>)? {
                     [<Weak $name>] {
@@ -109,6 +110,7 @@ macro_rules! refcounted {
             }
 
             impl $(<$($generic $(: $bound)?),*>)? [<Weak $name>] $(<$($generic),*>)? {
+                #[doc(hidden)]
                 /// Helper method to convert a weak reference to a strong reference. See also:
                 /// [crate::Refcounted].
                 pub fn upgrade(&self) -> Option<$name $(<$($generic),*>)?> {
