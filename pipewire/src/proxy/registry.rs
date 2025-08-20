@@ -28,6 +28,7 @@ refcounted! {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) struct RegistryMethods<T: HasProxy + Refcounted> {
     pub bind: Box<dyn FnMut(&Proxy<T>, Id, &str, u32) -> std::io::Result<Box<dyn HasProxy>>>,
     #[allow(unused)]
@@ -35,6 +36,7 @@ pub(crate) struct RegistryMethods<T: HasProxy + Refcounted> {
 }
 
 /// Events that might be emitted by a [Registry].
+#[allow(clippy::type_complexity)]
 #[derive(Default)]
 pub struct RegistryEvents {
     /// A global object was exported by the server. The object may be tracked using

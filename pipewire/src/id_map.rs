@@ -23,10 +23,7 @@ enum Item<T> {
 
 impl<T> Item<T> {
     fn is_empty(&self) -> bool {
-        match self {
-            Item::Empty => true,
-            _ => false,
-        }
+        matches!(self, Item::Empty)
     }
 
     fn as_ref(&self) -> Option<&T> {

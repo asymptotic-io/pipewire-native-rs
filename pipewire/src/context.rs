@@ -98,7 +98,7 @@ impl Context {
     /// Attemps to create a connection to the PipeWire server. The connection is represented by the
     /// returned [Core], which can then be used for further interaction with the PipeWire server.
     pub fn connect(&self, properties: Option<Properties>) -> std::io::Result<Core> {
-        Core::new(self, properties.unwrap_or(Properties::new()))
+        Core::new(self, properties.unwrap_or_default())
     }
 }
 

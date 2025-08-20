@@ -22,7 +22,7 @@ impl Default for Properties {
     }
 }
 
-pub(crate) fn parse_bool(value: &String) -> bool {
+pub(crate) fn parse_bool(value: &str) -> bool {
     atob(value)
 }
 

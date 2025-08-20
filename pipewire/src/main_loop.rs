@@ -86,9 +86,7 @@ refcounted! {
 impl MainLoop {
     /// Create a new main loop.
     pub fn new(props: &Properties) -> Option<MainLoop> {
-        let Some(l) = InnerMainLoop::new(props) else {
-            return None;
-        };
+        let l = InnerMainLoop::new(props)?;
 
         debug!("Creating main loop");
 
@@ -348,11 +346,13 @@ impl InnerMainLoop {
             .load_spa_handle(None, spa::interface::plugin::LOOP_FACTORY, None)
             .ok()?;
 
+        #[allow(clippy::arc_with_non_send_sync)]
         let loop_ = handle.get_interface(spa::interface::LOOP).and_then(|i| {
             Arc::new(Box::into_pin(i))
                 .downcast_arc_pin_box::<spa::interface::r#loop::LoopImpl>()
                 .ok()
         })?;
+        #[allow(clippy::arc_with_non_send_sync)]
         let loop_utils = handle
             .get_interface(spa::interface::LOOP_UTILS)
             .and_then(|i| {
@@ -360,6 +360,7 @@ impl InnerMainLoop {
                     .downcast_arc_pin_box::<spa::interface::r#loop::LoopUtilsImpl>()
                     .ok()
             })?;
+        #[allow(clippy::arc_with_non_send_sync)]
         let loop_control = handle
             .get_interface(spa::interface::LOOP_CONTROL)
             .and_then(|i| {

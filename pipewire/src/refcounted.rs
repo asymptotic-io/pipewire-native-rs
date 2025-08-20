@@ -118,7 +118,7 @@ macro_rules! refcounted {
                 }
             }
 
-            impl $(<$($generic $(: $bound)?),*>)? crate::Refcounted for $name $(<$($generic),*>)? {
+            impl $(<$($generic $(: $bound)?),*>)? $crate::Refcounted for $name $(<$($generic),*>)? {
                 type WeakRef = [<Weak $name>] $(<$($generic),*>)?;
 
                 fn upgrade(this: &Self::WeakRef) -> Option<Self> {

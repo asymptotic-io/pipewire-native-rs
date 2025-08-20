@@ -32,11 +32,11 @@ const DEFAULT_REMOTE: &str = "pipewire-0";
 pub(crate) fn get_remote(props: Option<&spa::dict::Dict>) -> String {
     std::env::var("PIPEWIRE_REMOTE")
         .ok()
-        .filter(|v| v.len() > 0)
+        .filter(|v| !v.is_empty())
         .or_else(|| {
             props
                 .and_then(|p| p.lookup(keys::REMOTE_NAME).to_owned())
-                .filter(|v| v.len() > 0)
+                .filter(|v| !v.is_empty())
                 .map(|s| s.to_owned())
         })
         .unwrap_or(DEFAULT_REMOTE.to_owned())
@@ -118,7 +118,7 @@ impl Core {
                 if let Some(props) = info.props {
                     debug!("updating props {:?}", props);
                     this.context()
-                        .update_properties(&props, vec!["default.clock.quantum-limit"]);
+                        .update_properties(props, vec!["default.clock.quantum-limit"]);
                 }
             }),
             done: some_closure!([core_proxy] id, seq, {
@@ -309,6 +309,7 @@ pub struct CoreInfo<'a> {
     pub props: Option<&'a Properties>,
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) hello: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
     pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
@@ -325,6 +326,7 @@ pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
 }
 
 /// Events that may be emitted by a [Core] proxy object.
+#[allow(clippy::type_complexity)]
 #[derive(Default)]
 pub struct CoreEvents {
     /// Information about the core changed.

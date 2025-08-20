@@ -27,6 +27,7 @@ refcounted! {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) struct ClientMethods<T: HasProxy + Refcounted> {
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     pub(crate) update_properties: Box<dyn FnMut(&Proxy<T>, &Properties) -> std::io::Result<()>>,
@@ -56,6 +57,7 @@ pub struct ClientInfo<'a> {
 }
 
 /// Client events that can be subscribed to.
+#[allow(clippy::type_complexity)]
 #[derive(Default)]
 pub struct ClientEvents {
     /// Client information became available, or changed.

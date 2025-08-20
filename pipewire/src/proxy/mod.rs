@@ -57,6 +57,7 @@ refcounted! {
 }
 
 /// Events that might be emitted by a proxy.
+#[allow(clippy::type_complexity)]
 #[derive(Default)]
 pub struct ProxyEvents {
     /// The proxy is about to be destroyed (either because it went away, or because we are
@@ -94,7 +95,7 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
 
     /// The "global" ID for this object.
     pub fn bound_id(&self) -> Option<Id> {
-        self.inner.bound_id.borrow().clone()
+        *self.inner.bound_id.borrow()
     }
 
     pub(crate) fn set_bound_id(&self, id: Id) {
@@ -150,20 +151,12 @@ pub trait HasProxy: Any {
 impl dyn HasProxy {
     /// Downcast from a `dyn HasProxy` to the specific type.
     pub fn downcast<T: HasProxy + Refcounted>(&self) -> Option<T> {
-        if let Some(object) = (self as &dyn Any).downcast_ref::<T>() {
-            Some(object.clone())
-        } else {
-            None
-        }
+        (self as &dyn Any).downcast_ref::<T>().cloned()
     }
 
     /// Downcast from a `dyn HasProxy` to the corresponding [Proxy] type.
     pub fn downcast_proxy<T: HasProxy + Refcounted>(&self) -> Option<Proxy<T>> {
-        if let Some(object) = (self as &dyn Any).downcast_ref::<T>() {
-            Some(object.proxy())
-        } else {
-            None
-        }
+        (self as &dyn Any).downcast_ref::<T>().map(|o| o.proxy())
     }
 }
 

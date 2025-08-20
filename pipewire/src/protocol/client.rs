@@ -256,7 +256,10 @@ impl Client {
 
         let core = &self.core();
         let seq = *self.inner.last_in_seq.borrow();
-        let res = err.raw_os_error().unwrap_or(err.kind() as i32).abs() as u32;
+        let res = err
+            .raw_os_error()
+            .unwrap_or(err.kind() as i32)
+            .unsigned_abs();
 
         proxy_notify!(core, error, seq, res, msg);
     }
@@ -277,12 +280,12 @@ impl Client {
 
         if remote_name.starts_with("/") || remote_name.starts_with("@") {
             // Absolute path
-            self.try_connect_local_socket(None, &remote_name, done_cb.as_ref())
+            self.try_connect_local_socket(None, &remote_name, &done_cb)
         } else {
             // Relative path
             if let Some(runtime_dir) = get_runtime_dir() {
                 if self
-                    .try_connect_local_socket(Some(&runtime_dir), &remote_name, done_cb.as_ref())
+                    .try_connect_local_socket(Some(&runtime_dir), &remote_name, &done_cb)
                     .is_ok()
                 {
                     // Connect via runtime dir worked
@@ -291,7 +294,7 @@ impl Client {
             }
 
             // Fallback to connect via system dir
-            self.try_connect_local_socket(Some(&get_system_dir()), &remote_name, done_cb.as_ref())
+            self.try_connect_local_socket(Some(&get_system_dir()), &remote_name, &done_cb)
         }
     }
 
@@ -299,7 +302,7 @@ impl Client {
         &self,
         path: Option<&str>,
         name: &str,
-        done_cb: Option<&Box<dyn Fn(std::io::Result<()>)>>,
+        done_cb: &Option<Box<dyn Fn(std::io::Result<()>)>>,
     ) -> std::io::Result<()> {
         let mut socket_path = PathBuf::new();
 
