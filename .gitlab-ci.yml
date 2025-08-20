@@ -1,0 +1,167 @@
+stages:
+  - container
+  - lint
+  - test
+  - extras
+  - deploy
+
+variables:
+  FDO_UPSTREAM_REPO: 'pipewire/pipewire-native-rs'
+
+# ci-templates as of Aug 19, 2025
+.templates_sha: &templates_sha aec7a6ce7bb38902c70641526f6611e27141784a
+
+include:
+  - project: 'freedesktop/ci-templates'
+    ref: *templates_sha
+    file: '/templates/fedora.yml'
+
+.fedora:
+  variables:
+    # Update this tag when you want to trigger a rebuild
+    BASE_TAG: '2025-08-19.3'
+    FDO_DISTRIBUTION_VERSION: '42'
+    # wget: required by install-rust.sh
+    # openssl-devel, perl-FindBin: required to build cargo tools
+    # make: required to build cargo tools
+    # clang-devel: proc-macros2 needs a linker
+    # pipewire: tests start a pipewire instance
+    # pipewire-utils: config parsing depends on spa-json-dump
+    FDO_DISTRIBUTION_PACKAGES: >-
+      pipewire
+      pipewire-utils
+      pipewire-devel
+      wget
+      openssl-devel
+      perl-FindBin
+      make
+      clang-devel
+      git
+      python3-pip
+      python3-setuptools
+    FDO_DISTRIBUTION_EXEC: >-
+      pip3 install git+http://gitlab.freedesktop.org/freedesktop/ci-templates &&
+      bash ci/install-rust.sh stable
+  before_script:
+    - source ./ci/env.sh
+    - mkdir .cargo && echo -e "[net]\ngit-fetch-with-cli = true" > .cargo/config
+
+.fedora-x86:
+  extends:
+    - .fedora
+  variables:
+    FDO_DISTRIBUTION_TAG: 'x86_64-$BASE_TAG'
+
+.fedora-arm:
+  extends:
+    - .fedora
+  variables:
+    FDO_DISTRIBUTION_TAG: 'aarch64-$BASE_TAG'
+
+.build:
+  before_script:
+    - source ./ci/env.sh
+
+container_fedora-x86:
+  extends:
+    - .fedora-x86
+    - .fdo.container-build@fedora
+  stage: container
+
+container_fedora-arm:
+  extends:
+    - .fedora-arm
+    - .fdo.container-build@fedora
+  stage: container
+
+rustfmt:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+  stage: lint
+  script:
+    - cargo fmt --version
+    - cargo fmt -- --color=always --check
+
+.test-template: &test-definition
+  script:
+    - rustc --version
+    - cargo build --color=always --all-targets
+    - cargo test --color=always
+
+test-stable-x86:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+    - .build
+  <<: *test-definition
+  stage: test
+
+test-stable-arm:
+  extends:
+    - .fedora-arm
+    - .fdo.distribution-image@fedora
+    - .build
+  <<: *test-definition
+  stage: test
+
+rustdoc:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+    - .build
+  stage: extras
+  variables:
+    RUSTDOCFLAGS: '-Dwarnings'
+  script:
+    - rustdoc --version
+    - cargo doc --no-deps
+
+clippy:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+    - .build
+  stage: extras
+  script:
+    - cargo clippy --version
+    - cargo clippy --color=always --all-targets -- -D warnings
+
+deny:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+  stage: extras
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "release"'
+  script:
+    - cargo deny check
+
+outdated:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+  stage: extras
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "release"'
+  script:
+    - cargo outdated --root-deps-only --exit-code 1 -v
+
+pages:
+  extends:
+    - .fedora-x86
+    - .fdo.distribution-image@fedora
+    - .build
+  stage: 'deploy'
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $PIPELINE_BRANCH != $CI_DEFAULT_BRANCH
+      when: never
+  script:
+    - cargo doc --color=always
+    - mv target/doc public/
+  artifacts:
+    paths:
+      - 'public'
