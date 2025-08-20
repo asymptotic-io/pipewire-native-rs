@@ -32,7 +32,6 @@ fn test_thread() {
     let thread = thread_utils
         .create(None, move || {
             accum_thr.fetch_add(1, Ordering::SeqCst);
-
             Box::new(true)
         })
         .expect("Thread should be created");
@@ -44,5 +43,5 @@ fn test_thread() {
         .expect("Return value should be a bool");
 
     assert_eq!(accum.load(Ordering::SeqCst), 1);
-    assert_eq!(*retval, true);
+    assert!(*retval);
 }

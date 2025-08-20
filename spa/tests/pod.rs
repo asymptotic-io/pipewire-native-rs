@@ -100,7 +100,7 @@ fn test_pod_builder() {
     }
     unsafe {
         sbuilder
-            .add_array(4, spa_sys::SPA_TYPE_Bool, 0, [].as_ptr() as *const c_void)
+            .add_array(4, spa_sys::SPA_TYPE_Bool, 0, [].as_ptr())
             .unwrap();
     }
     unsafe {
@@ -169,7 +169,7 @@ where
 fn test_pod_decode() {
     test_a_pod(&());
     test_a_pod(&true);
-    test_a_pod(&(-123 as i32));
+    test_a_pod(&(-123_i32));
     test_a_pod(&(i64::MIN));
     test_a_pod(&"hello");
     test_a_pod(&vec![1u8, 2, 3, 4].as_slice());
@@ -243,9 +243,9 @@ fn test_pod_parser() {
         .build()
         .unwrap();
 
-    let mut parser = Parser::new(&res);
-    assert_eq!(parser.pop_none().unwrap(), ());
-    assert_eq!(parser.pop_bool().unwrap(), true);
+    let mut parser = Parser::new(res);
+    parser.pop_none().unwrap();
+    assert!(parser.pop_bool().unwrap());
     assert_eq!(parser.pop_id().unwrap(), Id(1u32));
     assert_eq!(parser.pop_int().unwrap(), 2);
     assert_eq!(parser.pop_long().unwrap(), 3);

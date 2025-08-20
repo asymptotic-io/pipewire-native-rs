@@ -9,6 +9,7 @@ use std::{
 
 use pipewire_native_spa::{emit_hook, hook::HookList};
 
+#[allow(clippy::type_complexity)]
 struct TestEvents {
     constie: Option<Box<dyn FnMut(i32)>>,
     normie: Option<Box<dyn FnMut(&TestStruct, i32, &str)>>,

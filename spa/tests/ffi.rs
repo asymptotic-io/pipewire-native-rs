@@ -175,10 +175,7 @@ fn setup_loop(
     loop_handle
 }
 
-fn setup_loop_ctrl(
-    support: &mut interface::Support,
-    loop_handle: &Box<dyn interface::plugin::Handle>,
-) {
+fn setup_loop_ctrl(support: &mut interface::Support, loop_handle: &dyn interface::plugin::Handle) {
     let loop_ctrl_iface = loop_handle
         .get_interface(interface::LOOP_CONTROL)
         .expect("Loop factory should produce control interface");
@@ -190,10 +187,7 @@ fn setup_loop_ctrl(
     support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
 }
 
-fn setup_loop_utils(
-    support: &mut interface::Support,
-    loop_handle: &Box<dyn interface::plugin::Handle>,
-) {
+fn setup_loop_utils(support: &mut interface::Support, loop_handle: &dyn interface::plugin::Handle) {
     let loop_utils_iface = loop_handle
         .get_interface(interface::LOOP_UTILS)
         .expect("Loop factory should produce utils interface");
@@ -214,8 +208,8 @@ fn test_load_support() {
     let _cpu_handle = setup_cpu(&mut support, &plugin);
     let loop_handle = setup_loop(&mut support, &plugin);
 
-    setup_loop_ctrl(&mut support, &loop_handle);
-    setup_loop_utils(&mut support, &loop_handle);
+    setup_loop_ctrl(&mut support, loop_handle.as_ref());
+    setup_loop_utils(&mut support, loop_handle.as_ref());
 }
 
 #[test]
@@ -227,8 +221,8 @@ fn test_loop_support() {
     let _cpu_handle = setup_cpu(&mut support, &plugin);
     let loop_handle = setup_loop(&mut support, &plugin);
 
-    setup_loop_ctrl(&mut support, &loop_handle);
-    setup_loop_utils(&mut support, &loop_handle);
+    setup_loop_ctrl(&mut support, loop_handle.as_ref());
+    setup_loop_utils(&mut support, loop_handle.as_ref());
 
     let eloop = support.get_interface::<interface::r#loop::LoopImpl>(interface::LOOP);
     let lutils = support.get_interface::<interface::r#loop::LoopUtilsImpl>(interface::LOOP_UTILS);
@@ -249,7 +243,7 @@ fn test_loop_support() {
         let res = utils.update_io(&mut io_src, flags::Io::IN);
         assert!(res.is_ok());
 
-        writer.write("Hello".as_bytes()).unwrap();
+        writer.write_all("Hello".as_bytes()).unwrap();
 
         let event_src = utils.add_event(Box::new(event_callback));
         assert!(event_src.is_some());
