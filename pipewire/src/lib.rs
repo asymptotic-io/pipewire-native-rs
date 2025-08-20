@@ -183,6 +183,40 @@ pub fn init() {
 }
 
 /// Utility macro to reduce closure-related boilerplate.
+///
+/// This closure allows creating a closure that captures [Refcounted] and [Clone] values without
+/// having to manually manage the `downgrade()`/`upgrade()` cycle and `clone()` calls respectively.
+/// The syntax is a little strange at first, but it adds a great deal of convenience. This is
+/// expected to improve in the future, with less arcane syntax.
+///
+/// Example:
+/// ```ignore
+/// // We assume `AppContext` is `Clone` (maybe internally has an `Arc`)
+/// fn setup_registry(app: AppContext, core: &Core) -> Registry {
+///     let registry = core.registry();
+///
+///     // some_closure!() is the same as closure!(), but wrapped in a Some()
+///     registry.add_listener(RegistryEvents {
+///         //      captured via Clone    ----.
+///         //                                |         .---- callback
+///         // captured via Refcounted \      |         |     arguments
+///         //                          v     v         v
+///         //                    |--------|------| |-----------------|
+///         global: some_closure!([registry ^(app)] id, type_, version, {
+///             // registry is made available here through a weak reference
+///             let object = registry.bind(...);
+///             app.add_object(id, object);
+///         }),
+///         global_remove: some_closure!([^(app)] id, {
+///             // Without the macro, we would have to create and move two cloned copies of `app`
+///             app.remove_object(id);
+///         }),
+///     });
+/// }
+/// ```
+///
+/// In addition to the `^` marker to capture via [Clone], there is also a `^mut` marker to capture
+/// via [Clone] and make the capture value available as `mut`.
 #[macro_export]
 macro_rules! closure {
     ([$($names:ident <- $objects:ident),* $(^($($clones:ident),+))? $(^mut($($mut_clones:ident),+))?] $($($args:ident),* ,)? $body:block) => {
