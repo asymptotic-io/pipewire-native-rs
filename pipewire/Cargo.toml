@@ -14,3 +14,10 @@ tinyjson = "2.5.1"
 [dev-dependencies]
 serial_test = "3"
 tempfile = "3"
+
+[lints.clippy]
+# API users are responsible for their own synchronisation between main loop and
+# other threads (a common pattern might be separate threads, but mutual
+# exclusion via the thread lock). This means we legitimately have cases with
+# non-Sync items in an Arc.
+arc_with_non_send_sync = "allow"

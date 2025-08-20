@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
-use tempfile;
 
 use pipewire_native::{
     self as pipewire, closure,
