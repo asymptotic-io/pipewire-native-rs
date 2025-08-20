@@ -83,6 +83,7 @@ impl Support {
         let pin = Box::into_pin(iface);
         let data = unsafe { pin.make_native() };
 
+        #[allow(clippy::arc_with_non_send_sync)]
         self.supports.insert(name, Arc::new(pin));
         self.add_or_update_c(name, data);
     }

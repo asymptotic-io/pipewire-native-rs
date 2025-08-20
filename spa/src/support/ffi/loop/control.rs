@@ -132,6 +132,7 @@ impl CLoopControlMethodsImpl {
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         unsafe {
+            #[allow(clippy::cmp_null)]
             if (*funcs).lock as *const c_void != std::ptr::null() {
                 result_from(((*funcs).lock)(control_impl.iface.cb.data))
             } else {
@@ -145,7 +146,8 @@ impl CLoopControlMethodsImpl {
         let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
         unsafe {
-            if (*funcs).unlock as *const c_void != std::ptr::null() {
+            #[allow(clippy::cmp_null)]
+            if (*funcs).lock as *const c_void != std::ptr::null() {
                 result_from(((*funcs).unlock)(control_impl.iface.cb.data))
             } else {
                 Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
