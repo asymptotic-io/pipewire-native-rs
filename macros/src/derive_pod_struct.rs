@@ -4,7 +4,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, Data, DeriveInput, Fields, Ident};
+use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input, parse_quote};
 
 pub fn derive_pod_struct(input: TokenStream) -> TokenStream {
     let DeriveInput {

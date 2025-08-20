@@ -4,7 +4,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, BinOp, Data, DeriveInput, Expr, ExprBinary, Ident};
+use syn::{BinOp, Data, DeriveInput, Expr, ExprBinary, Ident, parse_macro_input, parse_quote};
 
 pub fn derive_enum_u32(input: TokenStream) -> TokenStream {
     let DeriveInput {
