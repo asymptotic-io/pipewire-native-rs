@@ -84,14 +84,14 @@ struct CSourceImpl {
 }
 
 impl CLoopImpl {
-    fn from_loop(this: &LoopImpl) -> (Rc<RefCell<CLoopImpl>>, &mut CLoop) {
+    fn from_loop(this: &LoopImpl) -> (Rc<RefCell<CLoopImpl>>, &CLoop) {
         let c_loopimpl = this
             .inner
             .as_ref()
             .downcast_ref::<Rc<RefCell<CLoopImpl>>>()
             .unwrap()
             .clone();
-        let c_loop = unsafe { c_loopimpl.borrow().iface.as_mut().unwrap() };
+        let c_loop = unsafe { c_loopimpl.borrow().iface.as_ref().unwrap() };
 
         (c_loopimpl, c_loop)
     }
