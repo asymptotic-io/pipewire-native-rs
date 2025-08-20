@@ -28,6 +28,9 @@ pub struct State {
     pub clients: RefCell<HashMap<Id, (proxy::client::Client, Properties)>>,
 }
 
+unsafe impl Send for State {}
+unsafe impl Sync for State {}
+
 impl State {
     pub fn new(name: &str) -> std::io::Result<Arc<State>> {
         pipewire::init();
@@ -60,7 +63,7 @@ impl State {
 
                 match object {
                     Ok(object) => {
-                        state.new_object(&state, object, props);
+                        state.new_object(state, object, props);
                     }
                     Err(e) => todo!("Send error {e} to UI"),
                 }
@@ -84,29 +87,26 @@ impl State {
         self.core.disconnect();
     }
     fn new_object(&self, state: &Arc<Self>, object: Box<dyn proxy::HasProxy>, props: &Properties) {
-        match object.type_() {
-            types::interface::CLIENT => {
-                let client = object.downcast::<proxy::client::Client>().unwrap();
+        if object.type_() == types::interface::CLIENT {
+            let client = object.downcast::<proxy::client::Client>().unwrap();
 
-                client.add_listener(ClientEvents {
-                    info: some_closure!([^(state)] info, {
-                        state.client_info(info);
-                    }),
-                    ..Default::default()
-                });
+            client.add_listener(ClientEvents {
+                info: some_closure!([^(state)] info, {
+                    state.client_info(info);
+                }),
+                ..Default::default()
+            });
 
-                client.proxy().add_listener(ProxyEvents {
-                    removed: some_closure!([client ^(state)] {
-                        state.client_removed(client);
-                    }),
-                    ..Default::default()
-                });
+            client.proxy().add_listener(ProxyEvents {
+                removed: some_closure!([client ^(state)] {
+                    state.client_removed(client);
+                }),
+                ..Default::default()
+            });
 
-                self.clients
-                    .borrow_mut()
-                    .insert(client.proxy().id(), (client, props.clone()));
-            }
-            _ => (),
+            self.clients
+                .borrow_mut()
+                .insert(client.proxy().id(), (client, props.clone()));
         }
     }
 

@@ -132,12 +132,12 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
         ])
         .split(frame.area());
 
-    let mut types = vec![Span::from("Clients")];
+    let mut types = [Span::from("Clients")];
 
     if ui_state.pane == Pane::Types {
         let n = types.len();
         if let Some(span) = types.get_mut(ui_state.position as usize % n) {
-            *span = span.clone().style(selection_style.clone());
+            *span = span.clone().style(selection_style);
         }
     }
 
@@ -152,7 +152,7 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
             Block::default()
                 .title("Types")
                 .borders(Borders::ALL)
-                .padding(block_padding.clone()),
+                .padding(block_padding),
         ),
         layout[0],
     );
@@ -183,7 +183,7 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
                 || (ui_state.pane == Pane::Details && ui_state.last_position as usize % n == idx)
             {
                 selected = idx;
-                span.style(selection_style.clone())
+                span.style(selection_style)
             } else {
                 span
             },
@@ -219,7 +219,7 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
         Block::default()
             .title("Objects")
             .borders(Borders::ALL)
-            .padding(block_padding.clone()),
+            .padding(block_padding),
     );
 
     let mut details = Paragraph::new(Text::from(detail_lines))
@@ -227,9 +227,9 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
             Block::default()
                 .title("Details")
                 .borders(Borders::ALL)
-                .padding(block_padding.clone())
+                .padding(block_padding)
                 .style(if ui_state.pane == Pane::Details {
-                    selection_style.clone()
+                    selection_style
                 } else {
                     Style::default()
                 }),
