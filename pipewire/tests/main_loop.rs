@@ -47,7 +47,7 @@ fn test_mainloop(exec: MainLoopRun) {
     let res = ml.update_io(&mut io_src, flags::Io::IN);
     assert!(res.is_ok());
 
-    writer.write("Hello".as_bytes()).unwrap();
+    writer.write_all("Hello".as_bytes()).unwrap();
 
     let event_src = ml.add_event(Box::new(event_callback));
     assert!(event_src.is_some());
