@@ -74,7 +74,7 @@ macro_rules! refcounted {
     (
         // FIXME: bounds can be non-types, so we probably need something that munches tts
         $(#[$($attrs:meta)*])*
-        $visibility:vis struct $name:ident $(<$($generic:ident $(: $bound:ty)?),*>)? {
+        $visibility:vis struct $name:ident $(<$($generic:tt $(: $bound:ty)?),*>)? {
             $($body:tt)*
         }
     ) => {
