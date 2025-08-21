@@ -2,240 +2,483 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::sync::Arc;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
-use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use pipewire::{keys, proxy::HasProxy};
-use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style, Stylize},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, Padding, Paragraph, Wrap},
-    DefaultTerminal, Frame,
+use tui_realm_stdlib::List;
+use tuirealm::{
+    command::{Cmd, CmdResult, Direction, Position},
+    event::{Key, KeyEvent},
+    props::{Alignment, Color, Style, TableBuilder, TextSpan},
+    ratatui::layout,
+    terminal::{CrosstermTerminalAdapter, TerminalBridge},
+    Application, AttrValue, Attribute, Component, Event, EventListenerCfg, MockComponent,
+    NoUserEvent, PollStrategy, State, StateValue, Update,
 };
 
 mod pw;
 
-#[derive(Eq, PartialEq)]
-enum Pane {
+#[derive(Debug, Eq, PartialEq, Clone)]
+enum Msg {
+    FocusChanged(ComponentId),
+    TypeChanged(TypeSelection),
+    ObjectChanged(usize),
+    Quit,
+    None,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+enum ComponentId {
     Types,
     Objects,
     Details,
 }
 
-impl Pane {
-    fn next(&self) -> Self {
-        match self {
-            Self::Types => Self::Objects,
-            Self::Objects => Self::Details,
-            Self::Details => Self::Details,
+struct Model {
+    app: Application<ComponentId, Msg, NoUserEvent>,
+    pw_state: Arc<pw::State>,
+    component_selection: ComponentId,
+    type_selection: TypeSelection,
+    object_selection: usize,
+    quit: bool,
+    redraw: bool,
+}
+
+impl Model {
+    fn new(pw_state: Arc<pw::State>) -> Self {
+        let mut app = Application::init(
+            EventListenerCfg::default().crossterm_input_listener(Duration::from_millis(20), 10),
+        );
+
+        app.mount(ComponentId::Types, Box::new(TypesList::default()), vec![])
+            .unwrap();
+        app.mount(
+            ComponentId::Objects,
+            Box::new(ObjectsList::default()),
+            vec![],
+        )
+        .unwrap();
+
+        app.mount(
+            ComponentId::Details,
+            Box::new(ObjectDetails::default()),
+            vec![],
+        )
+        .unwrap();
+
+        app.active(&ComponentId::Types).unwrap();
+
+        Self {
+            app,
+            pw_state,
+            component_selection: ComponentId::Types,
+            type_selection: TypeSelection::Clients,
+            object_selection: 0,
+            quit: false,
+            redraw: true,
         }
     }
 
-    fn prev(&self) -> Self {
-        match self {
-            Self::Details => Self::Objects,
-            Self::Objects => Self::Types,
-            Self::Types => Self::Types,
-        }
+    fn view(&mut self, terminal: &mut TerminalBridge<CrosstermTerminalAdapter>) {
+        let _ = terminal.raw_mut().draw(|f| {
+            let layout = layout::Layout::default()
+                .direction(layout::Direction::Horizontal)
+                .constraints([
+                    layout::Constraint::Percentage(10),
+                    layout::Constraint::Percentage(30),
+                    layout::Constraint::Percentage(60),
+                ])
+                .split(f.area());
+
+            self.app.view(&ComponentId::Types, f, layout[0]);
+            self.app.view(&ComponentId::Objects, f, layout[1]);
+            self.app.view(&ComponentId::Details, f, layout[2]);
+        });
     }
-}
 
-struct UiState {
-    pane: Pane,
-    position: i32,
-    last_position: i32,
-}
+    fn update_object_list(&mut self) {
+        match self.type_selection {
+            TypeSelection::Clients => {
+                let mut table = TableBuilder::default();
 
-fn init_ui() -> Result<DefaultTerminal> {
-    color_eyre::install()?;
-    Ok(ratatui::init())
-}
+                let guard = self.pw_state.main_loop.lock();
 
-fn main() -> Result<()> {
-    let mut terminal = init_ui()?;
-    let pw_state = pw::State::new("pw-browse")?;
+                let clients = self.pw_state.clients.borrow();
+                let mut entries = clients.iter().collect::<Vec<_>>();
+                entries.sort_by_key(|e| e.0);
 
-    let pw_state_ = pw_state.clone();
+                let n = entries.len();
 
-    pw_state.run();
+                for (idx, (id, (client, props))) in entries.iter().enumerate() {
+                    table.add_col(TextSpan::from(format!(
+                        "#{}: {}",
+                        client.proxy().bound_id().unwrap_or(**id),
+                        props.get(keys::APP_NAME).unwrap_or("unknown"),
+                    )));
 
-    let mut ui_state = UiState {
-        pane: Pane::Types,
-        position: 0,
-        last_position: 0,
-    };
-
-    // And use this main thread as the UI event loop
-    loop {
-        terminal.draw(|frame| {
-            draw(frame, &ui_state, &pw_state_);
-        })?;
-
-        if event::poll(std::time::Duration::from_millis(100))? {
-            match event::read()? {
-                Event::Key(KeyEvent {
-                    code: KeyCode::Right,
-                    ..
-                }) => {
-                    if ui_state.pane != Pane::Details {
-                        ui_state.pane = ui_state.pane.next();
-                        ui_state.last_position = ui_state.position;
-                        ui_state.position = 0;
+                    // Only add rows between columns
+                    if idx < n - 1 {
+                        table.add_row();
                     }
                 }
-                Event::Key(KeyEvent {
-                    code: KeyCode::Left,
-                    ..
-                }) => {
-                    if ui_state.pane != Pane::Types {
-                        ui_state.pane = ui_state.pane.prev();
-                        ui_state.position = ui_state.last_position;
-                        ui_state.last_position = 0;
-                    }
-                }
-                Event::Key(KeyEvent {
-                    code: KeyCode::Down,
-                    ..
-                }) => ui_state.position = ui_state.position.wrapping_add(1),
-                Event::Key(KeyEvent {
-                    code: KeyCode::Up, ..
-                }) => ui_state.position = ui_state.position.wrapping_sub(1),
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('q'),
-                    ..
-                }) => break,
-                _ => (),
+
+                self.app
+                    .attr(
+                        &ComponentId::Objects,
+                        Attribute::Content,
+                        AttrValue::Table(table.build()),
+                    )
+                    .unwrap();
+
+                drop(clients);
+                drop(guard);
+
+                self.update_object_details();
             }
         }
     }
 
-    pw_state.stop();
+    fn update_object_details(&mut self) {
+        match self.type_selection {
+            TypeSelection::Clients => {
+                let _guard = self.pw_state.main_loop.lock();
 
-    ratatui::restore();
+                let clients = self.pw_state.clients.borrow();
+                let mut entries = clients.iter().collect::<Vec<_>>();
+                entries.sort_by_key(|e| e.0);
 
-    Ok(())
+                if let Some(entry) = entries.get(self.object_selection) {
+                    let mut table = TableBuilder::default();
+                    let mut props = entry.1 .1.iter().collect::<Vec<_>>();
+
+                    props.sort_by_key(|e| e.0);
+
+                    let n = props.len();
+
+                    for (idx, (key, value)) in props.iter().enumerate() {
+                        table.add_col(TextSpan::from(*key).fg(Color::Cyan));
+                        table.add_col(TextSpan::from(" "));
+                        table.add_col(TextSpan::from(*value));
+
+                        // Only add rows between columns
+                        if idx < n - 1 {
+                            table.add_row();
+                        }
+                    }
+
+                    self.app
+                        .attr(
+                            &ComponentId::Details,
+                            Attribute::Content,
+                            AttrValue::Table(table.build()),
+                        )
+                        .unwrap();
+                }
+            }
+        }
+    }
 }
 
-fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
-    let selection_style = Style::default().add_modifier(Modifier::BOLD);
-    let block_padding = Padding::uniform(1);
+impl Update<Msg> for Model {
+    fn update(&mut self, msg: Option<Msg>) -> Option<Msg> {
+        self.redraw = true;
 
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(vec![
-            Constraint::Percentage(10),
-            Constraint::Percentage(20),
-            Constraint::Percentage(70),
-        ])
-        .split(frame.area());
-
-    let mut types = [Span::from("Clients")];
-
-    if ui_state.pane == Pane::Types {
-        let n = types.len();
-        if let Some(span) = types.get_mut(ui_state.position as usize % n) {
-            *span = span.clone().style(selection_style);
+        match msg.unwrap_or(Msg::None) {
+            Msg::FocusChanged(component_id) => {
+                self.component_selection = component_id;
+                self.app.active(&self.component_selection).unwrap();
+                None
+            }
+            Msg::TypeChanged(type_selection) => {
+                self.type_selection = type_selection;
+                self.object_selection = 0;
+                self.update_object_list();
+                None
+            }
+            Msg::ObjectChanged(idx) => {
+                self.object_selection = idx;
+                self.update_object_details();
+                None
+            }
+            Msg::Quit => {
+                self.quit = true;
+                None
+            }
+            Msg::None => None,
         }
     }
+}
 
-    frame.render_widget(
-        Paragraph::new(Text::from(
-            types
-                .iter()
-                .map(|s| Line::from(s.clone()))
-                .collect::<Vec<Line>>(),
-        ))
-        .block(
-            Block::default()
-                .title("Types")
-                .borders(Borders::ALL)
-                .padding(block_padding),
-        ),
-        layout[0],
-    );
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+enum TypeSelection {
+    Clients,
+}
 
-    let mut object_lines = vec![];
-    let mut selected = 0;
+impl TryFrom<usize> for TypeSelection {
+    type Error = ();
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(TypeSelection::Clients),
+            _ => Err(()),
+        }
+    }
+}
 
-    let guard = pw_state.main_loop.lock();
+#[derive(MockComponent)]
+struct TypesList {
+    component: List,
+}
 
-    let clients = pw_state.clients.borrow();
-    let mut entries = clients.iter().collect::<Vec<_>>();
-    entries.sort_by_key(|e| e.0);
+impl Default for TypesList {
+    fn default() -> Self {
+        Self {
+            component: List::default()
+                .inactive(Style::default().fg(Color::Magenta))
+                .scroll(true)
+                .rewind(true)
+                .title("Object types", Alignment::Left)
+                .highlighted_str(" ⋄ ")
+                .highlighted_color(Color::DarkGray)
+                .rows(
+                    TableBuilder::default()
+                        .add_col(TextSpan::from("Clients"))
+                        .build(),
+                ),
+        }
+    }
+}
 
-    let n = clients.len();
+impl Component<Msg, NoUserEvent> for TypesList {
+    fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
+        let old_selection = self.component.state();
+        let mut focus_changed = false;
 
-    for (idx, (id, (client, props))) in entries.iter().enumerate() {
-        let span = Span::from(format!(
-            "#{}: {}",
-            client.proxy().bound_id().unwrap_or(**id),
-            props.get(keys::APP_NAME).unwrap_or("unknown"),
-        ));
+        let _ = match ev {
+            Event::Keyboard(KeyEvent {
+                code: Key::Right, ..
+            }) => {
+                focus_changed = true;
+                CmdResult::None
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Down, ..
+            }) => self.perform(Cmd::Move(Direction::Down)),
+            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
+                self.perform(Cmd::Move(Direction::Up))
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::PageDown,
+                ..
+            }) => self.perform(Cmd::Scroll(Direction::Down)),
+            Event::Keyboard(KeyEvent {
+                code: Key::PageUp, ..
+            }) => self.perform(Cmd::Scroll(Direction::Up)),
+            Event::Keyboard(KeyEvent {
+                code: Key::Home, ..
+            }) => self.perform(Cmd::GoTo(Position::Begin)),
+            Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
+                self.perform(Cmd::GoTo(Position::End))
+            }
+            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
+            _ => CmdResult::None,
+        };
 
-        let line = Line::from(
-            if (ui_state.pane == Pane::Objects && ui_state.position as usize % n == idx)
-                || (ui_state.pane == Pane::Details && ui_state.last_position as usize % n == idx)
-            {
-                selected = idx;
-                span.style(selection_style)
+        let new_selection = self.component.state();
+        if old_selection != new_selection {
+            if let State::One(StateValue::Usize(idx)) = new_selection {
+                Some(Msg::TypeChanged(TypeSelection::try_from(idx).unwrap()))
             } else {
-                span
-            },
-        );
+                Some(Msg::None)
+            }
+        } else if focus_changed {
+            Some(Msg::FocusChanged(ComponentId::Objects))
+        } else {
+            Some(Msg::None)
+        }
+    }
+}
 
-        object_lines.push(line);
+#[derive(MockComponent)]
+struct ObjectsList {
+    component: List,
+}
+
+impl Default for ObjectsList {
+    fn default() -> Self {
+        Self {
+            component: List::default()
+                .inactive(Style::default().fg(Color::Magenta))
+                .scroll(true)
+                .rewind(true)
+                .title("Objects", Alignment::Left)
+                .highlighted_str(" ⋄ ")
+                .highlighted_color(Color::DarkGray)
+                .rows(TableBuilder::default().build()),
+        }
+    }
+}
+
+impl Component<Msg, NoUserEvent> for ObjectsList {
+    fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
+        let old_selection = self.component.state();
+        let mut focus_component = ComponentId::Objects;
+
+        let _ = match ev {
+            Event::Keyboard(KeyEvent {
+                code: Key::Left, ..
+            }) => {
+                focus_component = ComponentId::Types;
+                CmdResult::None
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Right, ..
+            }) => {
+                focus_component = ComponentId::Details;
+                CmdResult::None
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Down, ..
+            }) => self.perform(Cmd::Move(Direction::Down)),
+            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
+                self.perform(Cmd::Move(Direction::Up))
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::PageDown,
+                ..
+            }) => self.perform(Cmd::Scroll(Direction::Down)),
+            Event::Keyboard(KeyEvent {
+                code: Key::PageUp, ..
+            }) => self.perform(Cmd::Scroll(Direction::Up)),
+            Event::Keyboard(KeyEvent {
+                code: Key::Home, ..
+            }) => self.perform(Cmd::GoTo(Position::Begin)),
+            Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
+                self.perform(Cmd::GoTo(Position::End))
+            }
+            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
+            _ => CmdResult::None,
+        };
+
+        let new_selection = self.component.state();
+        if old_selection != new_selection {
+            if let State::One(StateValue::Usize(idx)) = new_selection {
+                Some(Msg::ObjectChanged(idx))
+            } else {
+                Some(Msg::None)
+            }
+        } else if focus_component != ComponentId::Objects {
+            Some(Msg::FocusChanged(focus_component))
+        } else {
+            Some(Msg::None)
+        }
+    }
+}
+
+#[derive(MockComponent)]
+struct ObjectDetails {
+    component: List,
+}
+
+impl Default for ObjectDetails {
+    fn default() -> Self {
+        Self {
+            component: List::default()
+                .inactive(Style::default().fg(Color::Magenta))
+                .scroll(true)
+                .rewind(true)
+                .title("Details", Alignment::Left)
+                .highlighted_str(" ")
+                .rows(TableBuilder::default().build()),
+        }
+    }
+}
+
+impl Component<Msg, NoUserEvent> for ObjectDetails {
+    fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
+        let mut focus_changed = false;
+
+        let _ = match ev {
+            Event::Keyboard(KeyEvent {
+                code: Key::Left, ..
+            }) => {
+                focus_changed = true;
+                CmdResult::None
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Down, ..
+            }) => self.perform(Cmd::Scroll(Direction::Down)),
+            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
+                self.perform(Cmd::Scroll(Direction::Up))
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::PageDown,
+                ..
+            }) => self.perform(Cmd::Scroll(Direction::Down)),
+            Event::Keyboard(KeyEvent {
+                code: Key::PageUp, ..
+            }) => self.perform(Cmd::Scroll(Direction::Up)),
+            Event::Keyboard(KeyEvent {
+                code: Key::Home, ..
+            }) => self.perform(Cmd::GoTo(Position::Begin)),
+            Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
+                self.perform(Cmd::GoTo(Position::End))
+            }
+            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
+            _ => CmdResult::None,
+        };
+
+        if focus_changed {
+            Some(Msg::FocusChanged(ComponentId::Objects))
+        } else {
+            Some(Msg::None)
+        }
+    }
+}
+
+fn main() {
+    let mut terminal =
+        TerminalBridge::init_crossterm().expect("Could not initialise terminal bridge");
+    let _ = terminal.enable_raw_mode();
+    let _ = terminal.enter_alternate_screen();
+
+    let pw_update = Arc::new(AtomicBool::new(false));
+    let pw_state = pw::State::new("pw-browse", pw_update.clone())
+        .expect("PipeWire initialisation should succeed");
+    let mut model = Model::new(pw_state);
+
+    model.pw_state.run();
+
+    // And use this main thread as the UI event loop
+    while !model.quit {
+        if let Ok(messages) = model.app.tick(PollStrategy::Once) {
+            for msg in messages {
+                let mut msg = Some(msg);
+                while msg.is_some() {
+                    msg = model.update(msg);
+                }
+            }
+
+            // We have an update from PipeWire
+            if pw_update.swap(false, Ordering::Relaxed) {
+                model.update_object_list();
+                model.redraw = true;
+            }
+
+            if model.redraw {
+                model.view(&mut terminal);
+                model.redraw = false;
+            }
+        }
     }
 
-    let mut detail_lines = vec![];
+    model.pw_state.stop();
 
-    if let Some(entry) = entries.get(selected) {
-        let mut props = entry.1 .1.iter().collect::<Vec<_>>();
-
-        props.sort_by_key(|e| e.0);
-
-        for (key, value) in props.iter() {
-            detail_lines.push(Line::from(vec![
-                Span::from(key.to_string()).blue(),
-                Span::from(" ".to_string()).blue(),
-                Span::from(value.to_string()).gray(),
-            ]));
-        }
-    };
-
-    drop(clients);
-
-    drop(guard);
-
-    let objects = Paragraph::new(Text::from(object_lines)).block(
-        Block::default()
-            .title("Objects")
-            .borders(Borders::ALL)
-            .padding(block_padding),
-    );
-
-    let mut details = Paragraph::new(Text::from(detail_lines))
-        .block(
-            Block::default()
-                .title("Details")
-                .borders(Borders::ALL)
-                .padding(block_padding)
-                .style(if ui_state.pane == Pane::Details {
-                    selection_style
-                } else {
-                    Style::default()
-                }),
-        )
-        .wrap(Wrap::default());
-
-    let length = details.line_count(details.line_width() as u16) as u16;
-    details = details.scroll(if ui_state.pane == Pane::Details {
-        (ui_state.position as u16 % length, 0)
-    } else {
-        (0, 0)
-    });
-
-    frame.render_widget(objects, layout[1]);
-    frame.render_widget(details, layout[2]);
+    let _ = terminal.leave_alternate_screen();
+    let _ = terminal.disable_raw_mode();
 }

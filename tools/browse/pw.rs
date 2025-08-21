@@ -2,7 +2,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use pipewire::{
     self,
@@ -23,6 +30,7 @@ use pipewire::{
 
 pub struct State {
     pub main_loop: ThreadLoop,
+    ui_update: Arc<AtomicBool>,
     _context: Context,
     core: Core,
     registry: Registry,
@@ -33,7 +41,7 @@ unsafe impl Send for State {}
 unsafe impl Sync for State {}
 
 impl State {
-    pub fn new(name: &str) -> std::io::Result<Arc<State>> {
+    pub fn new(name: &str, update: Arc<AtomicBool>) -> std::io::Result<Arc<State>> {
         pipewire::init();
         let mut props = Properties::new();
         props.set(keys::APP_NAME, name.to_string());
@@ -44,6 +52,7 @@ impl State {
         let registry = core.registry()?;
 
         let state = Arc::new(State {
+            ui_update: update,
             main_loop,
             _context: context,
             core,
@@ -105,6 +114,8 @@ impl State {
             self.clients
                 .borrow_mut()
                 .insert(client.proxy().id(), (client, props.clone()));
+
+            self.ui_update.store(true, Ordering::Relaxed);
         }
     }
 
@@ -116,10 +127,12 @@ impl State {
             .find(|(_, e)| e.0.proxy().bound_id() == Some(info.id))
         {
             entry.1 = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
         }
     }
 
     fn client_removed(&self, client: proxy::client::Client) {
         let _ = self.clients.borrow_mut().remove(&client.proxy().id());
+        self.ui_update.store(true, Ordering::Relaxed);
     }
 }

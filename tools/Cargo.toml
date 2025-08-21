@@ -8,7 +8,7 @@ name = "pw-browse"
 path = "browse/main.rs"
 
 [dependencies]
-color-eyre = "0.6.5"
 crossterm = "0.29.0"
 pipewire = { package = "pipewire-native", path = "../pipewire" }
-ratatui = { version = "0.29.0", features = [ "unstable-rendered-line-info" ] }
+tui-realm-stdlib = { version = "3.0.0", features = ["crossterm"] }
+tuirealm = { version = "3.0.1", features = ["derive", "crossterm"] }
