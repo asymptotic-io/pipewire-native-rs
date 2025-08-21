@@ -9,7 +9,6 @@ use pipewire::{
     context::Context,
     core::Core,
     keys,
-    main_loop::MainLoop,
     properties::Properties,
     proxy::{
         self,
@@ -17,11 +16,13 @@ use pipewire::{
         registry::{Registry, RegistryEvents},
         HasProxy, ProxyEvents,
     },
-    some_closure, types, Id,
+    some_closure,
+    thread_loop::ThreadLoop,
+    types, Id,
 };
 
 pub struct State {
-    pub main_loop: MainLoop,
+    pub main_loop: ThreadLoop,
     _context: Context,
     core: Core,
     registry: Registry,
@@ -37,8 +38,8 @@ impl State {
         let mut props = Properties::new();
         props.set(keys::APP_NAME, name.to_string());
 
-        let main_loop = MainLoop::new(&props).expect("main loop creation should not fail");
-        let context = Context::new(&main_loop, props)?;
+        let main_loop = ThreadLoop::new(&props).expect("main loop creation should not fail");
+        let context = Context::new(main_loop.main_loop(), props)?;
         let core = context.connect(None)?;
         let registry = core.registry()?;
 
@@ -74,18 +75,15 @@ impl State {
         Ok(state)
     }
 
-    pub fn run(&self) -> std::thread::JoinHandle<()> {
-        let main_loop = self.main_loop.clone();
-
-        std::thread::spawn(move || {
-            main_loop.run();
-        })
+    pub fn run(&self) {
+        self.main_loop.run();
     }
 
-    pub fn quit(&self) {
+    pub fn stop(&self) {
         self.main_loop.quit();
         self.core.disconnect();
     }
+
     fn new_object(&self, state: &Arc<Self>, object: Box<dyn proxy::HasProxy>, props: &Properties) {
         if object.type_() == types::interface::CLIENT {
             let client = object.downcast::<proxy::client::Client>().unwrap();

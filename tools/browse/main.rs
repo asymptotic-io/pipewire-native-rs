@@ -59,7 +59,7 @@ fn main() -> Result<()> {
 
     let pw_state_ = pw_state.clone();
 
-    let handle = pw_state.run();
+    pw_state.run();
 
     let mut ui_state = UiState {
         pane: Pane::Types,
@@ -111,8 +111,7 @@ fn main() -> Result<()> {
         }
     }
 
-    pw_state.quit();
-    let _ = handle.join();
+    pw_state.stop();
 
     ratatui::restore();
 
@@ -160,10 +159,7 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
     let mut object_lines = vec![];
     let mut selected = 0;
 
-    pw_state
-        .main_loop
-        .lock()
-        .expect("main loop lock should not fail");
+    let guard = pw_state.main_loop.lock();
 
     let clients = pw_state.clients.borrow();
     let mut entries = clients.iter().collect::<Vec<_>>();
@@ -210,10 +206,7 @@ fn draw(frame: &mut Frame, ui_state: &UiState, pw_state: &Arc<pw::State>) {
 
     drop(clients);
 
-    pw_state
-        .main_loop
-        .unlock()
-        .expect("main loop unlock should not fail");
+    drop(guard);
 
     let objects = Paragraph::new(Text::from(object_lines)).block(
         Block::default()
