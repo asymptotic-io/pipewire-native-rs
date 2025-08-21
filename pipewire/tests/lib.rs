@@ -26,7 +26,7 @@ fn start_pipewire() -> TestContext {
 
     let pipewire = std::process::Command::new("pipewire").spawn().unwrap();
 
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    std::thread::sleep(std::time::Duration::from_millis(500));
 
     TestContext {
         runtime_dir,
@@ -77,8 +77,8 @@ fn test_lib() {
         .unwrap();
 
     let timeout = libc::timespec {
-        tv_sec: 2,
-        tv_nsec: 0,
+        tv_sec: 0,
+        tv_nsec: 200_000_000,
     };
     let res = main_loop.update_timer(&mut timer_src, &timeout, None, false);
     assert!(res.is_ok());
