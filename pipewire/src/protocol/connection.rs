@@ -210,15 +210,18 @@ impl Connection {
                 header.is_some()
             );
 
-            if self.inner.in_buf.borrow().len() < wanted_capacity {
+            let capacity = self.inner.in_buf.borrow().len();
+            if capacity < wanted_capacity {
                 // Not enough space for header or message, make some space, try to fill some data,
                 // and then retry
                 trace!(
-                    "expanding capacity from {} -> {}",
-                    self.inner.in_buf.borrow().len(),
-                    wanted_capacity
+                    "expanding capacity to {}",
+                    wanted_capacity.max(capacity * 2)
                 );
-                self.inner.in_buf.borrow_mut().resize(wanted_capacity, 0);
+                self.inner
+                    .in_buf
+                    .borrow_mut()
+                    .resize(wanted_capacity.max(2 * capacity), 0);
                 self.read()?;
             } else if let Some(header) = header {
                 // We had enough space, and got the header, so we should be good to have the caller
