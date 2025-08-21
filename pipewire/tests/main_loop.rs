@@ -4,6 +4,7 @@
 
 use pipewire_native::main_loop::{MainLoop, MainLoopEvents};
 use pipewire_native::properties::Properties;
+use pipewire_native::thread_loop::ThreadLoop;
 use pipewire_native_spa::flags;
 
 use serial_test::serial;
@@ -18,21 +19,27 @@ const EVENT_CB: &str = "EVENT";
 const TIMER_CB: &str = "TIMER";
 const IDLE_CB: &str = "IDLE";
 const LISTENER_CB: &str = "LISTENER";
-const LOOP_TIMEOUT: Duration = Duration::from_secs(5);
+const LOOP_TIMEOUT: Duration = Duration::from_secs(1);
 
 static CALLBACKS: LazyLock<Mutex<HashMap<String, bool>>> = LazyLock::new(|| HashMap::new().into());
 
-#[allow(dead_code)]
+#[derive(Eq, PartialEq)]
 enum MainLoopRun {
     Run,
     Iterate,
+    Thread,
 }
 
 fn test_mainloop(exec: MainLoopRun) {
     pipewire_native::init();
 
-    let v: Vec<(String, String)> = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
-    let ml = MainLoop::new(&Properties::new_vec(v)).unwrap();
+    let props = Properties::new_vec(vec![("loop.name".to_string(), "pw-main-loop".to_string())]);
+    let (thread_ml, ml) = if exec == MainLoopRun::Thread {
+        let thread_ml = ThreadLoop::new(&props).unwrap();
+        (Some(thread_ml.clone()), thread_ml.main_loop().clone())
+    } else {
+        (None, MainLoop::new(&props).unwrap())
+    };
 
     let fd = ml.get_fd();
     assert!(fd != 0);
@@ -91,7 +98,7 @@ fn test_mainloop(exec: MainLoopRun) {
         MainLoopRun::Run => {
             let ml_ = ml.clone();
             std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                std::thread::sleep(std::time::Duration::from_millis(200));
                 ml_.quit();
             });
             ml.run();
@@ -109,6 +116,12 @@ fn test_mainloop(exec: MainLoopRun) {
              */
             assert_eq!(methods_dispatched.ok().unwrap(), 4);
             ml.leave();
+        }
+        MainLoopRun::Thread => {
+            let thread_ml = thread_ml.unwrap();
+            thread_ml.run();
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            thread_ml.quit();
         }
     }
 
@@ -142,6 +155,12 @@ fn test_main_loop_iterate() {
 #[serial]
 fn test_main_loop_run() {
     test_mainloop(MainLoopRun::Run);
+}
+
+#[test]
+#[serial]
+fn test_thread_loop() {
+    test_mainloop(MainLoopRun::Thread);
 }
 
 fn listener_callback() {

@@ -33,8 +33,9 @@ pub(crate) mod topic {
     define_topic!(CONTEXT, "pw.context");
     define_topic!(CORE, "pw.core");
     define_topic!(MAIN_LOOP, "pw.main-loop");
-    define_topic!(SUPPORT, "pw.support");
     define_topic!(PROTOCOL, "pw.protocol");
+    define_topic!(SUPPORT, "pw.support");
+    define_topic!(THREAD_LOOP, "pw.thread-loop");
 
     pub fn init(levels: &[(String, spa::interface::log::LogLevel)]) {
         for topic in [
@@ -45,6 +46,7 @@ pub(crate) mod topic {
             &MAIN_LOOP,
             &PROTOCOL,
             &SUPPORT,
+            &THREAD_LOOP,
         ] {
             // TODO: implement glob matching
             let pattern = levels.iter().find(|v| {

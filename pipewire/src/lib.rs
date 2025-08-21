@@ -70,6 +70,8 @@ pub mod properties;
 /// Proxy objects that represent objects exposed by the PipeWire server. This is the primary means
 /// by which clients can interact with server-side objects.
 pub mod proxy;
+/// Provides an event loop that runs in a separate thread.
+pub mod thread_loop;
 /// List of well-known types and interfaces shared by PipeWire server and clients.
 pub mod types;
 

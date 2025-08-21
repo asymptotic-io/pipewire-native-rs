@@ -95,6 +95,37 @@ impl MainLoop {
         })
     }
 
+    pub(crate) fn set_running(&self) -> std::io::Result<()> {
+        if self
+            .inner
+            .running
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+        {
+            Err(std::io::Error::from(std::io::ErrorKind::AlreadyExists))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn run_once(&self) -> std::io::Result<i32> {
+        if !self.inner.running.load(Ordering::Relaxed) {
+            return Err(std::io::Error::from(std::io::ErrorKind::NotConnected));
+        }
+
+        self.inner.support.loop_control.enter();
+
+        let res = self
+            .inner
+            .support
+            .loop_control
+            .iterate(Some(std::time::Duration::MAX));
+
+        self.inner.support.loop_control.leave();
+
+        res
+    }
+
     /// Run the main loop. This takes over executation of the current thread until [MainLoop::quit]
     /// is invoked.
     pub fn run(&self) {

@@ -865,6 +865,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "libc",
+ "parking_lot",
  "paste",
  "pipewire-native-macros",
  "pipewire-native-spa",
