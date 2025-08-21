@@ -49,6 +49,27 @@ pub struct CHook {
     pub priv_: *mut c_void,
 }
 
+impl CHook {
+    pub fn new_uninit() -> Self {
+        CHook {
+            link: CList {
+                next: std::ptr::null_mut(),
+                prev: std::ptr::null_mut(),
+            },
+            cb: CCallbacks {
+                funcs: std::ptr::null_mut(),
+                data: std::ptr::null_mut(),
+            },
+            // In C, this function pointer can be NULL, but Rust doesn't allow that, so a couple of
+            // lints and hoops to jump through
+            #[allow(invalid_value)]
+            #[allow(clippy::uninit_assumed_init)]
+            removed: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            priv_: std::ptr::null_mut(),
+        }
+    }
+}
+
 #[repr(C)]
 pub struct CControlHooks {
     pub version: u32,

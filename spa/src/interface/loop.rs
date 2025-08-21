@@ -3,10 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use super::plugin::Interface;
-use crate::{
-    flags,
-    interface::ffi::{CControlHooks, CHook},
-};
+use crate::{flags, hook::HookId};
 use std::{any::Any, os::fd::RawFd, pin::Pin, time::Duration};
 
 #[derive(Copy, Clone, Debug)]
@@ -72,11 +69,17 @@ impl Interface for LoopImpl {
     }
 }
 
+pub struct LoopControlHooks {
+    pub before: Option<Box<dyn FnMut()>>,
+    pub after: Option<Box<dyn FnMut()>>,
+}
+
 pub struct LoopControlImpl {
     pub inner: Pin<Box<dyn Any>>,
 
     pub get_fd: fn(&LoopControlImpl) -> u32,
-    pub add_hook: fn(&LoopControlImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
+    pub add_hook: fn(&LoopControlImpl, hooks: LoopControlHooks) -> HookId,
+    pub remove_hook: fn(&LoopControlImpl, hook: HookId),
     pub enter: fn(&LoopControlImpl),
     pub leave: fn(&LoopControlImpl),
     pub iterate: fn(&LoopControlImpl, timeout: Option<Duration>) -> std::io::Result<i32>,
@@ -97,8 +100,12 @@ impl LoopControlImpl {
         (self.get_fd)(self)
     }
 
-    pub fn add_hook(&self, hook: &CHook, hooks: &CControlHooks, data: u64) {
-        (self.add_hook)(self, hook, hooks, data)
+    pub fn add_hook(&self, hooks: LoopControlHooks) -> HookId {
+        (self.add_hook)(self, hooks)
+    }
+
+    pub fn remove_hook(&self, hook: HookId) {
+        (self.remove_hook)(self, hook)
     }
 
     pub fn enter(&self) {
