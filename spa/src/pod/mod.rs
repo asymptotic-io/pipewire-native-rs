@@ -598,6 +598,22 @@ where
     }
 }
 
+// Same as &[T]
+impl<T> Pod for Vec<T>
+where
+    T: Primitive,
+{
+    type DecodesTo = Self;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        self.as_slice().encode(data)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Vec<T>, usize), Error> {
+        <&[T]>::decode(data)
+    }
+}
+
 // Choice is encoded as:
 //
 // +--------------+
