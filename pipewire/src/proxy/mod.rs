@@ -14,6 +14,8 @@ use crate::{types::ObjectType, Id};
 
 /// A proxy representing client objects.
 pub mod client;
+/// A proxy representing modules loaded in the server.
+pub mod module;
 /// A proxy representing the registry.
 pub mod registry;
 
@@ -200,6 +202,9 @@ macro_rules! hasproxy_method_call {
             } else if $object.type_() == $crate::types::interface::CLIENT {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
                 _proxy.$method($($($args),*)?)
+            } else if $object.type_() == $crate::types::interface::MODULE {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::module::Module>().unwrap();
+                _proxy.$method($($($args),*)?)
             } else if $object.type_() == $crate::types::interface::REGISTRY {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::registry::Registry>().unwrap();
                 _proxy.$method($($($args),*)?)
@@ -219,6 +224,9 @@ macro_rules! hasproxy_notify {
             spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
         } else if $object.type_() == $crate::types::interface::CLIENT {
             let _proxy = $object.downcast_proxy::<$crate::proxy::client::Client>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
+        } else if $object.type_() == $crate::types::interface::MODULE {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::module::Module>().unwrap();
             spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
         } else if $object.type_() == $crate::types::interface::REGISTRY {
             let _proxy = $object.downcast_proxy::<$crate::proxy::registry::Registry>().unwrap();

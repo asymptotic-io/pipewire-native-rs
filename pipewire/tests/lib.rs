@@ -9,7 +9,7 @@ use pipewire_native::{
     context::Context,
     main_loop::MainLoop,
     properties::Properties,
-    proxy::{client::Client, registry::RegistryEvents, HasProxy, ProxyEvents},
+    proxy::{client::Client, module::Module, registry::RegistryEvents, HasProxy, ProxyEvents},
     some_closure, types, Id,
 };
 
@@ -69,7 +69,7 @@ fn test_lib() {
 
     let mut timer_src = main_loop
         .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
-            assert_eq!(objects.map.borrow().len(), 1);
+            assert!(objects.map.borrow().len() > 1);
             core.disconnect();
             assert_eq!(objects.map.borrow().len(), 0);
             main_loop.quit();
@@ -102,6 +102,19 @@ fn test_lib() {
                     });
 
                     client
+                }
+                types::interface::MODULE => {
+                    let module = registry.bind(id, type_, version).unwrap();
+                    let proxy = module.downcast_proxy::<Module>().unwrap();
+
+                    proxy.add_listener(ProxyEvents {
+                        removed: some_closure!([proxy ^(objects)] {
+                            objects.map.borrow_mut().remove(&proxy.id());
+                        }),
+                        ..Default::default()
+                    });
+
+                    module
                 }
                 _ => return,
             };

@@ -11,6 +11,8 @@ pub mod interface {
     pub const CLIENT: &str = "PipeWire:Interface:Client";
     /// The Core interface
     pub const CORE: &str = "PipeWire:Interface:Core";
+    /// The Module interface
+    pub const MODULE: &str = "PipeWire:Interface:Module";
     /// The Registry interface
     pub const REGISTRY: &str = "PipeWire:Interface:Registry";
 }

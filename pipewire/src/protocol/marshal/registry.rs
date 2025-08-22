@@ -6,7 +6,7 @@ use pipewire_native_macros as macros;
 use pipewire_native_spa::{self as spa, pod::Pod};
 
 use crate::{
-    closure, default_topic, log,
+    closure, default_topic, hasproxy_method_call, log,
     permission::PermissionBits,
     properties::Properties,
     protocol::connection::Connection,
@@ -49,8 +49,9 @@ impl Methods {
                 let registry = proxy.object().unwrap();
                 let core = registry.core();
 
-                let new_object = match type_ {
-                    types::interface::CLIENT => proxy::client::Client::new(&core),
+                let new_object: Box<dyn HasProxy> = match type_ {
+                    types::interface::CLIENT => Box::new(proxy::client::Client::new(&core)),
+                    types::interface::MODULE => Box::new(proxy::module::Module::new(&core)),
                     _ => {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::InvalidData,
@@ -65,11 +66,11 @@ impl Methods {
                         id: id as i32,
                         type_: type_.to_string(),
                         version: version as i32,
-                        new_id: new_object.proxy().id() as i32,
+                        new_id: hasproxy_method_call!(new_object, id) as i32,
                     }),
                 )?;
 
-                Ok(Box::new(new_object))
+                Ok(new_object)
             }),
             destroy: closure!([connection] proxy, id, {
                 connection.push(proxy.id(), Methods::Destroy(Destroy { id: id as i32 }))
