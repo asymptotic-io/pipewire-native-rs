@@ -54,7 +54,7 @@ impl Methods {
                     types::interface::MODULE => Box::new(proxy::module::Module::new(&core)),
                     _ => {
                         return Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
+                            std::io::ErrorKind::Unsupported,
                             format!("Unsupported proxy type {type_}"),
                         ))
                     }
