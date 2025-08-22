@@ -5,8 +5,6 @@
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
-use crate::param::ParamType;
-
 use super::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
 };
@@ -190,9 +188,9 @@ impl<'a> Builder<'a> {
     // |              |
     // +--------------+
     //
-    pub fn push_object<T, F>(mut self, type_: ObjectType, param_type: T, build_object: F) -> Self
+    pub fn push_object<I, F>(mut self, type_: ObjectType, id: I, build_object: F) -> Self
     where
-        T: Into<u32> + TryFrom<u32>,
+        I: Into<u32>,
         F: FnOnce(ObjectBuilder) -> ObjectBuilder,
     {
         if self.error.is_some() {
@@ -221,7 +219,7 @@ impl<'a> Builder<'a> {
         ret.data[old_pos..old_pos + 4].copy_from_slice(&(size as u32).to_ne_bytes());
         ret.data[old_pos + 4..old_pos + 8].copy_from_slice(&(Type::Object as u32).to_ne_bytes());
         ret.data[old_pos + 8..old_pos + 12].copy_from_slice(&(type_ as u32).to_ne_bytes());
-        ret.data[old_pos + 12..old_pos + 16].copy_from_slice(&param_type.into().to_ne_bytes());
+        ret.data[old_pos + 12..old_pos + 16].copy_from_slice(&id.into().to_ne_bytes());
 
         ret
     }
@@ -320,8 +318,9 @@ impl<'a> StructBuilder<'a> {
         StructBuilder::new(self.builder.push_struct(build_struct))
     }
 
-    pub fn push_object<F>(self, type_: ObjectType, id: ParamType, build_object: F) -> Self
+    pub fn push_object<T, F>(self, type_: ObjectType, id: T, build_object: F) -> Self
     where
+        T: Into<u32>,
         F: FnOnce(ObjectBuilder) -> ObjectBuilder,
     {
         StructBuilder::new(self.builder.push_object(type_, id, build_object))

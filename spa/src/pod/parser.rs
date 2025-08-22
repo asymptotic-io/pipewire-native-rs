@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use crate::param::{ParamObject, ParamType};
+use crate::param::ParamObject;
 
 use super::types::{Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type};
 use super::{Error, Pod, Primitive, RawPod};
@@ -126,12 +126,13 @@ impl<'a> Parser<'a> {
         Ok((ret, size + 8))
     }
 
-    pub fn pop_object<K, T>(
+    pub fn pop_object<K, I, T>(
         &'a mut self,
-        parse_object: impl FnOnce(&mut ObjectParser<'_>, ParamType) -> Result<T, Error>,
+        parse_object: impl FnOnce(&mut ObjectParser<'_>, I) -> Result<T, Error>,
     ) -> Result<(T, usize), Error>
     where
         K: ParamObject,
+        I: TryFrom<u32>,
     {
         if self.available() < 16 {
             return Err(Error::Invalid);
@@ -155,7 +156,7 @@ impl<'a> Parser<'a> {
             Err(_) => return Err(Error::Invalid),
         };
 
-        let param_type = match ParamType::try_from(u32::from_ne_bytes(
+        let id = match I::try_from(u32::from_ne_bytes(
             self.data[self.pos + 12..self.pos + 16].try_into().unwrap(),
         )) {
             Ok(id) => id,
@@ -170,7 +171,7 @@ impl<'a> Parser<'a> {
 
         let ret = {
             let mut object_parser = ObjectParser::new(&self.data[self.pos..self.pos + size - 8]);
-            parse_object(&mut object_parser, param_type)?
+            parse_object(&mut object_parser, id)?
         };
 
         // The caller may or may not iterate over all properties, don't depend on that
