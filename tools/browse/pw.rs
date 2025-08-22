@@ -4,7 +4,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -34,7 +34,7 @@ pub struct State {
     _context: Context,
     core: Core,
     registry: Registry,
-    pub clients: RefCell<HashMap<Id, (proxy::client::Client, Properties)>>,
+    pub clients: RefCell<BTreeMap<Id, (proxy::client::Client, Properties)>>,
 }
 
 unsafe impl Send for State {}
@@ -57,7 +57,7 @@ impl State {
             _context: context,
             core,
             registry,
-            clients: RefCell::new(HashMap::new()),
+            clients: RefCell::new(BTreeMap::new()),
         });
 
         let pw_state = state.clone();

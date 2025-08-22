@@ -110,15 +110,12 @@ impl Model {
                 let guard = self.pw_state.main_loop.lock();
 
                 let clients = self.pw_state.clients.borrow();
-                let mut entries = clients.iter().collect::<Vec<_>>();
-                entries.sort_by_key(|e| e.0);
+                let n = clients.len();
 
-                let n = entries.len();
-
-                for (idx, (id, (client, props))) in entries.iter().enumerate() {
+                for (idx, (id, (client, props))) in clients.iter().enumerate() {
                     table.add_col(TextSpan::from(format!(
                         "#{}: {}",
-                        client.proxy().bound_id().unwrap_or(**id),
+                        client.proxy().bound_id().unwrap_or(*id),
                         props.get(keys::APP_NAME).unwrap_or("unknown"),
                     )));
 
@@ -150,8 +147,7 @@ impl Model {
                 let _guard = self.pw_state.main_loop.lock();
 
                 let clients = self.pw_state.clients.borrow();
-                let mut entries = clients.iter().collect::<Vec<_>>();
-                entries.sort_by_key(|e| e.0);
+                let entries = clients.iter().collect::<Vec<_>>();
 
                 if let Some(entry) = entries.get(self.object_selection) {
                     let mut table = TableBuilder::default();
