@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use bitflags::bitflags;
 use pipewire_native_macros::EnumU32;
 
 use crate::pod::types::ObjectType;
@@ -31,6 +32,17 @@ pub enum ParamType {
     Latency,
     ProcessLatency,
     Tag,
+}
+
+bitflags! {
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct ParamInfoFlags : u32 {
+        const SERIAL    = 1 << 0;
+        const READ      = 1 << 1;
+        const WRITE     = 1 << 2;
+        const READWRITE = (1 << 1) | (1 << 2);
+    }
 }
 
 pub trait ParamObject {
