@@ -103,12 +103,11 @@ impl Model {
     }
 
     fn update_object_list(&mut self) {
+        let mut table = TableBuilder::default();
+        let guard = self.pw_state.main_loop.lock();
+
         match self.type_selection {
             TypeSelection::Clients => {
-                let mut table = TableBuilder::default();
-
-                let guard = self.pw_state.main_loop.lock();
-
                 let clients = self.pw_state.clients.borrow();
                 let n = clients.len();
 
@@ -132,17 +131,41 @@ impl Model {
                         AttrValue::Table(table.build()),
                     )
                     .unwrap();
+            }
+            TypeSelection::Modules => {
+                let modules = self.pw_state.modules.borrow();
+                let n = modules.len();
 
-                drop(clients);
-                drop(guard);
+                for (idx, (id, (client, props))) in modules.iter().enumerate() {
+                    table.add_col(TextSpan::from(format!(
+                        "#{}: {}",
+                        client.proxy().bound_id().unwrap_or(*id),
+                        props.get("module.name").unwrap_or("unknown"),
+                    )));
 
-                self.update_object_details();
+                    // Only add rows between columns
+                    if idx < n - 1 {
+                        table.add_row();
+                    }
+                }
+
+                self.app
+                    .attr(
+                        &ComponentId::Objects,
+                        Attribute::Content,
+                        AttrValue::Table(table.build()),
+                    )
+                    .unwrap();
             }
         }
+
+        drop(guard);
+
+        self.update_object_details();
     }
 
     fn update_object_details(&mut self) {
-        match self.type_selection {
+        let props = match self.type_selection {
             TypeSelection::Clients => {
                 let _guard = self.pw_state.main_loop.lock();
 
@@ -150,34 +173,59 @@ impl Model {
                 let entries = clients.iter().collect::<Vec<_>>();
 
                 if let Some(entry) = entries.get(self.object_selection) {
-                    let mut table = TableBuilder::default();
-                    let mut props = entry.1 .1.iter().collect::<Vec<_>>();
-
+                    let mut props = entry.1 .1.iter().collect::<Vec<(&str, &str)>>();
                     props.sort_by_key(|e| e.0);
 
-                    let n = props.len();
-
-                    for (idx, (key, value)) in props.iter().enumerate() {
-                        table.add_col(TextSpan::from(*key).fg(Color::Cyan));
-                        table.add_col(TextSpan::from(" "));
-                        table.add_col(TextSpan::from(*value));
-
-                        // Only add rows between columns
-                        if idx < n - 1 {
-                            table.add_row();
-                        }
-                    }
-
-                    self.app
-                        .attr(
-                            &ComponentId::Details,
-                            Attribute::Content,
-                            AttrValue::Table(table.build()),
-                        )
-                        .unwrap();
+                    props
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect()
+                } else {
+                    vec![]
                 }
             }
+            TypeSelection::Modules => {
+                let _guard = self.pw_state.main_loop.lock();
+
+                let modules = self.pw_state.modules.borrow();
+                let entries = modules.iter().collect::<Vec<_>>();
+
+                if let Some(entry) = entries.get(self.object_selection) {
+                    let mut props = entry.1 .1.iter().collect::<Vec<_>>();
+                    props.sort_by_key(|e| e.0);
+
+                    props
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
+        };
+
+        let n = props.len();
+
+        let mut table = TableBuilder::default();
+
+        for (idx, (key, value)) in props.iter().enumerate() {
+            table.add_col(TextSpan::from(key).fg(Color::Cyan));
+            table.add_col(TextSpan::from(" "));
+            table.add_col(TextSpan::from(value));
+
+            // Only add rows between columns
+            if idx < n - 1 {
+                table.add_row();
+            }
         }
+
+        self.app
+            .attr(
+                &ComponentId::Details,
+                Attribute::Content,
+                AttrValue::Table(table.build()),
+            )
+            .unwrap();
     }
 }
 
@@ -193,7 +241,6 @@ impl Update<Msg> for Model {
             }
             Msg::TypeChanged(type_selection) => {
                 self.type_selection = type_selection;
-                self.object_selection = 0;
                 self.update_object_list();
                 None
             }
@@ -214,6 +261,7 @@ impl Update<Msg> for Model {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 enum TypeSelection {
     Clients,
+    Modules,
 }
 
 impl TryFrom<usize> for TypeSelection {
@@ -221,6 +269,7 @@ impl TryFrom<usize> for TypeSelection {
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(TypeSelection::Clients),
+            1 => Ok(TypeSelection::Modules),
             _ => Err(()),
         }
     }
@@ -244,6 +293,8 @@ impl Default for TypesList {
                 .rows(
                     TableBuilder::default()
                         .add_col(TextSpan::from("Clients"))
+                        .add_row()
+                        .add_col(TextSpan::from("Modules"))
                         .build(),
                 ),
         }

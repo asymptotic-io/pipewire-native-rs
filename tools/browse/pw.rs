@@ -20,6 +20,7 @@ use pipewire::{
     proxy::{
         self,
         client::{ClientEvents, ClientInfo},
+        module::{ModuleEvents, ModuleInfo},
         registry::{Registry, RegistryEvents},
         HasProxy, ProxyEvents,
     },
@@ -35,6 +36,7 @@ pub struct State {
     core: Core,
     registry: Registry,
     pub clients: RefCell<BTreeMap<Id, (proxy::client::Client, Properties)>>,
+    pub modules: RefCell<BTreeMap<Id, (proxy::module::Module, Properties)>>,
 }
 
 unsafe impl Send for State {}
@@ -58,6 +60,7 @@ impl State {
             core,
             registry,
             clients: RefCell::new(BTreeMap::new()),
+            modules: RefCell::new(BTreeMap::new()),
         });
 
         let pw_state = state.clone();
@@ -65,17 +68,17 @@ impl State {
         let registry = &pw_state.registry;
         registry.add_listener(RegistryEvents {
             global: some_closure!([registry ^(state)] id, _perms, type_, version, props, {
-                if type_ != types::interface::CLIENT {
-                    return;
-                }
-
                 let object = registry.bind(id, type_, version);
 
                 match object {
                     Ok(object) => {
                         state.new_object(state, object, props);
                     }
-                    Err(e) => todo!("Send error {e} to UI"),
+                    Err(e) => {
+                        if e.kind() != std::io::ErrorKind::Unsupported {
+                            todo!("Send error {e} to UI");
+                        }
+                    }
                 }
             }),
             ..Default::default()
@@ -94,29 +97,52 @@ impl State {
     }
 
     fn new_object(&self, state: &Arc<Self>, object: Box<dyn proxy::HasProxy>, props: &Properties) {
-        if object.type_() == types::interface::CLIENT {
-            let client = object.downcast::<proxy::client::Client>().unwrap();
+        match object.type_() {
+            types::interface::CLIENT => {
+                let client = object.downcast::<proxy::client::Client>().unwrap();
 
-            client.add_listener(ClientEvents {
-                info: some_closure!([^(state)] info, {
-                    state.client_info(info);
-                }),
-                ..Default::default()
-            });
+                client.add_listener(ClientEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.client_info(info);
+                    }),
+                    ..Default::default()
+                });
 
-            client.proxy().add_listener(ProxyEvents {
-                removed: some_closure!([client ^(state)] {
-                    state.client_removed(client);
-                }),
-                ..Default::default()
-            });
+                client.proxy().add_listener(ProxyEvents {
+                    removed: some_closure!([client ^(state)] {
+                        state.client_removed(client);
+                    }),
+                    ..Default::default()
+                });
 
-            self.clients
-                .borrow_mut()
-                .insert(client.proxy().id(), (client, props.clone()));
+                self.clients
+                    .borrow_mut()
+                    .insert(client.proxy().id(), (client, props.clone()));
+            }
+            types::interface::MODULE => {
+                let module = object.downcast::<proxy::module::Module>().unwrap();
 
-            self.ui_update.store(true, Ordering::Relaxed);
+                module.add_listener(ModuleEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.module_info(info);
+                    }),
+                });
+
+                module.proxy().add_listener(ProxyEvents {
+                    removed: some_closure!([module ^(state)] {
+                        state.module_removed(module);
+                    }),
+                    ..Default::default()
+                });
+
+                self.modules
+                    .borrow_mut()
+                    .insert(module.proxy().id(), (module, props.clone()));
+            }
+            _ => {}
         }
+
+        self.ui_update.store(true, Ordering::Relaxed);
     }
 
     fn client_info(&self, info: &ClientInfo) {
@@ -133,6 +159,23 @@ impl State {
 
     fn client_removed(&self, client: proxy::client::Client) {
         let _ = self.clients.borrow_mut().remove(&client.proxy().id());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
+    fn module_info(&self, info: &ModuleInfo) {
+        if let Some((_, entry)) = self
+            .modules
+            .borrow_mut()
+            .iter_mut()
+            .find(|(_, e)| e.0.proxy().bound_id() == Some(info.id))
+        {
+            entry.1 = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn module_removed(&self, module: proxy::module::Module) {
+        let _ = self.modules.borrow_mut().remove(&module.proxy().id());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 }
