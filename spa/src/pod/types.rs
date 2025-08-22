@@ -89,6 +89,7 @@ pub enum Choice<T> {
 }
 
 bitflags! {
+    #[repr(C)]
     #[derive(Debug, Eq, PartialEq)]
     pub struct PropertyFlags: u32 {
         const READ_ONLY = 0x0000_0001;
