@@ -829,3 +829,26 @@ where
         Ok((Property { key, flags, value }, 8 + size))
     }
 }
+
+impl<T: Pod> Pod for Option<T> {
+    type DecodesTo = Option<T::DecodesTo>;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        match self {
+            Some(v) => v.encode(data),
+            None => ().encode(data),
+        }
+    }
+
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+        let res = T::decode(data);
+
+        match res {
+            Ok((v, size)) => Ok((Some(v), size)),
+            Err(_) => {
+                let (_, size) = <()>::decode(data)?;
+                Ok((None, size))
+            }
+        }
+    }
+}
