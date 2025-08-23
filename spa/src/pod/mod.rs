@@ -49,6 +49,32 @@ pub struct RawPod<'a> {
     data: &'a [u8],
 }
 
+impl<'a> std::fmt::Debug for RawPod<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RawPod {{ type: {:?}, size: {} }}",
+            self.type_, self.size
+        )
+    }
+}
+
+pub struct RawPodOwned {
+    size: usize,
+    type_: Type,
+    data: Vec<u8>,
+}
+
+impl std::fmt::Debug for RawPodOwned {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RawPodOwned {{ type: {:?}, size: {} }}",
+            self.type_, self.size
+        )
+    }
+}
+
 impl<'a> RawPod<'a> {
     pub fn wrap(data: &'a [u8]) -> Result<RawPod<'a>, Error> {
         if data.len() < 8 {
@@ -80,11 +106,104 @@ impl<'a> RawPod<'a> {
         self.type_
     }
 
+    pub fn data(&self) -> &[u8] {
+        self.data
+    }
+
     pub fn decode<T>(&self) -> Result<<T as Pod>::DecodesTo, Error>
     where
         T: Pod,
     {
         T::decode(self.data).map(|v| v.0)
+    }
+}
+
+impl RawPodOwned {
+    pub fn wrap(data: Vec<u8>) -> Result<RawPodOwned, Error> {
+        if data.len() < 8 {
+            return Err(Error::NoSpace);
+        }
+
+        let internal_size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
+        let size = 8 + internal_size + pad_8(internal_size);
+
+        if size > data.len() {
+            return Err(Error::NoSpace);
+        }
+
+        let type_ = Type::try_from(u32::from_ne_bytes(data[4..8].try_into().unwrap()))
+            .map_err(|_| Error::Invalid)?;
+
+        Ok(RawPodOwned { size, type_, data })
+    }
+
+    pub fn total_size(&self) -> usize {
+        self.size
+    }
+
+    pub fn type_(&self) -> Type {
+        self.type_
+    }
+
+    pub fn data(&self) -> &[u8] {
+        self.data.as_slice()
+    }
+
+    pub fn decode<T>(&self) -> Result<<T as Pod>::DecodesTo, Error>
+    where
+        T: Pod,
+    {
+        T::decode(&self.data).map(|v| v.0)
+    }
+
+    pub fn as_ref(&self) -> RawPod<'_> {
+        RawPod {
+            type_: self.type_(),
+            size: self.size,
+            data: self.data.as_slice(),
+        }
+    }
+}
+
+impl<'a> Pod for RawPod<'a> {
+    type DecodesTo = RawPodOwned;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        if data.len() < self.size {
+            return Err(Error::NoSpace);
+        }
+
+        data[0..self.size].copy_from_slice(self.data);
+
+        Ok(self.size)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+        let res = RawPodOwned::wrap(Vec::from(data))?;
+        let size = res.size;
+
+        Ok((res, size))
+    }
+}
+
+impl Pod for RawPodOwned {
+    type DecodesTo = RawPodOwned;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        if data.len() < self.size {
+            return Err(Error::NoSpace);
+        }
+
+        data[0..self.size].copy_from_slice(&self.data);
+
+        Ok(self.size)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+        let res = RawPodOwned::wrap(Vec::from(data))?;
+        let size = res.size;
+
+        Ok((res, size))
     }
 }
 
