@@ -9,7 +9,9 @@ use crate::pod::types::ObjectType;
 
 pub mod buffers;
 pub mod format;
+pub mod profile;
 pub mod props;
+pub mod route;
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
