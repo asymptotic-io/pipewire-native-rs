@@ -97,6 +97,7 @@ pub type Id = u32;
 
 #[allow(unused)]
 pub(crate) const INVALID_ID: Id = Id::MAX;
+pub(crate) const ANY_ID: Id = 0xFFFF_FFFF;
 
 pub(crate) static GLOBAL_SUPPORT: OnceLock<Support> = OnceLock::new();
 
