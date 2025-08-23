@@ -51,6 +51,7 @@ impl Methods {
 
                 let new_object: Box<dyn HasProxy> = match type_ {
                     types::interface::CLIENT => Box::new(proxy::client::Client::new(&core)),
+                    types::interface::DEVICE => Box::new(proxy::device::Device::new(&core)),
                     types::interface::MODULE => Box::new(proxy::module::Module::new(&core)),
                     _ => {
                         return Err(std::io::Error::new(

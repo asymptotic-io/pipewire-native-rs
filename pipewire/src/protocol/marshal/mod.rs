@@ -4,6 +4,7 @@
 
 pub(crate) mod client;
 pub(crate) mod core;
+pub(crate) mod device;
 pub(crate) mod message;
 pub(crate) mod module;
 pub(crate) mod registry;
