@@ -44,8 +44,8 @@ pub fn derive_pod_struct(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        impl #generics pipewire_native_spa::pod::Pod for #ident {
-            type DecodesTo = #ident;
+        impl #generics pipewire_native_spa::pod::Pod for #ident #generics {
+            type DecodesTo = #ident #generics;
 
             fn encode(&self, data: &mut [u8]) -> Result<usize, pipewire_native_spa::pod::Error> {
                 let builder = pipewire_native_spa::pod::builder::Builder::new(data);
