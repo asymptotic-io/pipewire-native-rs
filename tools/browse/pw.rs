@@ -20,6 +20,7 @@ use pipewire::{
     proxy::{
         self,
         client::{ClientEvents, ClientInfo},
+        device::{DeviceEvents, DeviceInfo},
         module::{ModuleEvents, ModuleInfo},
         registry::{Registry, RegistryEvents},
         HasProxy, ProxyEvents,
@@ -36,6 +37,7 @@ pub struct State {
     core: Core,
     registry: Registry,
     pub clients: RefCell<BTreeMap<Id, (proxy::client::Client, Properties)>>,
+    pub devices: RefCell<BTreeMap<Id, (proxy::device::Device, Properties)>>,
     pub modules: RefCell<BTreeMap<Id, (proxy::module::Module, Properties)>>,
 }
 
@@ -60,6 +62,7 @@ impl State {
             core,
             registry,
             clients: RefCell::new(BTreeMap::new()),
+            devices: RefCell::new(BTreeMap::new()),
             modules: RefCell::new(BTreeMap::new()),
         });
 
@@ -119,6 +122,27 @@ impl State {
                     .borrow_mut()
                     .insert(client.proxy().id(), (client, props.clone()));
             }
+            types::interface::DEVICE => {
+                let device = object.downcast::<proxy::device::Device>().unwrap();
+
+                device.add_listener(DeviceEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.device_info(info);
+                    }),
+                    ..Default::default()
+                });
+
+                device.proxy().add_listener(ProxyEvents {
+                    removed: some_closure!([device ^(state)] {
+                        state.device_removed(device);
+                    }),
+                    ..Default::default()
+                });
+
+                self.devices
+                    .borrow_mut()
+                    .insert(device.proxy().id(), (device, props.clone()));
+            }
             types::interface::MODULE => {
                 let module = object.downcast::<proxy::module::Module>().unwrap();
 
@@ -159,6 +183,23 @@ impl State {
 
     fn client_removed(&self, client: proxy::client::Client) {
         let _ = self.clients.borrow_mut().remove(&client.proxy().id());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
+    fn device_info(&self, info: &DeviceInfo) {
+        if let Some((_, entry)) = self
+            .devices
+            .borrow_mut()
+            .iter_mut()
+            .find(|(_, e)| e.0.proxy().bound_id() == Some(info.id))
+        {
+            entry.1 = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn device_removed(&self, device: proxy::device::Device) {
+        let _ = self.devices.borrow_mut().remove(&device.proxy().id());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 

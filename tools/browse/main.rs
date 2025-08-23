@@ -132,6 +132,32 @@ impl Model {
                     )
                     .unwrap();
             }
+            TypeSelection::Devices => {
+                let devices = self.pw_state.devices.borrow();
+                let n = devices.len();
+
+                for (idx, (id, (client, props))) in devices.iter().enumerate() {
+                    table.add_col(TextSpan::from(format!(
+                        "#{}: {} ({})",
+                        client.proxy().bound_id().unwrap_or(*id),
+                        props.get("device.name").unwrap_or("unknown"),
+                        props.get("device.nick").unwrap_or("unknown"),
+                    )));
+
+                    // Only add rows between columns
+                    if idx < n - 1 {
+                        table.add_row();
+                    }
+                }
+
+                self.app
+                    .attr(
+                        &ComponentId::Objects,
+                        Attribute::Content,
+                        AttrValue::Table(table.build()),
+                    )
+                    .unwrap();
+            }
             TypeSelection::Modules => {
                 let modules = self.pw_state.modules.borrow();
                 let n = modules.len();
@@ -171,6 +197,24 @@ impl Model {
 
                 let clients = self.pw_state.clients.borrow();
                 let entries = clients.iter().collect::<Vec<_>>();
+
+                if let Some(entry) = entries.get(self.object_selection) {
+                    let mut props = entry.1 .1.iter().collect::<Vec<(&str, &str)>>();
+                    props.sort_by_key(|e| e.0);
+
+                    props
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
+            TypeSelection::Devices => {
+                let _guard = self.pw_state.main_loop.lock();
+
+                let devices = self.pw_state.devices.borrow();
+                let entries = devices.iter().collect::<Vec<_>>();
 
                 if let Some(entry) = entries.get(self.object_selection) {
                     let mut props = entry.1 .1.iter().collect::<Vec<(&str, &str)>>();
@@ -261,6 +305,7 @@ impl Update<Msg> for Model {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 enum TypeSelection {
     Clients,
+    Devices,
     Modules,
 }
 
@@ -269,7 +314,8 @@ impl TryFrom<usize> for TypeSelection {
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(TypeSelection::Clients),
-            1 => Ok(TypeSelection::Modules),
+            1 => Ok(TypeSelection::Devices),
+            2 => Ok(TypeSelection::Modules),
             _ => Err(()),
         }
     }
@@ -293,6 +339,8 @@ impl Default for TypesList {
                 .rows(
                     TableBuilder::default()
                         .add_col(TextSpan::from("Clients"))
+                        .add_row()
+                        .add_col(TextSpan::from("Devices"))
                         .add_row()
                         .add_col(TextSpan::from("Modules"))
                         .build(),
