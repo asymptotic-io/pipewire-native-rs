@@ -113,15 +113,15 @@ impl Methods {
                     })
                 )
             }),
-            set_param: closure!([connection] proxy, param_type, flags, param_builder, {
+            set_param: closure!([connection] proxy, param_type, object_type, flags, param_builder, {
                 let mut param_data = [0u8; 16384];
 
                 let builder = Builder::new(param_data.as_mut_slice());
                 builder
                     .push_object(
-                        param_builder.object_type,
-                        param_builder.param_type,
-                        param_builder.builder
+                        object_type,
+                        param_type,
+                        param_builder
                     )
                     .build()
                     .map_err(|e| {

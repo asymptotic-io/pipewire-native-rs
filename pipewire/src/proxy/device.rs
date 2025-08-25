@@ -43,8 +43,15 @@ pub(crate) struct DeviceMethods<T: HasProxy + Refcounted> {
             Option<ParamBuilder>,
         ) -> std::io::Result<()>,
     >,
-    pub(crate) set_param:
-        Box<dyn FnMut(&Proxy<T>, spa::param::ParamType, u32, ParamBuilder) -> std::io::Result<()>>,
+    pub(crate) set_param: Box<
+        dyn FnMut(
+            &Proxy<T>,
+            spa::param::ParamType,
+            spa::pod::types::ObjectType,
+            u32,
+            Box<dyn FnOnce(spa::pod::builder::ObjectBuilder) -> spa::pod::builder::ObjectBuilder>,
+        ) -> std::io::Result<()>,
+    >,
 }
 
 bitflags! {
@@ -142,11 +149,14 @@ impl Device {
     pub fn set_param(
         &self,
         param_type: spa::param::ParamType,
+        object_type: spa::pod::types::ObjectType,
         flags: u32,
-        param: ParamBuilder,
+        builder: Box<
+            dyn FnOnce(spa::pod::builder::ObjectBuilder) -> spa::pod::builder::ObjectBuilder,
+        >,
     ) -> std::io::Result<()> {
         let proxy = self.proxy();
-        proxy_object_invoke!(proxy, set_param, param_type, flags, param)
+        proxy_object_invoke!(proxy, set_param, param_type, object_type, flags, builder)
     }
 
     pub(crate) fn methods(&self) -> Rc<RefCell<DeviceMethods<Device>>> {
