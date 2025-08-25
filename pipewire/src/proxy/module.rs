@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use bitflags::bitflags;
 use pipewire_native_spa as spa;
@@ -19,7 +18,7 @@ use crate::{
 refcounted! {
     /// Proxy that represents a module that is loaded on the server.
     pub struct Module {
-        proxy: RefCell<Option<Proxy<Module>>>,
+        proxy: RwLock<Option<Proxy<Module>>>,
         hooks: Arc<Mutex<spa::hook::HookList<ModuleEvents>>>,
     }
 }
@@ -70,7 +69,8 @@ impl HasProxy for Module {
     fn proxy(&self) -> Proxy<Self> {
         self.inner
             .proxy
-            .borrow()
+            .read()
+            .unwrap()
             .as_ref()
             .expect("Module proxy should be initialised on creation")
             .clone()
@@ -84,7 +84,11 @@ impl Module {
         };
 
         let id = core.next_proxy_id();
-        this.inner.proxy.borrow_mut().replace(Proxy::new(id, &this));
+        this.inner
+            .proxy
+            .write()
+            .unwrap()
+            .replace(Proxy::new(id, &this));
         core.add_proxy(&this, id);
 
         this
@@ -103,7 +107,7 @@ impl Module {
 impl InnerModule {
     fn new() -> Self {
         Self {
-            proxy: RefCell::new(None),
+            proxy: RwLock::new(None),
             hooks: spa::hook::HookList::new(),
         }
     }

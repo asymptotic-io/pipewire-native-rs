@@ -3,12 +3,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    cell::RefCell,
     os::{
         fd::{AsRawFd, RawFd},
         unix::net::UnixStream,
     },
     path::PathBuf,
+    sync::RwLock,
 };
 
 use pipewire_native_spa as spa;
@@ -37,14 +37,14 @@ fn get_system_dir() -> String {
 
 refcounted! {
     pub(crate) struct Client {
-        core: RefCell<Option<WeakCore>>,
-        stream: RefCell<Option<UnixStream>>,
+        core: RwLock<Option<WeakCore>>,
+        stream: RwLock<Option<UnixStream>>,
         connection: Connection,
-        connected: RefCell<bool>,
-        need_flush: RefCell<bool>,
-        last_in_seq: RefCell<u32>,
-        source: RefCell<Option<main_loop::Source>>,
-        hooks: RefCell<Option<spa::hook::HookId>>,
+        connected: RwLock<bool>,
+        need_flush: RwLock<bool>,
+        last_in_seq: RwLock<u32>,
+        source: RwLock<Option<main_loop::Source>>,
+        hooks: RwLock<Option<spa::hook::HookId>>,
     }
 }
 
@@ -66,7 +66,7 @@ impl Client {
             start: None,
         });
 
-        this.inner.hooks.borrow_mut().replace(listener);
+        this.inner.hooks.write().unwrap().replace(listener);
 
         this
     }
@@ -78,7 +78,8 @@ impl Client {
     pub(crate) fn core(&self) -> Core {
         self.inner
             .core
-            .borrow()
+            .read()
+            .unwrap()
             .clone()
             .and_then(|w| w.upgrade())
             .expect("Client shoud have core initialised on creation")
@@ -98,14 +99,14 @@ impl Client {
     }
 
     pub(crate) fn disconnect(&self) {
-        let _ = self.inner.source.take();
-        let _ = self.inner.stream.take();
+        let _ = self.inner.source.write().unwrap().take();
+        let _ = self.inner.stream.write().unwrap().take();
 
         self.inner.connection.disconnect();
-        self.inner.connected.replace(false);
-        self.inner.need_flush.replace(false);
+        *self.inner.connected.write().unwrap() = false;
+        *self.inner.need_flush.write().unwrap() = false;
 
-        self.inner.last_in_seq.replace(0);
+        *self.inner.last_in_seq.write().unwrap() = 0;
     }
 
     pub(crate) fn set_stream(&self, stream: UnixStream, close: bool) -> std::io::Result<()> {
@@ -116,8 +117,8 @@ impl Client {
         self.inner
             .connection
             .set_stream(stream.try_clone().expect("unix stream should be cloneable"));
-        self.inner.stream.replace(Some(stream));
-        self.inner.connected.replace(true);
+        self.inner.stream.write().unwrap().replace(stream);
+        *self.inner.connected.write().unwrap() = false;
 
         let main_loop = self.core().context().main_loop();
 
@@ -130,7 +131,7 @@ impl Client {
             }),
         );
 
-        self.inner.source.replace(source);
+        *self.inner.source.write().unwrap() = source;
 
         Ok(())
     }
@@ -138,13 +139,13 @@ impl Client {
     fn on_destroy(&self) {
         self.inner
             .connection
-            .remove_listener(self.inner.hooks.borrow().unwrap());
+            .remove_listener(self.inner.hooks.read().unwrap().unwrap());
     }
 
     fn on_need_flush(&self) {
-        self.inner.need_flush.replace(true);
+        *self.inner.need_flush.write().unwrap() = true;
 
-        if let Some(source) = self.inner.source.borrow_mut().as_mut() {
+        if let Some(source) = self.inner.source.write().unwrap().as_mut() {
             let main_loop = self.core().context().main_loop();
             let _ = main_loop.update_io(source, source.mask() | spa::flags::Io::OUT);
         }
@@ -174,10 +175,18 @@ impl Client {
             }
         }
 
-        if mask.contains(spa::flags::Io::OUT) || *self.inner.need_flush.borrow() {
-            self.inner.need_flush.replace(false);
+        if mask.contains(spa::flags::Io::OUT) || *self.inner.need_flush.read().unwrap() {
+            *self.inner.need_flush.write().unwrap() = true;
 
-            match self.inner.stream.borrow().as_ref().unwrap().take_error() {
+            match self
+                .inner
+                .stream
+                .read()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .take_error()
+            {
                 Ok(None) => { /* all good, nothing to do */ }
                 Ok(Some(err)) => {
                     self.on_connection_error(err, "connection error");
@@ -192,7 +201,7 @@ impl Client {
             match self.inner.connection.flush() {
                 Ok(_) => {
                     let main_loop = self.core().context().main_loop();
-                    let mut source_ref = self.inner.source.borrow_mut();
+                    let mut source_ref = self.inner.source.write().unwrap();
                     let source = source_ref.as_mut().unwrap();
                     let _ = main_loop.update_io(source, source.mask() & !spa::flags::Io::OUT);
                 }
@@ -249,7 +258,7 @@ impl Client {
             _ => unreachable!(),
         }
 
-        self.inner.last_in_seq.replace(header.seq);
+        *self.inner.last_in_seq.write().unwrap() = header.seq;
 
         Ok(())
     }
@@ -257,13 +266,13 @@ impl Client {
     fn on_connection_error(&self, err: std::io::Error, msg: &str) {
         warn!("Got connection error: {:?}", err);
 
-        if let Some(source) = self.inner.source.take() {
+        if let Some(source) = self.inner.source.write().unwrap().take() {
             let main_loop = self.core().context().main_loop();
             main_loop.destroy_source(source);
         }
 
         let core = &self.core();
-        let seq = *self.inner.last_in_seq.borrow();
+        let seq = *self.inner.last_in_seq.read().unwrap();
         let res = err
             .raw_os_error()
             .unwrap_or(err.kind() as i32)
@@ -339,18 +348,18 @@ impl Client {
 impl InnerClient {
     fn new() -> Self {
         Self {
-            core: RefCell::new(None),
-            stream: RefCell::new(None),
+            core: RwLock::new(None),
+            stream: RwLock::new(None),
             connection: Connection::new(None),
-            connected: RefCell::new(false),
-            need_flush: RefCell::new(false),
-            last_in_seq: RefCell::new(0),
-            source: RefCell::new(None),
-            hooks: RefCell::new(None),
+            connected: RwLock::new(false),
+            need_flush: RwLock::new(false),
+            last_in_seq: RwLock::new(0),
+            source: RwLock::new(None),
+            hooks: RwLock::new(None),
         }
     }
 
     fn set_core(&self, core: WeakCore) {
-        self.core.borrow_mut().replace(core);
+        self.core.write().unwrap().replace(core);
     }
 }

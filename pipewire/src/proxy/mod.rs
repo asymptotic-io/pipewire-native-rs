@@ -3,8 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::any::Any;
-use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use pipewire_native_spa as spa;
 
@@ -55,7 +54,7 @@ refcounted! {
     pub struct Proxy<T: HasProxy + Refcounted> {
         object: T::WeakRef,
         id: Id,
-        bound_id: RefCell<Option<Id>>,
+        bound_id: RwLock<Option<Id>>,
         hooks: Arc<Mutex<spa::hook::HookList<ProxyEvents>>>,
     }
 }
@@ -99,16 +98,16 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
 
     /// The "global" ID for this object.
     pub fn bound_id(&self) -> Option<Id> {
-        *self.inner.bound_id.borrow()
+        *self.inner.bound_id.read().unwrap()
     }
 
     pub(crate) fn set_bound_id(&self, id: Id) {
-        self.inner.bound_id.replace(Some(id));
+        *self.inner.bound_id.write().unwrap() = Some(id);
         spa::emit_hook!(self.inner.hooks, bound, id);
     }
 
     pub(crate) fn set_bound_props(&self, id: Id, props: &Properties) {
-        self.inner.bound_id.replace(Some(id));
+        *self.inner.bound_id.write().unwrap() = Some(id);
         spa::emit_hook!(self.inner.hooks, bound_props, id, props);
     }
 
@@ -127,7 +126,7 @@ impl<T: HasProxy + Refcounted> InnerProxy<T> {
         Self {
             object,
             id,
-            bound_id: RefCell::new(None),
+            bound_id: RwLock::new(None),
             hooks: spa::hook::HookList::new(),
         }
     }
@@ -177,7 +176,7 @@ impl dyn HasProxy {
 #[macro_export]
 macro_rules! proxy_object_invoke {
     ($proxy:ident, $method:ident $(, $($args:tt)*)?) => {
-        ($proxy.object().unwrap().methods().borrow_mut().$method)(&$proxy $(, $($args)*)?)
+        ($proxy.object().unwrap().methods().lock().unwrap().$method)(&$proxy $(, $($args)*)?)
     };
 }
 

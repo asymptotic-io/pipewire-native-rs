@@ -2,9 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use bitflags::bitflags;
 use pipewire_native_spa as spa;
@@ -21,8 +19,8 @@ use crate::{
 refcounted! {
     /// Proxy that represents a client that is connected to the server.
     pub struct Client {
-        proxy: RefCell<Option<Proxy<Client>>>,
-        methods: Rc<RefCell<ClientMethods<Client>>>,
+        proxy: RwLock<Option<Proxy<Client>>>,
+        methods: Arc<Mutex<ClientMethods<Client>>>,
         hooks: Arc<Mutex<spa::hook::HookList<ClientEvents>>>,
     }
 }
@@ -78,7 +76,8 @@ impl HasProxy for Client {
     fn proxy(&self) -> Proxy<Self> {
         self.inner
             .proxy
-            .borrow()
+            .read()
+            .unwrap()
             .as_ref()
             .expect("Client proxy should be initialised on creation")
             .clone()
@@ -92,7 +91,11 @@ impl Client {
         };
 
         let id = core.next_proxy_id();
-        this.inner.proxy.borrow_mut().replace(Proxy::new(id, &this));
+        this.inner
+            .proxy
+            .write()
+            .unwrap()
+            .replace(Proxy::new(id, &this));
         core.add_proxy(&this, id);
 
         this
@@ -124,7 +127,7 @@ impl Client {
         proxy_object_invoke!(proxy, update_permissions, permissions)
     }
 
-    pub(crate) fn methods(&self) -> Rc<RefCell<ClientMethods<Client>>> {
+    pub(crate) fn methods(&self) -> Arc<Mutex<ClientMethods<Client>>> {
         self.inner.methods.clone()
     }
 
@@ -136,8 +139,8 @@ impl Client {
 impl InnerClient {
     fn new(core: &Core) -> Self {
         Self {
-            proxy: RefCell::new(None),
-            methods: Rc::new(RefCell::new(protocol::marshal::client::Methods::marshal(
+            proxy: RwLock::new(None),
+            methods: Arc::new(Mutex::new(protocol::marshal::client::Methods::marshal(
                 core.connection(),
             ))),
             hooks: spa::hook::HookList::new(),

@@ -2,9 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use bitflags::bitflags;
 use pipewire_native_spa as spa;
@@ -23,8 +21,8 @@ use crate::{
 refcounted! {
     /// Proxy that represents a device that is connected to the server.
     pub struct Device {
-        proxy: RefCell<Option<Proxy<Device>>>,
-        methods: Rc<RefCell<DeviceMethods<Device>>>,
+        proxy: RwLock<Option<Proxy<Device>>>,
+        methods: Arc<Mutex<DeviceMethods<Device>>>,
         hooks: Arc<Mutex<spa::hook::HookList<DeviceEvents>>>,
     }
 }
@@ -101,7 +99,8 @@ impl HasProxy for Device {
     fn proxy(&self) -> Proxy<Self> {
         self.inner
             .proxy
-            .borrow()
+            .read()
+            .unwrap()
             .as_ref()
             .expect("Device proxy should be initialised on creation")
             .clone()
@@ -115,7 +114,11 @@ impl Device {
         };
 
         let id = core.next_proxy_id();
-        this.inner.proxy.borrow_mut().replace(Proxy::new(id, &this));
+        this.inner
+            .proxy
+            .write()
+            .unwrap()
+            .replace(Proxy::new(id, &this));
         core.add_proxy(&this, id);
 
         this
@@ -159,7 +162,7 @@ impl Device {
         proxy_object_invoke!(proxy, set_param, param_type, object_type, flags, builder)
     }
 
-    pub(crate) fn methods(&self) -> Rc<RefCell<DeviceMethods<Device>>> {
+    pub(crate) fn methods(&self) -> Arc<Mutex<DeviceMethods<Device>>> {
         self.inner.methods.clone()
     }
 
@@ -171,8 +174,8 @@ impl Device {
 impl InnerDevice {
     fn new(core: &Core) -> Self {
         Self {
-            proxy: RefCell::new(None),
-            methods: Rc::new(RefCell::new(protocol::marshal::device::Methods::marshal(
+            proxy: RwLock::new(None),
+            methods: Arc::new(Mutex::new(protocol::marshal::device::Methods::marshal(
                 core.connection(),
             ))),
             hooks: spa::hook::HookList::new(),

@@ -3,10 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    cell::RefCell,
     os::fd::RawFd,
-    rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use bitflags::bitflags;
@@ -48,10 +46,10 @@ refcounted! {
         context: WeakContext,
         properties: Properties,
         client: protocol::client::Client,
-        destroyed: RefCell<bool>,
-        proxy: RefCell<Option<Proxy<Core>>>,
-        objects: RefCell<IdMap<Box<dyn HasProxy>>>,
-        methods: Rc<RefCell<CoreMethods<Core>>>,
+        destroyed: RwLock<bool>,
+        proxy: RwLock<Option<Proxy<Core>>>,
+        objects: RwLock<IdMap<Box<dyn HasProxy>>>,
+        methods: Arc<Mutex<CoreMethods<Core>>>,
         hooks: Arc<Mutex<spa::hook::HookList<CoreEvents>>>,
     }
 }
@@ -65,12 +63,17 @@ impl Core {
         };
 
         // Reserve id 0 because we are id 0
-        let id = this.inner.objects.borrow_mut().reserve();
+        let id = this.inner.objects.write().unwrap().reserve();
         let core_proxy = Proxy::new(0, &this);
-        this.inner.proxy.borrow_mut().replace(core_proxy.clone());
+        this.inner
+            .proxy
+            .write()
+            .unwrap()
+            .replace(core_proxy.clone());
         this.inner
             .objects
-            .borrow_mut()
+            .write()
+            .unwrap()
             .insert_at(id, Box::new(this.clone()));
 
         let client = proxy::client::Client::new(&this);
@@ -81,7 +84,7 @@ impl Core {
         core_proxy.add_listener(ProxyEvents {
             destroy: some_closure!([this] {
                 debug!("core destroy");
-                let mut destroyed = this.inner.destroyed.borrow_mut();
+                let mut destroyed = this.inner.destroyed.write().unwrap();
 
                 if *destroyed {
                     return;
@@ -89,7 +92,7 @@ impl Core {
 
                 *destroyed = true;
 
-                let mut objects = this.inner.objects.borrow_mut();
+                let mut objects = this.inner.objects.write().unwrap();
                 let client = objects.get(1).unwrap();
 
                 hasproxy_notify!(client, destroy);
@@ -102,7 +105,8 @@ impl Core {
                 for o in this
                     .inner
                     .objects
-                    .borrow()
+                    .read()
+                    .unwrap()
                     .iter()
                     .skip(1) // first object is core, so skip it
                     .map(|(_id, object)| object)
@@ -124,7 +128,7 @@ impl Core {
             done: some_closure!([core_proxy] id, seq, {
                 debug!("got done: {id} {seq}");
                 let core = core_proxy.object().unwrap();
-                let proxies = core.inner.objects.borrow();
+                let proxies = core.inner.objects.read().unwrap();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_notify!(object, done, seq);
@@ -133,7 +137,7 @@ impl Core {
             error: some_closure!([core_proxy] id, seq, res, message, {
                 debug!("got error: {id} {seq} {res} {message}");
                 let core = core_proxy.object().unwrap();
-                let proxies = core.inner.objects.borrow();
+                let proxies = core.inner.objects.read().unwrap();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_notify!(object, error, seq, res, message);
@@ -146,7 +150,7 @@ impl Core {
             remove_id: some_closure!([core_proxy] id, {
                 debug!("got remove_id: {id}");
                 let core = core_proxy.object().unwrap();
-                let mut proxies = core.inner.objects.borrow_mut();
+                let mut proxies = core.inner.objects.write().unwrap();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_notify!(object, removed);
@@ -156,7 +160,7 @@ impl Core {
             bound_id: some_closure!([core_proxy] id, global_id, {
                 debug!("got bound_id: {id} {global_id}");
                 let core = core_proxy.object().unwrap();
-                let proxies = core.inner.objects.borrow();
+                let proxies = core.inner.objects.read().unwrap();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_method_call!(object, set_bound_id, global_id);
@@ -171,7 +175,7 @@ impl Core {
             bound_props: some_closure!([core_proxy] id, global_id, props, {
                 debug!("got bound_props: {id} {global_id} {props:?}");
                 let core = core_proxy.object().unwrap();
-                let proxies = core.inner.objects.borrow();
+                let proxies = core.inner.objects.read().unwrap();
 
                 if let Some(object) = proxies.get(id) {
                     hasproxy_method_call!(object, set_bound_props, global_id, props);
@@ -211,24 +215,31 @@ impl Core {
     }
 
     pub(crate) fn next_proxy_id(&self) -> Id {
-        self.inner.objects.borrow_mut().reserve()
+        self.inner.objects.write().unwrap().reserve()
     }
 
     pub(crate) fn add_proxy<T: HasProxy + Refcounted>(&self, object: &T, id: Id) {
         self.inner
             .objects
-            .borrow_mut()
+            .write()
+            .unwrap()
             .insert_at(id, Box::new(object.clone()));
     }
 
     pub(crate) fn find_proxy_type(&self, id: Id) -> Option<types::ObjectType> {
-        self.inner.objects.borrow().get(id).map(|o| o.type_())
+        self.inner
+            .objects
+            .read()
+            .unwrap()
+            .get(id)
+            .map(|o| o.type_())
     }
 
     pub(crate) fn find_proxy<T: HasProxy + Refcounted>(&self, id: Id) -> Option<Proxy<T>> {
         self.inner
             .objects
-            .borrow()
+            .read()
+            .unwrap()
             .get(id)
             .and_then(|o| o.downcast_proxy::<T>())
     }
@@ -251,7 +262,7 @@ impl Core {
         proxy_object_invoke!(proxy, get_registry)
     }
 
-    pub(crate) fn methods(&self) -> Rc<RefCell<CoreMethods<Core>>> {
+    pub(crate) fn methods(&self) -> Arc<Mutex<CoreMethods<Core>>> {
         self.inner.methods.clone()
     }
 
@@ -272,7 +283,8 @@ impl HasProxy for Core {
     fn proxy(&self) -> Proxy<Core> {
         self.inner
             .proxy
-            .borrow()
+            .read()
+            .unwrap()
             .as_ref()
             .expect("Proxy should be initialised")
             .clone()
@@ -358,10 +370,10 @@ impl InnerCore {
             context: context.downgrade(),
             properties,
             client,
-            destroyed: RefCell::new(false),
-            proxy: RefCell::new(None),
-            objects: RefCell::new(IdMap::new()),
-            methods: Rc::new(RefCell::new(protocol::marshal::core::Methods::marshal(
+            destroyed: RwLock::new(false),
+            proxy: RwLock::new(None),
+            objects: RwLock::new(IdMap::new()),
+            methods: Arc::new(Mutex::new(protocol::marshal::core::Methods::marshal(
                 connection,
             ))),
             hooks: spa::hook::HookList::new(),

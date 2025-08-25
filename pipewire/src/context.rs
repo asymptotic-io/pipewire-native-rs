@@ -3,10 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    cell::RefCell,
     ffi::CStr,
     pin::Pin,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, RwLock},
 };
 
 use crate::{
@@ -29,7 +28,7 @@ refcounted! {
     /// properties, and loaded from standard client configuration), and the main event loop.
     pub struct Context {
         main_loop: MainLoop,
-        properties: RefCell<Properties>,
+        properties: RwLock<Properties>,
         conf: Properties,
         // In the C implementation, this is a list, but in practice there is only native-protocol
         protocol: Protocol,
@@ -77,17 +76,18 @@ impl Context {
 
     /// Retrieves the [Properties] associated with this context.
     pub fn properties(&self) -> Properties {
-        self.inner.properties.borrow().clone()
+        self.inner.properties.read().unwrap().clone()
     }
 
     pub(crate) fn properties_dict(&self) -> spa::dict::Dict {
-        self.inner.properties.borrow().dict()
+        self.inner.properties.read().unwrap().dict()
     }
 
     pub(crate) fn update_properties(&self, props: &Properties, keys: Vec<&str>) {
         self.inner
             .properties
-            .borrow_mut()
+            .write()
+            .unwrap()
             .update_keys(props.iter(), keys);
     }
 
@@ -116,7 +116,7 @@ impl InnerContext {
 
         let mut this = InnerContext {
             main_loop,
-            properties: RefCell::new(properties),
+            properties: RwLock::new(properties),
             conf: Properties::new(),
             protocol: Protocol::new("protocol-native"),
             system,
@@ -137,27 +137,39 @@ impl InnerContext {
 
         if vm_type != spa::interface::cpu::CpuVm::None {
             this.properties
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set("cpu.vm.name", vm_type.to_string());
         }
 
         // TODO: add overrides and rules from context.properties
 
         if let Ok(core_name) = std::env::var("PIPEWIRE_CORE") {
-            this.properties.borrow_mut().set(keys::CORE_NAME, core_name);
+            this.properties
+                .write()
+                .unwrap()
+                .set(keys::CORE_NAME, core_name);
         }
 
         if let Some(cpu) = &cpu {
-            if this.properties.borrow().get(keys::CPU_MAX_ALIGN).is_none() {
+            if this
+                .properties
+                .read()
+                .unwrap()
+                .get(keys::CPU_MAX_ALIGN)
+                .is_none()
+            {
                 this.properties
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .set(keys::CPU_MAX_ALIGN, cpu.get_max_align().to_string());
             }
         }
 
         if this
             .properties
-            .borrow()
+            .read()
+            .unwrap()
             .get_bool("mem.mlock-all")
             .unwrap_or(false)
         {
@@ -186,7 +198,8 @@ impl InnerContext {
     fn load_conf(&mut self) -> std::io::Result<()> {
         let conf_prefix = std::env::var("PIPEWIRE_CONFIG_PREFIX").ok().or_else(|| {
             self.properties
-                .borrow()
+                .read()
+                .unwrap()
                 .get(keys::CONFIG_PREFIX)
                 .map(String::from)
         });
@@ -195,7 +208,8 @@ impl InnerContext {
             .ok()
             .or_else(|| {
                 self.properties
-                    .borrow()
+                    .read()
+                    .unwrap()
                     .get(keys::CONFIG_NAME)
                     .map(String::from)
             })
@@ -210,34 +224,60 @@ impl InnerContext {
     }
 
     fn set_default_properties(&mut self) {
-        if self.properties.borrow().get(keys::APP_NAME).is_none() {
+        if self
+            .properties
+            .read()
+            .unwrap()
+            .get(keys::APP_NAME)
+            .is_none()
+        {
             self.properties
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set(keys::APP_NAME, PROCESS_NAME.clone());
         };
         if self
             .properties
-            .borrow()
+            .read()
+            .unwrap()
             .get(keys::APP_PROCESS_BINARY)
             .is_none()
         {
             self.properties
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set(keys::APP_NAME, PROCESS_NAME.clone());
         };
-        if self.properties.borrow().get(keys::APP_LANGUAGE).is_none() {
+        if self
+            .properties
+            .read()
+            .unwrap()
+            .get(keys::APP_LANGUAGE)
+            .is_none()
+        {
             if let Ok(lang) = std::env::var("LANG") {
-                self.properties.borrow_mut().set(keys::APP_LANGUAGE, lang);
+                self.properties
+                    .write()
+                    .unwrap()
+                    .set(keys::APP_LANGUAGE, lang);
             }
         };
-        if self.properties.borrow().get(keys::APP_PROCESS_ID).is_none() {
+        if self
+            .properties
+            .read()
+            .unwrap()
+            .get(keys::APP_PROCESS_ID)
+            .is_none()
+        {
             self.properties
-                .borrow_mut()
+                .write()
+                .unwrap()
                 .set(keys::APP_PROCESS_ID, std::process::id().to_string());
         };
         if self
             .properties
-            .borrow()
+            .read()
+            .unwrap()
             .get(keys::APP_PROCESS_USER)
             .is_none()
         {
@@ -247,20 +287,22 @@ impl InnerContext {
                     .map(|p| CStr::from_ptr(p.pw_name).to_string_lossy().to_string())
             } {
                 self.properties
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .set(keys::APP_PROCESS_USER, user);
             }
         };
         if self
             .properties
-            .borrow()
+            .read()
+            .unwrap()
             .get(keys::APP_PROCESS_HOST)
             .is_none()
         {
             let mut name: [u8; 256] = [0; 256];
             unsafe { libc::gethostname(name.as_mut_ptr() as *mut i8, name.len() as libc::size_t) };
             if let Ok(hostname) = CStr::from_bytes_until_nul(&name) {
-                self.properties.borrow_mut().set(
+                self.properties.write().unwrap().set(
                     keys::APP_PROCESS_HOST,
                     hostname.to_string_lossy().to_string(),
                 );
@@ -268,25 +310,29 @@ impl InnerContext {
         };
         if self
             .properties
-            .borrow()
+            .read()
+            .unwrap()
             .get(keys::APP_PROCESS_SESSION_ID)
             .is_none()
         {
             if let Ok(session_id) = std::env::var("XDG_SESSION_ID") {
                 self.properties
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .set(keys::APP_PROCESS_SESSION_ID, session_id);
             }
         };
         if self
             .properties
-            .borrow()
+            .read()
+            .unwrap()
             .get(keys::WINDOW_X11_DISPLAY)
             .is_none()
         {
             if let Ok(display) = std::env::var("DISPLAY") {
                 self.properties
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .set(keys::WINDOW_X11_DISPLAY, display);
             }
         };

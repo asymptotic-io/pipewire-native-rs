@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use pipewire_native::{
     self as pipewire, closure,
@@ -36,7 +39,7 @@ fn start_pipewire() -> TestContext {
 
 #[derive(Clone)]
 struct Objects {
-    map: Arc<RefCell<HashMap<Id, Box<dyn HasProxy>>>>,
+    map: Arc<RwLock<HashMap<Id, Box<dyn HasProxy>>>>,
 }
 
 unsafe impl Send for Objects {}
@@ -48,7 +51,7 @@ fn test_lib() {
     pipewire::init();
 
     let objects = Objects {
-        map: Arc::new(RefCell::new(HashMap::new())),
+        map: Arc::new(RwLock::new(HashMap::new())),
     };
 
     let v = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
@@ -62,16 +65,16 @@ fn test_lib() {
     core.proxy().add_listener(ProxyEvents {
         destroy: some_closure!([^(objects)] {
             println!("core destroyed, clearing objects");
-            objects.map.borrow_mut().clear();
+            objects.map.write().unwrap().clear();
         }),
         ..Default::default()
     });
 
     let mut timer_src = main_loop
         .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
-            assert!(objects.map.borrow().len() > 1);
+            assert!(objects.map.read().unwrap().len() > 1);
             core.disconnect();
-            assert_eq!(objects.map.borrow().len(), 0);
+            assert_eq!(objects.map.read().unwrap().len(), 0);
             main_loop.quit();
         }))
         .unwrap();
@@ -96,7 +99,7 @@ fn test_lib() {
 
                     proxy.add_listener(ProxyEvents {
                         removed: some_closure!([proxy ^(objects)] {
-                            objects.map.borrow_mut().remove(&proxy.id());
+                            objects.map.write().unwrap().remove(&proxy.id());
                         }),
                         ..Default::default()
                     });
@@ -109,7 +112,7 @@ fn test_lib() {
 
                     proxy.add_listener(ProxyEvents {
                         removed: some_closure!([proxy ^(objects)] {
-                            objects.map.borrow_mut().remove(&proxy.id());
+                            objects.map.write().unwrap().remove(&proxy.id());
                         }),
                         ..Default::default()
                     });
@@ -119,15 +122,15 @@ fn test_lib() {
                 _ => return,
             };
 
-            objects.map.borrow_mut().insert(id, object);
+            objects.map.write().unwrap().insert(id, object);
         }),
         global_remove: some_closure!([^(objects)] id, {
             println!("global {id} removed");
-            let _ = objects.map.borrow_mut().remove(&id);
+            let _ = objects.map.write().unwrap().remove(&id);
         }),
     });
 
     main_loop.run();
 
-    assert_eq!(objects.map.borrow().len(), 0);
+    assert_eq!(objects.map.read().unwrap().len(), 0);
 }

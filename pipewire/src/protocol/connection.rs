@@ -3,10 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    cell::RefCell,
     io::{Read, Write},
     os::{fd::RawFd, unix::net::UnixStream},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use pipewire_native_spa::{self as spa, pod::Pod};
@@ -28,19 +27,19 @@ const MAX_MESSAGE_SIZE: usize = 16_777_216;
 
 refcounted! {
     pub(crate) struct Connection {
-        stream: RefCell<Option<UnixStream>>,
+        stream: RwLock<Option<UnixStream>>,
         hooks: Arc<Mutex<spa::hook::HookList<ConnectionEvents>>>,
         // Data received
-        in_buf: RefCell<Vec<u8>>,
-        in_size: RefCell<usize>,
-        in_offset: RefCell<usize>,
-        last_recv_generation: RefCell<i64>,
+        in_buf: RwLock<Vec<u8>>,
+        in_size: RwLock<usize>,
+        in_offset: RwLock<usize>,
+        last_recv_generation: RwLock<i64>,
         // Data to send
-        out_seq: RefCell<u32>,
-        out_buf: RefCell<Vec<u8>>,
-        out_size: RefCell<usize>,
-        out_fds: RefCell<Vec<RawFd>>,
-        last_sent_generation: RefCell<i64>,
+        out_seq: RwLock<u32>,
+        out_buf: RwLock<Vec<u8>>,
+        out_size: RwLock<usize>,
+        out_fds: RwLock<Vec<RawFd>>,
+        last_sent_generation: RwLock<i64>,
     }
 }
 
@@ -61,28 +60,28 @@ impl Connection {
     }
 
     pub(crate) fn next_seq(&self) -> u32 {
-        *self.inner.out_seq.borrow()
+        *self.inner.out_seq.read().unwrap()
     }
 
     pub(crate) fn set_stream(&self, stream: UnixStream) {
-        self.inner.stream.replace(Some(stream));
+        self.inner.stream.write().unwrap().replace(stream);
     }
 
     pub(crate) fn disconnect(&self) {
-        self.inner.stream.replace(None);
+        self.inner.stream.write().unwrap().take();
         self.clear_buffers();
     }
 
     fn clear_buffers(&self) {
-        self.inner.in_buf.borrow_mut().fill(0);
-        self.inner.in_size.replace(0);
-        self.inner.in_offset.replace(0);
-        self.inner.last_recv_generation.replace(0);
-        self.inner.out_seq.replace(0);
-        self.inner.out_buf.borrow_mut().fill(0);
-        self.inner.out_size.replace(0);
-        self.inner.out_fds.borrow_mut().clear();
-        self.inner.last_sent_generation.replace(0);
+        self.inner.in_buf.write().unwrap().fill(0);
+        *self.inner.in_size.write().unwrap() = 0;
+        *self.inner.in_offset.write().unwrap() = 0;
+        *self.inner.last_recv_generation.write().unwrap() = 0;
+        *self.inner.out_seq.write().unwrap() = 0;
+        self.inner.out_buf.write().unwrap().fill(0);
+        *self.inner.out_size.write().unwrap() = 0;
+        self.inner.out_fds.write().unwrap().clear();
+        *self.inner.last_sent_generation.write().unwrap() = 0;
     }
 
     pub(crate) fn add_listener(&self, events: ConnectionEvents) -> spa::hook::HookId {
@@ -98,10 +97,10 @@ impl Connection {
         id: Id,
         object: T,
     ) -> std::io::Result<()> {
-        let seq = *self.inner.out_seq.borrow();
+        let seq = *self.inner.out_seq.read().unwrap();
 
-        let recv_generation = self.inner.last_recv_generation.borrow();
-        let mut sent_generation = self.inner.last_sent_generation.borrow_mut();
+        let recv_generation = self.inner.last_recv_generation.read().unwrap();
+        let mut sent_generation = self.inner.last_sent_generation.write().unwrap();
 
         // TODO: support CoreGeneration as well when we implement server
         let footer = if *recv_generation > *sent_generation {
@@ -128,8 +127,8 @@ impl Connection {
             footer,
         };
 
-        let mut buf = self.inner.out_buf.borrow_mut();
-        let mut size = self.inner.out_size.borrow_mut();
+        let mut buf = self.inner.out_buf.write().unwrap();
+        let mut size = self.inner.out_size.write().unwrap();
 
         loop {
             let rest = &mut buf.as_mut_slice()[*size..];
@@ -159,17 +158,17 @@ impl Connection {
             message.object
         );
 
-        self.inner.out_seq.replace((seq + 1) & ASYNC_SEQ_MASK);
+        *self.inner.out_seq.write().unwrap() = (seq + 1) & ASYNC_SEQ_MASK;
         spa::emit_hook!(self.inner.hooks, need_flush);
 
         Ok(())
     }
 
     pub(crate) fn flush(&self) -> std::io::Result<()> {
-        let mut o_stream = self.inner.stream.borrow_mut();
+        let mut o_stream = self.inner.stream.write().unwrap();
         let stream = o_stream.as_mut().unwrap();
-        let mut buf = self.inner.out_buf.borrow_mut();
-        let mut size = self.inner.out_size.borrow_mut();
+        let mut buf = self.inner.out_buf.write().unwrap();
+        let mut size = self.inner.out_size.write().unwrap();
         let mut idx = 0;
         let mut res = Ok(());
 
@@ -210,7 +209,7 @@ impl Connection {
                 header.is_some()
             );
 
-            let capacity = self.inner.in_buf.borrow().len();
+            let capacity = self.inner.in_buf.read().unwrap().len();
             if capacity < wanted_capacity {
                 // Not enough space for header or message, make some space, try to fill some data,
                 // and then retry
@@ -220,7 +219,8 @@ impl Connection {
                 );
                 self.inner
                     .in_buf
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .resize(wanted_capacity.max(2 * capacity), 0);
                 self.read()?;
             } else if let Some(header) = header {
@@ -246,9 +246,9 @@ impl Connection {
         &self,
         header: &Header,
     ) -> std::io::Result<(T, Option<F>)> {
-        let buf = self.inner.in_buf.borrow_mut();
-        let mut size = self.inner.in_size.borrow_mut();
-        let mut offset = self.inner.in_offset.borrow_mut();
+        let buf = self.inner.in_buf.read().unwrap();
+        let mut size = self.inner.in_size.write().unwrap();
+        let mut offset = self.inner.in_offset.write().unwrap();
 
         let start = *offset + marshal::HEADER_LEN;
         let end = start + header.size as usize;
@@ -311,9 +311,7 @@ impl Connection {
                 match p {
                     CoreFooterPayload::Generation(g) => {
                         trace!("updating core generation to {}", g.registry_generation);
-                        self.inner
-                            .last_recv_generation
-                            .replace(g.registry_generation);
+                        *self.inner.last_recv_generation.write().unwrap() = g.registry_generation;
                     }
                 }
             }
@@ -321,8 +319,8 @@ impl Connection {
     }
 
     fn parse_next(&self) -> std::io::Result<(usize, Option<Header>)> {
-        let size = *self.inner.in_size.borrow();
-        let offset = *self.inner.in_offset.borrow();
+        let size = *self.inner.in_size.read().unwrap();
+        let offset = *self.inner.in_offset.read().unwrap();
 
         if size - offset < marshal::HEADER_LEN {
             return Ok((marshal::HEADER_LEN, None));
@@ -330,7 +328,7 @@ impl Connection {
 
         trace!("looking for message header from [{offset}..{size}]");
 
-        let buf = self.inner.in_buf.borrow();
+        let buf = self.inner.in_buf.read().unwrap();
         let header = match Header::decode(&buf[offset..size]) {
             Ok((header, _)) => header,
             Err(e) => {
@@ -348,10 +346,10 @@ impl Connection {
     }
 
     fn read(&self) -> std::io::Result<()> {
-        let mut stream_ref = self.inner.stream.borrow_mut();
+        let mut stream_ref = self.inner.stream.write().unwrap();
         let stream = stream_ref.as_mut().unwrap();
-        let mut buf = self.inner.in_buf.borrow_mut();
-        let mut size = self.inner.in_size.borrow_mut();
+        let mut buf = self.inner.in_buf.write().unwrap();
+        let mut size = self.inner.in_size.write().unwrap();
 
         let read = stream.read(&mut buf[*size..])?;
         trace!("read {read} bytes at {size}");
@@ -371,17 +369,17 @@ impl Connection {
 impl InnerConnection {
     pub(crate) fn new(stream: Option<UnixStream>) -> Self {
         InnerConnection {
-            stream: RefCell::new(stream),
+            stream: RwLock::new(stream),
             hooks: spa::hook::HookList::new(),
-            in_buf: RefCell::new(vec![0; 16384]),
-            in_size: RefCell::new(0),
-            in_offset: RefCell::new(0),
-            last_recv_generation: RefCell::new(0),
-            out_seq: RefCell::new(0),
-            out_buf: RefCell::new(vec![0; 16384]),
-            out_size: RefCell::new(0),
-            out_fds: RefCell::new(Vec::new()),
-            last_sent_generation: RefCell::new(0),
+            in_buf: RwLock::new(vec![0; 16384]),
+            in_size: RwLock::new(0),
+            in_offset: RwLock::new(0),
+            last_recv_generation: RwLock::new(0),
+            out_seq: RwLock::new(0),
+            out_buf: RwLock::new(vec![0; 16384]),
+            out_size: RwLock::new(0),
+            out_fds: RwLock::new(Vec::new()),
+            last_sent_generation: RwLock::new(0),
         }
     }
 }

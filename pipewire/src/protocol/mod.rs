@@ -6,7 +6,7 @@ pub(crate) mod client;
 pub(crate) mod connection;
 pub(crate) mod marshal;
 
-use std::cell::RefCell;
+use std::sync::RwLock;
 
 use client::Client;
 
@@ -22,7 +22,7 @@ const ASYNC_SEQ_MASK: u32 = ASYNC_SEQ_BIT - 1;
 
 refcounted! {
     pub(crate) struct Protocol {
-        context: RefCell<Option<WeakContext>>,
+        context: RwLock<Option<WeakContext>>,
         #[allow(unused)]
         name: String,
     }
@@ -48,12 +48,12 @@ impl Protocol {
 impl InnerProtocol {
     fn new(name: &str) -> Self {
         Self {
-            context: RefCell::new(None),
+            context: RwLock::new(None),
             name: name.to_owned(),
         }
     }
 
     fn set_context(&self, context: WeakContext) {
-        self.context.borrow_mut().replace(context);
+        self.context.write().unwrap().replace(context);
     }
 }

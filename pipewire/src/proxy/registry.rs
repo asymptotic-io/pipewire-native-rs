@@ -2,9 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use pipewire_native_spa as spa;
 
@@ -22,8 +20,8 @@ refcounted! {
     /// details, see the [Proxy](super::Proxy) documentation.
     pub struct Registry {
         core: Core,
-        proxy: RefCell<Option<Proxy<Registry>>>,
-        methods: Rc<RefCell<RegistryMethods<Registry>>>,
+        proxy: RwLock<Option<Proxy<Registry>>>,
+        methods: Arc<Mutex<RegistryMethods<Registry>>>,
         hooks: Arc<Mutex<spa::hook::HookList<RegistryEvents>>>,
     }
 }
@@ -58,7 +56,8 @@ impl HasProxy for Registry {
     fn proxy(&self) -> Proxy<Self> {
         self.inner
             .proxy
-            .borrow()
+            .read()
+            .unwrap()
             .as_ref()
             .expect("Registry proxy should be initialised on creation")
             .clone()
@@ -72,7 +71,11 @@ impl Registry {
         };
 
         let id = core.next_proxy_id();
-        this.inner.proxy.borrow_mut().replace(Proxy::new(id, &this));
+        this.inner
+            .proxy
+            .write()
+            .unwrap()
+            .replace(Proxy::new(id, &this));
         core.add_proxy(&this, id);
 
         this
@@ -94,7 +97,7 @@ impl Registry {
         proxy_object_invoke!(proxy, bind, id, type_, version)
     }
 
-    pub(crate) fn methods(&self) -> Rc<RefCell<RegistryMethods<Registry>>> {
+    pub(crate) fn methods(&self) -> Arc<Mutex<RegistryMethods<Registry>>> {
         self.inner.methods.clone()
     }
 
@@ -107,8 +110,8 @@ impl InnerRegistry {
     fn new(core: &Core) -> Self {
         Self {
             core: core.clone(),
-            proxy: RefCell::new(None),
-            methods: Rc::new(RefCell::new(protocol::marshal::registry::Methods::marshal(
+            proxy: RwLock::new(None),
+            methods: Arc::new(Mutex::new(protocol::marshal::registry::Methods::marshal(
                 core.connection(),
             ))),
             hooks: spa::hook::HookList::new(),

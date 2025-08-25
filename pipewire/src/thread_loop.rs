@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
 use parking_lot::lock_api::RawMutex;
+use parking_lot::RwLock;
 use pipewire_native_spa::interface::r#loop::LoopControlHooks;
-use std::cell::RefCell;
 use std::sync::Arc;
 use std::thread;
 
@@ -18,7 +18,7 @@ default_topic!(log::topic::THREAD_LOOP);
 refcounted! {
     /// Provides a main loop implementation which runs in a separate thread.
     pub struct ThreadLoop {
-        thread: RefCell<Option<thread::JoinHandle<std::io::Result<i32>>>>,
+        thread: RwLock<Option<thread::JoinHandle<std::io::Result<i32>>>>,
         main_loop: MainLoop,
         mutex: Arc<parking_lot::Mutex<()>>,
     }
@@ -100,14 +100,14 @@ impl ThreadLoop {
             Ok(0)
         }));
 
-        self.inner.thread.replace(Some(handle));
+        self.inner.thread.write().replace(handle);
     }
 
     /// Quit the thread main loop.
     pub fn quit(&self) {
         debug!("quit");
 
-        if let Some(handle) = self.inner.thread.take() {
+        if let Some(handle) = self.inner.thread.write().take() {
             self.inner.main_loop.quit();
             let _ = handle.join();
         }
@@ -133,7 +133,7 @@ impl InnerThreadLoop {
         let main_loop = MainLoop::new(props)?;
 
         Some(InnerThreadLoop {
-            thread: RefCell::new(None),
+            thread: RwLock::new(None),
             main_loop,
             mutex: Arc::new(parking_lot::Mutex::new(())),
         })
