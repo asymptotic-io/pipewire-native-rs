@@ -3,11 +3,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    cell::RefCell,
     collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock,
     },
 };
 
@@ -36,9 +35,9 @@ pub struct State {
     _context: Context,
     core: Core,
     registry: Registry,
-    pub clients: RefCell<BTreeMap<Id, (proxy::client::Client, Properties)>>,
-    pub devices: RefCell<BTreeMap<Id, (proxy::device::Device, Properties)>>,
-    pub modules: RefCell<BTreeMap<Id, (proxy::module::Module, Properties)>>,
+    pub clients: RwLock<BTreeMap<Id, (proxy::client::Client, Properties)>>,
+    pub devices: RwLock<BTreeMap<Id, (proxy::device::Device, Properties)>>,
+    pub modules: RwLock<BTreeMap<Id, (proxy::module::Module, Properties)>>,
 }
 
 unsafe impl Send for State {}
@@ -61,9 +60,9 @@ impl State {
             _context: context,
             core,
             registry,
-            clients: RefCell::new(BTreeMap::new()),
-            devices: RefCell::new(BTreeMap::new()),
-            modules: RefCell::new(BTreeMap::new()),
+            clients: RwLock::new(BTreeMap::new()),
+            devices: RwLock::new(BTreeMap::new()),
+            modules: RwLock::new(BTreeMap::new()),
         });
 
         let pw_state = state.clone();
@@ -119,7 +118,8 @@ impl State {
                 });
 
                 self.clients
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .insert(client.proxy().id(), (client, props.clone()));
             }
             types::interface::DEVICE => {
@@ -140,7 +140,8 @@ impl State {
                 });
 
                 self.devices
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .insert(device.proxy().id(), (device, props.clone()));
             }
             types::interface::MODULE => {
@@ -160,7 +161,8 @@ impl State {
                 });
 
                 self.modules
-                    .borrow_mut()
+                    .write()
+                    .unwrap()
                     .insert(module.proxy().id(), (module, props.clone()));
             }
             _ => {}
@@ -172,7 +174,8 @@ impl State {
     fn client_info(&self, info: &ClientInfo) {
         if let Some((_, entry)) = self
             .clients
-            .borrow_mut()
+            .write()
+            .unwrap()
             .iter_mut()
             .find(|(_, e)| e.0.proxy().bound_id() == Some(info.id))
         {
@@ -182,14 +185,15 @@ impl State {
     }
 
     fn client_removed(&self, client: proxy::client::Client) {
-        let _ = self.clients.borrow_mut().remove(&client.proxy().id());
+        let _ = self.clients.write().unwrap().remove(&client.proxy().id());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
     fn device_info(&self, info: &DeviceInfo) {
         if let Some((_, entry)) = self
             .devices
-            .borrow_mut()
+            .write()
+            .unwrap()
             .iter_mut()
             .find(|(_, e)| e.0.proxy().bound_id() == Some(info.id))
         {
@@ -199,14 +203,15 @@ impl State {
     }
 
     fn device_removed(&self, device: proxy::device::Device) {
-        let _ = self.devices.borrow_mut().remove(&device.proxy().id());
+        let _ = self.devices.write().unwrap().remove(&device.proxy().id());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
     fn module_info(&self, info: &ModuleInfo) {
         if let Some((_, entry)) = self
             .modules
-            .borrow_mut()
+            .write()
+            .unwrap()
             .iter_mut()
             .find(|(_, e)| e.0.proxy().bound_id() == Some(info.id))
         {
@@ -216,7 +221,7 @@ impl State {
     }
 
     fn module_removed(&self, module: proxy::module::Module) {
-        let _ = self.modules.borrow_mut().remove(&module.proxy().id());
+        let _ = self.modules.write().unwrap().remove(&module.proxy().id());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 }

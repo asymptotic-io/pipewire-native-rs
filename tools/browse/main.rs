@@ -104,11 +104,10 @@ impl Model {
 
     fn update_object_list(&mut self) {
         let mut table = TableBuilder::default();
-        let guard = self.pw_state.main_loop.lock();
 
         match self.type_selection {
             TypeSelection::Clients => {
-                let clients = self.pw_state.clients.borrow();
+                let clients = self.pw_state.clients.read().unwrap();
                 let n = clients.len();
 
                 for (idx, (id, (client, props))) in clients.iter().enumerate() {
@@ -133,7 +132,7 @@ impl Model {
                     .unwrap();
             }
             TypeSelection::Devices => {
-                let devices = self.pw_state.devices.borrow();
+                let devices = self.pw_state.devices.read().unwrap();
                 let n = devices.len();
 
                 for (idx, (id, (client, props))) in devices.iter().enumerate() {
@@ -159,7 +158,7 @@ impl Model {
                     .unwrap();
             }
             TypeSelection::Modules => {
-                let modules = self.pw_state.modules.borrow();
+                let modules = self.pw_state.modules.read().unwrap();
                 let n = modules.len();
 
                 for (idx, (id, (client, props))) in modules.iter().enumerate() {
@@ -185,17 +184,13 @@ impl Model {
             }
         }
 
-        drop(guard);
-
         self.update_object_details();
     }
 
     fn update_object_details(&mut self) {
         let props = match self.type_selection {
             TypeSelection::Clients => {
-                let _guard = self.pw_state.main_loop.lock();
-
-                let clients = self.pw_state.clients.borrow();
+                let clients = self.pw_state.clients.read().unwrap();
                 let entries = clients.iter().collect::<Vec<_>>();
 
                 if let Some(entry) = entries.get(self.object_selection) {
@@ -211,9 +206,7 @@ impl Model {
                 }
             }
             TypeSelection::Devices => {
-                let _guard = self.pw_state.main_loop.lock();
-
-                let devices = self.pw_state.devices.borrow();
+                let devices = self.pw_state.devices.read().unwrap();
                 let entries = devices.iter().collect::<Vec<_>>();
 
                 if let Some(entry) = entries.get(self.object_selection) {
@@ -229,9 +222,7 @@ impl Model {
                 }
             }
             TypeSelection::Modules => {
-                let _guard = self.pw_state.main_loop.lock();
-
-                let modules = self.pw_state.modules.borrow();
+                let modules = self.pw_state.modules.read().unwrap();
                 let entries = modules.iter().collect::<Vec<_>>();
 
                 if let Some(entry) = entries.get(self.object_selection) {
