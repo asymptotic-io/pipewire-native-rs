@@ -27,18 +27,6 @@
 //! Example usage of the library can be found in the source repository. The simple client test in
 //! `tests/lib.rs` is a good starting point. The `pw-browse` utility in `tools/browse` can also
 //! serve as a guide for writing clients.
-//!
-//! # Thread-safety
-//!
-//! <div class="warning">
-//! Objects provided by this API are largely not thread-safe.
-//! </div>
-//!
-//! Other than the [MainLoop](main_loop::MainLoop), objects provided by the API are not-thread
-//! safe, and should not be accessed concurrently across threads. These objects are usually marked
-//! [Send] so they can be provided to the main loop, but the assumption is that any access is
-//! performed via mutual-exclusion with the main loop thread as discussed in they
-//! [main loop documentation](main_loop::MainLoop).
 
 use std::sync::OnceLock;
 
