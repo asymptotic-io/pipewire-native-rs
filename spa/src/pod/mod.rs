@@ -173,7 +173,7 @@ impl<'a> Pod for RawPod<'a> {
             return Err(Error::NoSpace);
         }
 
-        data[0..self.size].copy_from_slice(self.data);
+        data[0..self.size].copy_from_slice(&self.data[0..self.size]);
 
         Ok(self.size)
     }
@@ -194,7 +194,7 @@ impl Pod for RawPodOwned {
             return Err(Error::NoSpace);
         }
 
-        data[0..self.size].copy_from_slice(&self.data);
+        data[0..self.size].copy_from_slice(&self.data[0..self.size]);
 
         Ok(self.size)
     }
