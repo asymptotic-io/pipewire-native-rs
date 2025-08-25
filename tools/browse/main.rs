@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+mod components;
+mod pw;
+
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -11,18 +14,17 @@ use std::{
 };
 
 use pipewire::{keys, proxy::HasProxy};
-use tui_realm_stdlib::List;
 use tuirealm::{
-    command::{Cmd, CmdResult, Direction, Position},
-    event::{Key, KeyEvent},
-    props::{Alignment, Color, Style, TableBuilder, TextSpan},
+    props::{Color, TableBuilder, TextSpan},
     ratatui::layout,
     terminal::{CrosstermTerminalAdapter, TerminalBridge},
-    Application, AttrValue, Attribute, Component, Event, EventListenerCfg, MockComponent,
-    NoUserEvent, PollStrategy, State, StateValue, Update,
+    Application, AttrValue, Attribute, EventListenerCfg, NoUserEvent, PollStrategy, Update,
 };
 
-mod pw;
+use components::{
+    object_details::ObjectDetails, object_list::ObjectList, type_list::TypeList,
+    type_list::TypeSelection,
+};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum Msg {
@@ -56,11 +58,11 @@ impl Model {
             EventListenerCfg::default().crossterm_input_listener(Duration::from_millis(20), 10),
         );
 
-        app.mount(ComponentId::Types, Box::new(TypesList::default()), vec![])
+        app.mount(ComponentId::Types, Box::new(TypeList::default()), vec![])
             .unwrap();
         app.mount(
             ComponentId::Objects,
-            Box::new(ObjectsList::default()),
+            Box::new(ObjectList::default()),
             vec![],
         )
         .unwrap();
@@ -289,240 +291,6 @@ impl Update<Msg> for Model {
                 None
             }
             Msg::None => None,
-        }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
-enum TypeSelection {
-    Clients,
-    Devices,
-    Modules,
-}
-
-impl TryFrom<usize> for TypeSelection {
-    type Error = ();
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(TypeSelection::Clients),
-            1 => Ok(TypeSelection::Devices),
-            2 => Ok(TypeSelection::Modules),
-            _ => Err(()),
-        }
-    }
-}
-
-#[derive(MockComponent)]
-struct TypesList {
-    component: List,
-}
-
-impl Default for TypesList {
-    fn default() -> Self {
-        Self {
-            component: List::default()
-                .inactive(Style::default().fg(Color::Magenta))
-                .scroll(true)
-                .rewind(true)
-                .title("Object types", Alignment::Left)
-                .highlighted_str(" ⋄ ")
-                .highlighted_color(Color::DarkGray)
-                .rows(
-                    TableBuilder::default()
-                        .add_col(TextSpan::from("Clients"))
-                        .add_row()
-                        .add_col(TextSpan::from("Devices"))
-                        .add_row()
-                        .add_col(TextSpan::from("Modules"))
-                        .build(),
-                ),
-        }
-    }
-}
-
-impl Component<Msg, NoUserEvent> for TypesList {
-    fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
-        let old_selection = self.component.state();
-        let mut focus_changed = false;
-
-        let _ = match ev {
-            Event::Keyboard(KeyEvent {
-                code: Key::Right, ..
-            }) => {
-                focus_changed = true;
-                CmdResult::None
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::Down, ..
-            }) => self.perform(Cmd::Move(Direction::Down)),
-            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
-                self.perform(Cmd::Move(Direction::Up))
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::PageDown,
-                ..
-            }) => self.perform(Cmd::Scroll(Direction::Down)),
-            Event::Keyboard(KeyEvent {
-                code: Key::PageUp, ..
-            }) => self.perform(Cmd::Scroll(Direction::Up)),
-            Event::Keyboard(KeyEvent {
-                code: Key::Home, ..
-            }) => self.perform(Cmd::GoTo(Position::Begin)),
-            Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
-                self.perform(Cmd::GoTo(Position::End))
-            }
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
-            _ => CmdResult::None,
-        };
-
-        let new_selection = self.component.state();
-        if old_selection != new_selection {
-            if let State::One(StateValue::Usize(idx)) = new_selection {
-                Some(Msg::TypeChanged(TypeSelection::try_from(idx).unwrap()))
-            } else {
-                Some(Msg::None)
-            }
-        } else if focus_changed {
-            Some(Msg::FocusChanged(ComponentId::Objects))
-        } else {
-            Some(Msg::None)
-        }
-    }
-}
-
-#[derive(MockComponent)]
-struct ObjectsList {
-    component: List,
-}
-
-impl Default for ObjectsList {
-    fn default() -> Self {
-        Self {
-            component: List::default()
-                .inactive(Style::default().fg(Color::Magenta))
-                .scroll(true)
-                .rewind(true)
-                .title("Objects", Alignment::Left)
-                .highlighted_str(" ⋄ ")
-                .highlighted_color(Color::DarkGray)
-                .rows(TableBuilder::default().build()),
-        }
-    }
-}
-
-impl Component<Msg, NoUserEvent> for ObjectsList {
-    fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
-        let old_selection = self.component.state();
-        let mut focus_component = ComponentId::Objects;
-
-        let _ = match ev {
-            Event::Keyboard(KeyEvent {
-                code: Key::Left, ..
-            }) => {
-                focus_component = ComponentId::Types;
-                CmdResult::None
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::Right, ..
-            }) => {
-                focus_component = ComponentId::Details;
-                CmdResult::None
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::Down, ..
-            }) => self.perform(Cmd::Move(Direction::Down)),
-            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
-                self.perform(Cmd::Move(Direction::Up))
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::PageDown,
-                ..
-            }) => self.perform(Cmd::Scroll(Direction::Down)),
-            Event::Keyboard(KeyEvent {
-                code: Key::PageUp, ..
-            }) => self.perform(Cmd::Scroll(Direction::Up)),
-            Event::Keyboard(KeyEvent {
-                code: Key::Home, ..
-            }) => self.perform(Cmd::GoTo(Position::Begin)),
-            Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
-                self.perform(Cmd::GoTo(Position::End))
-            }
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
-            _ => CmdResult::None,
-        };
-
-        let new_selection = self.component.state();
-        if old_selection != new_selection {
-            if let State::One(StateValue::Usize(idx)) = new_selection {
-                Some(Msg::ObjectChanged(idx))
-            } else {
-                Some(Msg::None)
-            }
-        } else if focus_component != ComponentId::Objects {
-            Some(Msg::FocusChanged(focus_component))
-        } else {
-            Some(Msg::None)
-        }
-    }
-}
-
-#[derive(MockComponent)]
-struct ObjectDetails {
-    component: List,
-}
-
-impl Default for ObjectDetails {
-    fn default() -> Self {
-        Self {
-            component: List::default()
-                .inactive(Style::default().fg(Color::Magenta))
-                .scroll(true)
-                .rewind(true)
-                .title("Details", Alignment::Left)
-                .highlighted_str(" ")
-                .rows(TableBuilder::default().build()),
-        }
-    }
-}
-
-impl Component<Msg, NoUserEvent> for ObjectDetails {
-    fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
-        let mut focus_changed = false;
-
-        let _ = match ev {
-            Event::Keyboard(KeyEvent {
-                code: Key::Left, ..
-            }) => {
-                focus_changed = true;
-                CmdResult::None
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::Down, ..
-            }) => self.perform(Cmd::Scroll(Direction::Down)),
-            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
-                self.perform(Cmd::Scroll(Direction::Up))
-            }
-            Event::Keyboard(KeyEvent {
-                code: Key::PageDown,
-                ..
-            }) => self.perform(Cmd::Scroll(Direction::Down)),
-            Event::Keyboard(KeyEvent {
-                code: Key::PageUp, ..
-            }) => self.perform(Cmd::Scroll(Direction::Up)),
-            Event::Keyboard(KeyEvent {
-                code: Key::Home, ..
-            }) => self.perform(Cmd::GoTo(Position::Begin)),
-            Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
-                self.perform(Cmd::GoTo(Position::End))
-            }
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
-            _ => CmdResult::None,
-        };
-
-        if focus_changed {
-            Some(Msg::FocusChanged(ComponentId::Objects))
-        } else {
-            Some(Msg::None)
         }
     }
 }
