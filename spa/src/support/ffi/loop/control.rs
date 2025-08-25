@@ -2,10 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
-use std::cell::RefCell;
 use std::ffi::{c_int, c_uint, c_void, CString};
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use crate::emit_hook;
@@ -54,6 +52,9 @@ struct CLoopControlImpl {
     c_hook_methods: CControlHooks,
 }
 
+unsafe impl Send for CLoopControlImpl {}
+unsafe impl Sync for CLoopControlImpl {}
+
 extern "C" fn loop_before_trampoline(data: *mut c_void) {
     let loop_control_impl_ = unsafe { (data as *mut CLoopControlImpl).as_ref().unwrap() };
 
@@ -67,7 +68,7 @@ extern "C" fn loop_after_trampoline(data: *mut c_void) {
 }
 
 pub fn new_impl(interface: *mut CInterface) -> LoopControlImpl {
-    let inner = Box::pin(Rc::new(RefCell::new(CLoopControlImpl {
+    let inner = Box::pin(Arc::new(RwLock::new(CLoopControlImpl {
         iface: interface as *mut CLoopControlIface,
         hooks: HookList::new(),
         c_hook: CHook::new_uninit(),
@@ -78,14 +79,14 @@ pub fn new_impl(interface: *mut CInterface) -> LoopControlImpl {
         },
     })));
 
-    let cb_data = inner.borrow().methods().iface.cb.data;
-    let funcs = inner.borrow().methods().iface.cb.funcs as *const CLoopControlMethods;
+    let cb_data = inner.read().unwrap().methods().iface.cb.data;
+    let funcs = inner.read().unwrap().methods().iface.cb.funcs as *const CLoopControlMethods;
 
-    let mut temp_inner = inner.borrow_mut();
+    let mut temp_inner = inner.write().unwrap();
     let c_hook = (&mut temp_inner.c_hook) as *mut CHook;
     let c_hook_methods = &temp_inner.c_hook_methods as *const CControlHooks;
     // The struct is repr(C), so get a pointer to the first member and use that to cast to the
-    // structure itself. FIXME: using the Pin<Box<Rc<RefCell<...>>>> caused a crash in the
+    // structure itself. FIXME: using the Pin<Box<Arc<RwLock<...>>>> caused a crash in the
     // trampoline, but we should use that if we can.
     let user_data = &mut temp_inner.iface as *mut *mut CLoopControlIface as *mut c_void;
 
@@ -115,10 +116,10 @@ pub fn new_impl(interface: *mut CInterface) -> LoopControlImpl {
 }
 
 impl CLoopControlImpl {
-    fn from_control(this: &LoopControlImpl) -> Rc<RefCell<CLoopControlImpl>> {
+    fn from_control(this: &LoopControlImpl) -> Arc<RwLock<CLoopControlImpl>> {
         this.inner
             .as_ref()
-            .downcast_ref::<Rc<RefCell<CLoopControlImpl>>>()
+            .downcast_ref::<Arc<RwLock<CLoopControlImpl>>>()
             .unwrap()
             .clone()
     }
@@ -129,7 +130,7 @@ impl CLoopControlImpl {
 
     fn get_fd(this: &LoopControlImpl) -> u32 {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -141,7 +142,8 @@ impl CLoopControlImpl {
         let control_impl = Self::from_control(this);
 
         let id = control_impl
-            .borrow_mut()
+            .write()
+            .unwrap()
             .hooks
             .lock()
             .unwrap()
@@ -153,12 +155,18 @@ impl CLoopControlImpl {
     fn remove_hook(this: &LoopControlImpl, hook: HookId) {
         let control_impl = Self::from_control(this);
 
-        control_impl.borrow_mut().hooks.lock().unwrap().remove(hook);
+        control_impl
+            .write()
+            .unwrap()
+            .hooks
+            .lock()
+            .unwrap()
+            .remove(hook);
     }
 
     fn enter(this: &LoopControlImpl) {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -168,7 +176,7 @@ impl CLoopControlImpl {
 
     fn leave(this: &LoopControlImpl) {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -180,7 +188,7 @@ impl CLoopControlImpl {
 
     fn iterate(this: &LoopControlImpl, timeout: Option<Duration>) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -201,7 +209,7 @@ impl CLoopControlImpl {
 
     fn check(this: &LoopControlImpl) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -211,7 +219,7 @@ impl CLoopControlImpl {
 
     fn lock(this: &LoopControlImpl) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -228,7 +236,7 @@ impl CLoopControlImpl {
 
     fn unlock(this: &LoopControlImpl) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -250,7 +258,7 @@ impl CLoopControlImpl {
         };
 
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -271,7 +279,7 @@ impl CLoopControlImpl {
 
     fn wait(this: &LoopControlImpl, abstime: &libc::timespec) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -283,7 +291,7 @@ impl CLoopControlImpl {
 
     fn signal(this: &LoopControlImpl, wait_for_accept: bool) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;
@@ -293,7 +301,7 @@ impl CLoopControlImpl {
 
     fn accept(this: &LoopControlImpl) -> std::io::Result<i32> {
         let impl_rc = Self::from_control(this);
-        let control_impl = impl_rc.borrow();
+        let control_impl = impl_rc.read().unwrap();
         let methods = control_impl.methods();
 
         let funcs = methods.iface.cb.funcs as *const CLoopControlMethods;

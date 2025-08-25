@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{any::TypeId, pin::Pin, rc::Rc, sync::Arc};
+use std::{any::TypeId, pin::Pin, sync::Arc};
 
 use crate::dict::Dict;
 
@@ -44,7 +44,6 @@ impl std::fmt::Debug for dyn Interface {
     }
 }
 
-type RefcountedPinBox<T> = Rc<Pin<Box<T>>>;
 type ArcRefcountedPinBox<T> = Arc<Pin<Box<T>>>;
 
 impl dyn Interface {
@@ -61,19 +60,6 @@ impl dyn Interface {
     {
         if self.is::<T>() {
             Ok(unsafe { Box::from_raw(Box::into_raw(self) as *mut T) })
-        } else {
-            Err(self)
-        }
-    }
-
-    pub fn downcast_rc_pin_box<T>(
-        self: RefcountedPinBox<Self>,
-    ) -> Result<RefcountedPinBox<T>, RefcountedPinBox<Self>>
-    where
-        T: 'static,
-    {
-        if self.is::<T>() {
-            Ok(unsafe { Rc::from_raw(Rc::into_raw(self) as *mut Pin<Box<T>>) })
         } else {
             Err(self)
         }
