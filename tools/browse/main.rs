@@ -15,23 +15,22 @@ use std::{
 
 use tuirealm::{
     props::{Color, TableBuilder, TextSpan},
-    ratatui::layout,
+    ratatui::{layout, widgets::Clear},
     terminal::{CrosstermTerminalAdapter, TerminalBridge},
     Application, AttrValue, Attribute, EventListenerCfg, NoUserEvent, PollStrategy, Update,
 };
 
 use components::{
-    object_details::ObjectDetails, object_list::ObjectList, type_list::TypeList,
-    type_list::TypeSelection,
+    object_details::ObjectDetails, object_list::ObjectList, popup::Popup, renderable::Renderable,
+    type_list::TypeList, type_list::TypeSelection,
 };
-
-use crate::components::renderable::Renderable;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum Msg {
     FocusChanged(ComponentId),
     TypeChanged(TypeSelection),
     ObjectChanged(usize),
+    ShowParams(bool),
     Quit,
     None,
 }
@@ -41,6 +40,7 @@ enum ComponentId {
     Types,
     Objects,
     Details,
+    Popup,
 }
 
 struct Model {
@@ -49,6 +49,7 @@ struct Model {
     component_selection: ComponentId,
     type_selection: TypeSelection,
     object_selection: usize,
+    show_params: bool,
     quit: bool,
     redraw: bool,
 }
@@ -67,13 +68,14 @@ impl Model {
             vec![],
         )
         .unwrap();
-
         app.mount(
             ComponentId::Details,
             Box::new(ObjectDetails::default()),
             vec![],
         )
         .unwrap();
+        app.mount(ComponentId::Popup, Box::new(Popup::default()), vec![])
+            .unwrap();
 
         app.active(&ComponentId::Types).unwrap();
 
@@ -83,13 +85,14 @@ impl Model {
             component_selection: ComponentId::Types,
             type_selection: TypeSelection::Clients,
             object_selection: 0,
+            show_params: false,
             quit: false,
             redraw: true,
         }
     }
 
     fn view(&mut self, terminal: &mut TerminalBridge<CrosstermTerminalAdapter>) {
-        let _ = terminal.raw_mut().draw(|f| {
+        let _ = terminal.raw_mut().draw(|frame| {
             let layout = layout::Layout::default()
                 .direction(layout::Direction::Horizontal)
                 .constraints([
@@ -97,11 +100,23 @@ impl Model {
                     layout::Constraint::Percentage(30),
                     layout::Constraint::Percentage(60),
                 ])
-                .split(f.area());
+                .split(frame.area());
 
-            self.app.view(&ComponentId::Types, f, layout[0]);
-            self.app.view(&ComponentId::Objects, f, layout[1]);
-            self.app.view(&ComponentId::Details, f, layout[2]);
+            self.app.view(&ComponentId::Types, frame, layout[0]);
+            self.app.view(&ComponentId::Objects, frame, layout[1]);
+            self.app.view(&ComponentId::Details, frame, layout[2]);
+
+            if self.show_params {
+                let area = frame.area();
+                let popup_area = layout::Rect {
+                    x: area.width / 6,
+                    y: area.height / 6,
+                    width: area.width * 4 / 6,
+                    height: area.height * 4 / 6,
+                };
+                frame.render_widget(Clear, popup_area);
+                self.app.view(&ComponentId::Popup, frame, popup_area);
+            }
         });
     }
 
@@ -210,6 +225,20 @@ impl Model {
                 .unwrap();
         }
     }
+
+    fn update_object_params(&mut self) -> bool {
+        let object = match self.get_current_object() {
+            Some(o) => o,
+            None => return false,
+        };
+
+        let params = object.params();
+        if params.is_empty() {
+            return false;
+        }
+
+        true
+    }
 }
 
 impl Update<Msg> for Model {
@@ -230,6 +259,21 @@ impl Update<Msg> for Model {
             Msg::ObjectChanged(idx) => {
                 self.object_selection = idx;
                 self.update_object_details();
+                None
+            }
+            Msg::ShowParams(show_params) => {
+                let have_params = self.update_object_params();
+                let show_params = show_params && have_params;
+
+                if show_params != self.show_params {
+                    self.show_params = show_params;
+                    if self.show_params {
+                        self.app.active(&ComponentId::Popup).unwrap();
+                    } else {
+                        self.app.active(&self.component_selection).unwrap();
+                    }
+                }
+
                 None
             }
             Msg::Quit => {

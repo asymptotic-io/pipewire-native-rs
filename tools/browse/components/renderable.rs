@@ -11,12 +11,17 @@ use crate::pw::{ClientDetails, DeviceDetails, ModuleDetails};
 // Enough to render PW objects in a list view or detail view
 pub trait Renderable {
     fn props(&self) -> &Properties;
+    fn params(&self) -> &[(spa::param::ParamType, spa::pod::RawPodOwned)];
     fn title(&self) -> TextSpan;
 }
 
 impl Renderable for ClientDetails {
     fn props(&self) -> &Properties {
         &self.props
+    }
+
+    fn params(&self) -> &[(spa::param::ParamType, spa::pod::RawPodOwned)] {
+        &[]
     }
 
     fn title(&self) -> TextSpan {
@@ -36,6 +41,10 @@ impl Renderable for DeviceDetails {
         &self.props
     }
 
+    fn params(&self) -> &[(spa::param::ParamType, spa::pod::RawPodOwned)] {
+        self.params.as_slice()
+    }
+
     fn title(&self) -> TextSpan {
         TextSpan::from(format!(
             "#{}: {} ({})",
@@ -52,6 +61,10 @@ impl Renderable for DeviceDetails {
 impl Renderable for ModuleDetails {
     fn props(&self) -> &Properties {
         &self.props
+    }
+
+    fn params(&self) -> &[(spa::param::ParamType, spa::pod::RawPodOwned)] {
+        &[]
     }
 
     fn title(&self) -> TextSpan {

@@ -6,47 +6,38 @@ use tui_realm_stdlib::List;
 use tuirealm::{
     command::{Cmd, CmdResult, Direction, Position},
     event::{Key, KeyEvent},
-    props::{Alignment, Color, Style, TableBuilder},
+    props::{Color, Style, TableBuilder},
     Component, Event, MockComponent, NoUserEvent,
 };
 
-use crate::{ComponentId, Msg};
+use crate::Msg;
 
 #[derive(MockComponent)]
-pub struct ObjectDetails {
+pub struct Popup {
     component: List,
 }
 
-impl Default for ObjectDetails {
+impl Default for Popup {
     fn default() -> Self {
         Self {
             component: List::default()
                 .inactive(Style::default().fg(Color::Magenta))
                 .scroll(true)
                 .rewind(true)
-                .title("Details", Alignment::Left)
                 .highlighted_str(" ")
                 .rows(TableBuilder::default().build()),
         }
     }
 }
 
-impl Component<Msg, NoUserEvent> for ObjectDetails {
+impl Component<Msg, NoUserEvent> for Popup {
     fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
-        let mut focus_changed = false;
-
         let _ = match ev {
             Event::Keyboard(KeyEvent {
-                code: Key::Left, ..
-            }) => {
-                focus_changed = true;
-                CmdResult::None
-            }
-            Event::Keyboard(KeyEvent {
                 code: Key::Down, ..
-            }) => self.perform(Cmd::Scroll(Direction::Down)),
+            }) => self.perform(Cmd::Move(Direction::Down)),
             Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
-                self.perform(Cmd::Scroll(Direction::Up))
+                self.perform(Cmd::Move(Direction::Up))
             }
             Event::Keyboard(KeyEvent {
                 code: Key::PageDown,
@@ -61,18 +52,11 @@ impl Component<Msg, NoUserEvent> for ObjectDetails {
             Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
                 self.perform(Cmd::GoTo(Position::End))
             }
-            Event::Keyboard(KeyEvent {
-                code: Key::Char('p'),
-                ..
-            }) => return Some(Msg::ShowParams(true)),
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
+            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => {
+                return Some(Msg::ShowParams(false))
+            }
             _ => CmdResult::None,
         };
-
-        if focus_changed {
-            Some(Msg::FocusChanged(ComponentId::Objects))
-        } else {
-            Some(Msg::None)
-        }
+        Some(Msg::None)
     }
 }
