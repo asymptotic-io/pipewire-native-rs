@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
 
     pub fn pop_object<K, I, T>(
         &'a mut self,
-        parse_object: impl FnOnce(&mut ObjectParser<'_>, I) -> Result<T, Error>,
+        parse_object: impl FnOnce(&mut ObjectParser<'a, K>, I) -> Result<T, Error>,
     ) -> Result<(T, usize), Error>
     where
         K: ParamObject,
@@ -181,21 +181,26 @@ impl<'a> Parser<'a> {
     }
 }
 
-pub struct ObjectParser<'a> {
+pub struct ObjectParser<'a, K> {
     data: &'a [u8],
     pos: usize,
+    phantom: std::marker::PhantomData<K>,
 }
 
-impl<'a> ObjectParser<'a> {
-    fn new(data: &'a [u8]) -> ObjectParser<'a> {
-        ObjectParser { data, pos: 0 }
+impl<'a, K> ObjectParser<'a, K> {
+    fn new(data: &'a [u8]) -> ObjectParser<'a, K> {
+        ObjectParser {
+            data,
+            pos: 0,
+            phantom: std::marker::PhantomData,
+        }
     }
 
     pub fn available(&self) -> usize {
         self.data.len() - self.pos
     }
 
-    pub fn pop_property<K>(&mut self) -> Result<Option<(K, PropertyFlags, RawPod<'a>)>, Error>
+    pub fn pop_property(&mut self) -> Result<Option<(K, PropertyFlags, RawPod<'a>)>, Error>
     where
         K: TryFrom<u32> + ParamObject,
     {
@@ -228,5 +233,17 @@ impl<'a> ObjectParser<'a> {
         self.pos += data.total_size();
 
         Ok(Some((key, flags, data)))
+    }
+}
+
+impl<'a, K: ParamObject + TryFrom<u32>> Iterator for ObjectParser<'a, K> {
+    type Item = (K, PropertyFlags, RawPod<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.pop_property() {
+            Ok(Some(item)) => Some(item),
+            Ok(None) => None, // end of data
+            Err(_) => None,   // actual parsing error
+        }
     }
 }
