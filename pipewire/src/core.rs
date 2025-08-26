@@ -23,7 +23,7 @@ use crate::{
 
 default_topic!(log::topic::CORE);
 
-const VERSION: u32 = 3;
+const VERSION: u32 = 4;
 
 const DEFAULT_REMOTE: &str = "pipewire-0";
 
