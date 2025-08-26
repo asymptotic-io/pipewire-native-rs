@@ -35,6 +35,9 @@ pub struct ClientDetails {
     pub props: Properties,
 }
 
+unsafe impl Send for ClientDetails {}
+unsafe impl Sync for ClientDetails {}
+
 #[derive(Clone)]
 pub struct DeviceDetails {
     pub device: proxy::device::Device,
@@ -42,11 +45,17 @@ pub struct DeviceDetails {
     pub params: Vec<(spa::param::ParamType, spa::pod::RawPodOwned)>,
 }
 
+unsafe impl Send for DeviceDetails {}
+unsafe impl Sync for DeviceDetails {}
+
 #[derive(Clone)]
 pub struct ModuleDetails {
     pub module: proxy::module::Module,
     pub props: Properties,
 }
+
+unsafe impl Send for ModuleDetails {}
+unsafe impl Sync for ModuleDetails {}
 
 pub struct State {
     pub main_loop: ThreadLoop,
