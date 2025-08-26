@@ -10,5 +10,6 @@ path = "browse/main.rs"
 [dependencies]
 crossterm = "0.29.0"
 pipewire = { package = "pipewire-native", path = "../pipewire" }
+spa = { package = "pipewire-native-spa", path = "../spa" }
 tui-realm-stdlib = { version = "3.0.0", features = ["crossterm"] }
 tuirealm = { version = "3.0.1", features = ["derive", "crossterm"] }

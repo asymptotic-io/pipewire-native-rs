@@ -13,7 +13,6 @@ use std::{
     time::Duration,
 };
 
-use pipewire::properties::Properties;
 use tuirealm::{
     props::{Color, TableBuilder, TextSpan},
     ratatui::layout,
@@ -107,36 +106,36 @@ impl Model {
     }
 
     fn update_object_list(&mut self) {
-        let mut objects: Vec<(Box<dyn Renderable>, Properties)> = vec![];
+        let mut objects: Vec<Box<dyn Renderable>> = vec![];
 
         match self.type_selection {
             TypeSelection::Clients => {
-                let clients = self.pw_state.clients.read().unwrap();
+                let clients = self.pw_state.clients.lock().unwrap();
 
-                for (_, (client, props)) in clients.iter() {
-                    objects.push((Box::new(client.clone()), props.clone()));
+                for client in clients.values() {
+                    objects.push(Box::new(client.clone()));
                 }
             }
             TypeSelection::Devices => {
-                let devices = self.pw_state.devices.read().unwrap();
+                let devices = self.pw_state.devices.lock().unwrap();
 
-                for (_, (device, props)) in devices.iter() {
-                    objects.push((Box::new(device.clone()), props.clone()));
+                for device in devices.values() {
+                    objects.push(Box::new(device.clone()));
                 }
             }
             TypeSelection::Modules => {
-                let modules = self.pw_state.modules.read().unwrap();
+                let modules = self.pw_state.modules.lock().unwrap();
 
-                for (_, (module, props)) in modules.iter() {
-                    objects.push((Box::new(module.clone()), props.clone()))
+                for module in modules.values() {
+                    objects.push(Box::new(module.clone()));
                 }
             }
         }
 
         let mut table = TableBuilder::default();
 
-        for (idx, (object, props)) in objects.iter().enumerate() {
-            table.add_col(object.title(props));
+        for (idx, object) in objects.iter().enumerate() {
+            table.add_col(object.title());
 
             if idx < objects.len() - 1 {
                 table.add_row();
@@ -153,24 +152,35 @@ impl Model {
         self.update_object_details();
     }
 
-    fn update_object_details(&mut self) {
-        let props = match self.type_selection {
+    fn get_current_object(&self) -> Option<Box<dyn Renderable>> {
+        match self.type_selection {
             TypeSelection::Clients => {
-                let clients = self.pw_state.clients.read().unwrap();
+                let clients = self.pw_state.clients.lock().unwrap();
                 let entries = clients.iter().collect::<Vec<_>>();
-                entries.get(self.object_selection).map(|e| e.1 .1.clone())
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
             }
             TypeSelection::Devices => {
-                let devices = self.pw_state.devices.read().unwrap();
+                let devices = self.pw_state.devices.lock().unwrap();
                 let entries = devices.iter().collect::<Vec<_>>();
-                entries.get(self.object_selection).map(|e| e.1 .1.clone())
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
             }
             TypeSelection::Modules => {
-                let modules = self.pw_state.modules.read().unwrap();
+                let modules = self.pw_state.modules.lock().unwrap();
                 let entries = modules.iter().collect::<Vec<_>>();
-                entries.get(self.object_selection).map(|e| e.1 .1.clone())
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
             }
-        };
+        }
+    }
+
+    fn update_object_details(&mut self) {
+        let object = self.get_current_object();
+        let props = object.as_ref().map(|o| o.props());
 
         if let Some(props) = props {
             let mut props_str = props.iter().collect::<Vec<_>>();
