@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use pipewire::{keys, proxy::HasProxy};
+use pipewire::properties::Properties;
 use tuirealm::{
     props::{Color, TableBuilder, TextSpan},
     ratatui::layout,
@@ -25,6 +25,8 @@ use components::{
     object_details::ObjectDetails, object_list::ObjectList, type_list::TypeList,
     type_list::TypeSelection,
 };
+
+use crate::components::renderable::Renderable;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum Msg {
@@ -105,87 +107,49 @@ impl Model {
     }
 
     fn update_object_list(&mut self) {
-        let mut table = TableBuilder::default();
+        let mut objects: Vec<(Box<dyn Renderable>, Properties)> = vec![];
 
         match self.type_selection {
             TypeSelection::Clients => {
                 let clients = self.pw_state.clients.read().unwrap();
-                let n = clients.len();
 
-                for (idx, (id, (client, props))) in clients.iter().enumerate() {
-                    table.add_col(TextSpan::from(format!(
-                        "#{}: {}",
-                        client.proxy().bound_id().unwrap_or(*id),
-                        props.get(keys::APP_NAME).unwrap_or("unknown"),
-                    )));
-
-                    // Only add rows between columns
-                    if idx < n - 1 {
-                        table.add_row();
-                    }
+                for (_, (client, props)) in clients.iter() {
+                    objects.push((Box::new(client.clone()), props.clone()));
                 }
-
-                self.app
-                    .attr(
-                        &ComponentId::Objects,
-                        Attribute::Content,
-                        AttrValue::Table(table.build()),
-                    )
-                    .unwrap();
             }
             TypeSelection::Devices => {
                 let devices = self.pw_state.devices.read().unwrap();
-                let n = devices.len();
 
-                for (idx, (id, (client, props))) in devices.iter().enumerate() {
-                    table.add_col(TextSpan::from(format!(
-                        "#{}: {} ({})",
-                        client.proxy().bound_id().unwrap_or(*id),
-                        props.get("device.name").unwrap_or("unknown"),
-                        props.get("device.nick").unwrap_or("unknown"),
-                    )));
-
-                    // Only add rows between columns
-                    if idx < n - 1 {
-                        table.add_row();
-                    }
+                for (_, (device, props)) in devices.iter() {
+                    objects.push((Box::new(device.clone()), props.clone()));
                 }
-
-                self.app
-                    .attr(
-                        &ComponentId::Objects,
-                        Attribute::Content,
-                        AttrValue::Table(table.build()),
-                    )
-                    .unwrap();
             }
             TypeSelection::Modules => {
                 let modules = self.pw_state.modules.read().unwrap();
-                let n = modules.len();
 
-                for (idx, (id, (client, props))) in modules.iter().enumerate() {
-                    table.add_col(TextSpan::from(format!(
-                        "#{}: {}",
-                        client.proxy().bound_id().unwrap_or(*id),
-                        props.get("module.name").unwrap_or("unknown"),
-                    )));
-
-                    // Only add rows between columns
-                    if idx < n - 1 {
-                        table.add_row();
-                    }
+                for (_, (module, props)) in modules.iter() {
+                    objects.push((Box::new(module.clone()), props.clone()))
                 }
-
-                self.app
-                    .attr(
-                        &ComponentId::Objects,
-                        Attribute::Content,
-                        AttrValue::Table(table.build()),
-                    )
-                    .unwrap();
             }
         }
 
+        let mut table = TableBuilder::default();
+
+        for (idx, (object, props)) in objects.iter().enumerate() {
+            table.add_col(object.title(props));
+
+            if idx < objects.len() - 1 {
+                table.add_row();
+            }
+        }
+
+        self.app
+            .attr(
+                &ComponentId::Objects,
+                Attribute::Content,
+                AttrValue::Table(table.build()),
+            )
+            .unwrap();
         self.update_object_details();
     }
 
@@ -194,75 +158,47 @@ impl Model {
             TypeSelection::Clients => {
                 let clients = self.pw_state.clients.read().unwrap();
                 let entries = clients.iter().collect::<Vec<_>>();
-
-                if let Some(entry) = entries.get(self.object_selection) {
-                    let mut props = entry.1 .1.iter().collect::<Vec<(&str, &str)>>();
-                    props.sort_by_key(|e| e.0);
-
-                    props
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
-                        .collect()
-                } else {
-                    vec![]
-                }
+                entries.get(self.object_selection).map(|e| e.1 .1.clone())
             }
             TypeSelection::Devices => {
                 let devices = self.pw_state.devices.read().unwrap();
                 let entries = devices.iter().collect::<Vec<_>>();
-
-                if let Some(entry) = entries.get(self.object_selection) {
-                    let mut props = entry.1 .1.iter().collect::<Vec<(&str, &str)>>();
-                    props.sort_by_key(|e| e.0);
-
-                    props
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
-                        .collect()
-                } else {
-                    vec![]
-                }
+                entries.get(self.object_selection).map(|e| e.1 .1.clone())
             }
             TypeSelection::Modules => {
                 let modules = self.pw_state.modules.read().unwrap();
                 let entries = modules.iter().collect::<Vec<_>>();
-
-                if let Some(entry) = entries.get(self.object_selection) {
-                    let mut props = entry.1 .1.iter().collect::<Vec<_>>();
-                    props.sort_by_key(|e| e.0);
-
-                    props
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
-                        .collect()
-                } else {
-                    vec![]
-                }
+                entries.get(self.object_selection).map(|e| e.1 .1.clone())
             }
         };
 
-        let n = props.len();
+        if let Some(props) = props {
+            let mut props_str = props.iter().collect::<Vec<_>>();
+            props_str.sort_by_key(|e| e.0);
 
-        let mut table = TableBuilder::default();
+            let n = props_str.len();
 
-        for (idx, (key, value)) in props.iter().enumerate() {
-            table.add_col(TextSpan::from(key).fg(Color::Cyan));
-            table.add_col(TextSpan::from(" "));
-            table.add_col(TextSpan::from(value));
+            let mut table = TableBuilder::default();
 
-            // Only add rows between columns
-            if idx < n - 1 {
-                table.add_row();
+            for (idx, (key, value)) in props_str.iter().enumerate() {
+                table.add_col(TextSpan::from(*key).fg(Color::Cyan));
+                table.add_col(TextSpan::from(" "));
+                table.add_col(TextSpan::from(*value));
+
+                // Only add rows between columns
+                if idx < n - 1 {
+                    table.add_row();
+                }
             }
-        }
 
-        self.app
-            .attr(
-                &ComponentId::Details,
-                Attribute::Content,
-                AttrValue::Table(table.build()),
-            )
-            .unwrap();
+            self.app
+                .attr(
+                    &ComponentId::Details,
+                    Attribute::Content,
+                    AttrValue::Table(table.build()),
+                )
+                .unwrap();
+        }
     }
 }
 

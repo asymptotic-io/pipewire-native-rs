@@ -4,4 +4,5 @@
 
 pub mod object_details;
 pub mod object_list;
+pub mod renderable;
 pub mod type_list;
