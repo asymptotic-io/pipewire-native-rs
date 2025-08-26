@@ -43,6 +43,7 @@ fn pad_8(size: usize) -> usize {
     }
 }
 
+#[derive(Clone)]
 pub struct RawPod<'a> {
     size: usize,
     type_: Type,
@@ -59,6 +60,7 @@ impl<'a> std::fmt::Debug for RawPod<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct RawPodOwned {
     size: usize,
     type_: Type,
