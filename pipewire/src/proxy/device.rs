@@ -151,7 +151,7 @@ impl Device {
     /// Set a parameter on the device.
     pub fn set_param(
         &self,
-        param_type: spa::param::ParamType,
+        param_id: spa::param::ParamType,
         object_type: spa::pod::types::ObjectType,
         flags: u32,
         builder: Box<
@@ -159,7 +159,7 @@ impl Device {
         >,
     ) -> std::io::Result<()> {
         let proxy = self.proxy();
-        proxy_object_invoke!(proxy, set_param, param_type, object_type, flags, builder)
+        proxy_object_invoke!(proxy, set_param, param_id, object_type, flags, builder)
     }
 
     pub(crate) fn methods(&self) -> Arc<Mutex<DeviceMethods<Device>>> {

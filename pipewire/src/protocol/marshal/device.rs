@@ -83,7 +83,7 @@ impl Methods {
                         builder
                             .push_object(
                                 param_builder.object_type,
-                                param_builder.param_type,
+                                param_builder.param_id,
                                 param_builder.builder
                             )
                             .build()
@@ -113,14 +113,14 @@ impl Methods {
                     })
                 )
             }),
-            set_param: closure!([connection] proxy, param_type, object_type, flags, param_builder, {
+            set_param: closure!([connection] proxy, param_id, object_type, flags, param_builder, {
                 let mut param_data = [0u8; 16384];
 
                 let builder = Builder::new(param_data.as_mut_slice());
                 builder
                     .push_object(
                         object_type,
-                        param_type,
+                        param_id,
                         param_builder
                     )
                     .build()
@@ -136,7 +136,7 @@ impl Methods {
                 connection.push(
                     proxy.id(),
                     Methods::SetParam(SetParam {
-                        id: SpaId(param_type),
+                        id: SpaId(param_id),
                         flags: flags as i32,
                         param
                     })
@@ -204,11 +204,11 @@ impl Events {
             }
             Events::Param(param) => {
                 let seq = param.seq as u32;
-                let param_type = param.id.0;
+                let param_id = param.id.0;
                 let index = param.index as u32;
                 let next = param.next as u32;
                 let param_pod = param.param;
-                proxy_object_notify!(proxy, param, seq, param_type, index, next, &param_pod);
+                proxy_object_notify!(proxy, param, seq, param_id, index, next, &param_pod);
             }
         }
 

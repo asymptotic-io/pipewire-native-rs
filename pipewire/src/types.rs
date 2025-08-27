@@ -31,7 +31,7 @@ pub mod params {
         /// The object type for the param being built.
         pub object_type: spa::pod::types::ObjectType,
         /// The id of the param being built.
-        pub param_type: spa::param::ParamType,
+        pub param_id: spa::param::ParamType,
         /// A free form Pod builder for the individual object fields.
         pub builder:
             Box<dyn FnOnce(spa::pod::builder::ObjectBuilder) -> spa::pod::builder::ObjectBuilder>,
