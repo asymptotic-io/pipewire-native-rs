@@ -53,6 +53,7 @@ impl Methods {
                     types::interface::CLIENT => Box::new(proxy::client::Client::new(&core)),
                     types::interface::DEVICE => Box::new(proxy::device::Device::new(&core)),
                     types::interface::MODULE => Box::new(proxy::module::Module::new(&core)),
+                    types::interface::NODE => Box::new(proxy::node::Node::new(&core)),
                     _ => {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::Unsupported,

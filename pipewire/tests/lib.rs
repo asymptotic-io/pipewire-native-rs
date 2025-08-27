@@ -12,7 +12,10 @@ use pipewire_native::{
     context::Context,
     main_loop::MainLoop,
     properties::Properties,
-    proxy::{client::Client, module::Module, registry::RegistryEvents, HasProxy, ProxyEvents},
+    proxy::{
+        client::Client, device::Device, module::Module, node::Node, registry::RegistryEvents,
+        HasProxy, ProxyEvents,
+    },
     some_closure, types, Id,
 };
 
@@ -106,6 +109,19 @@ fn test_lib() {
 
                     client
                 }
+                types::interface::DEVICE => {
+                    let device = registry.bind(id, type_, version).unwrap();
+                    let proxy = device.downcast_proxy::<Device>().unwrap();
+
+                    proxy.add_listener(ProxyEvents {
+                        removed: some_closure!([proxy ^(objects)] {
+                            objects.map.write().unwrap().remove(&proxy.id());
+                        }),
+                        ..Default::default()
+                    });
+
+                    device
+                }
                 types::interface::MODULE => {
                     let module = registry.bind(id, type_, version).unwrap();
                     let proxy = module.downcast_proxy::<Module>().unwrap();
@@ -118,6 +134,19 @@ fn test_lib() {
                     });
 
                     module
+                }
+                types::interface::NODE => {
+                    let node = registry.bind(id, type_, version).unwrap();
+                    let proxy = node.downcast_proxy::<Node>().unwrap();
+
+                    proxy.add_listener(ProxyEvents {
+                        removed: some_closure!([proxy ^(objects)] {
+                            objects.map.write().unwrap().remove(&proxy.id());
+                        }),
+                        ..Default::default()
+                    });
+
+                    node
                 }
                 _ => return,
             };
