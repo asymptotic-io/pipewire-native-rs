@@ -17,6 +17,12 @@ pub enum Error {
     NoSpace,
 }
 
+impl From<Error> for std::fmt::Error {
+    fn from(_value: Error) -> Self {
+        std::fmt::Error
+    }
+}
+
 pub trait Pod {
     // Default to Self once that is stable, or try to generate references to owned data
     type DecodesTo;
@@ -57,6 +63,40 @@ impl<'a> std::fmt::Debug for RawPod<'a> {
             "RawPod {{ type: {:?}, size: {} }}",
             self.type_, self.size
         )
+    }
+}
+
+impl<'a> std::fmt::Display for RawPod<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.type_() {
+            Type::Start => unreachable!(),
+            Type::None => write!(f, "()"),
+            Type::Bool => write!(f, "{}", bool::decode(self.data)?.0),
+            Type::Id => write!(f, "Id({})", Id::<u32>::decode(self.data)?.0 .0),
+            Type::Int => write!(f, "{}", i32::decode(self.data)?.0),
+            Type::Long => write!(f, "{}", i64::decode(self.data)?.0),
+            Type::Float => write!(f, "{}", f32::decode(self.data)?.0),
+            Type::Double => write!(f, "{}", f64::decode(self.data)?.0),
+            Type::String => write!(f, "{}", String::decode(self.data)?.0),
+            Type::Bytes => write!(f, "{:?}", Vec::<u8>::decode(self.data)?.0),
+            Type::Rectangle => {
+                let rect = Rectangle::decode(self.data)?.0;
+                write!(f, "{}x{}", rect.width, rect.height)
+            }
+            Type::Fraction => {
+                let frac = Fraction::decode(self.data)?.0;
+                write!(f, "{}/{}", frac.num, frac.denom)
+            }
+            Type::Bitmap => write!(f, "bitmap"),
+            Type::Array => write!(f, "array[]"),
+            Type::Struct => write!(f, "struct{{}}"),
+            Type::Object => write!(f, "object{{}}"),
+            Type::Sequence => write!(f, "sequence{{}}"),
+            Type::Pointer => write!(f, "pointer"),
+            Type::Fd => write!(f, "fd"),
+            Type::Choice => write!(f, "choice{{}}"),
+            Type::Pod => write!(f, "pod"),
+        }
     }
 }
 
