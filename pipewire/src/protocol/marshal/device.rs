@@ -64,7 +64,6 @@ impl Methods {
                     })
                 )
             }),
-            //Box<dyn FnMut(&Proxy<T>, u32, u32, u32, u32, ParamBuilder) -> std::io::Result<()>>,
             enum_params: closure!([connection] proxy, seq, id, index, num, filter, {
                 let id = match id {
                     Some(id) => id as u32,
