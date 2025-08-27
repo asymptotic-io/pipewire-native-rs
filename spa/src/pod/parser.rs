@@ -179,6 +179,55 @@ impl<'a> Parser<'a> {
 
         Ok((ret, size + 8))
     }
+
+    pub fn pop_object_raw<I, T>(
+        &'a mut self,
+        parse_object: impl FnOnce(&mut ObjectParserRaw<'a>, ObjectType, I) -> Result<T, Error>,
+    ) -> Result<(T, usize), Error>
+    where
+        I: TryFrom<u32>,
+    {
+        if self.available() < 16 {
+            return Err(Error::Invalid);
+        }
+
+        let size =
+            u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
+        if self.available() < 8 + size {
+            return Err(Error::Invalid);
+        }
+
+        let t = u32::from_ne_bytes(self.data[self.pos + 4..self.pos + 8].try_into().unwrap());
+        if t != Type::Object as u32 {
+            return Err(Error::Invalid);
+        }
+
+        let object_type = match ObjectType::try_from(u32::from_ne_bytes(
+            self.data[self.pos + 8..self.pos + 12].try_into().unwrap(),
+        )) {
+            Ok(ot) => ot,
+            Err(_) => return Err(Error::Invalid),
+        };
+
+        let id = match I::try_from(u32::from_ne_bytes(
+            self.data[self.pos + 12..self.pos + 16].try_into().unwrap(),
+        )) {
+            Ok(id) => id,
+            Err(_) => return Err(Error::Invalid),
+        };
+
+        self.pos += 16;
+
+        let ret = {
+            let mut object_parser = ObjectParserRaw::new(&self.data[self.pos..self.pos + size - 8]);
+            parse_object(&mut object_parser, object_type, id)?
+        };
+
+        // The caller may or may not iterate over all properties, don't depend on that
+        self.pos += size - 8;
+
+        Ok((ret, size + 8))
+    }
 }
 
 pub struct ObjectParser<'a, K> {
@@ -238,6 +287,60 @@ impl<'a, K> ObjectParser<'a, K> {
 
 impl<'a, K: ParamObject + TryFrom<u32>> Iterator for ObjectParser<'a, K> {
     type Item = (K, PropertyFlags, RawPod<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.pop_property() {
+            Ok(Some(item)) => Some(item),
+            Ok(None) => None, // end of data
+            Err(_) => None,   // actual parsing error
+        }
+    }
+}
+
+pub struct ObjectParserRaw<'a> {
+    data: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> ObjectParserRaw<'a> {
+    fn new(data: &'a [u8]) -> ObjectParserRaw<'a> {
+        ObjectParserRaw { data, pos: 0 }
+    }
+
+    pub fn available(&self) -> usize {
+        self.data.len() - self.pos
+    }
+
+    pub fn pop_property(&mut self) -> Result<Option<(u32, PropertyFlags, RawPod<'a>)>, Error> {
+        if self.available() == 0 {
+            return Ok(None);
+        }
+
+        if self.available() < 16 {
+            return Err(Error::Invalid);
+        }
+
+        let key = u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap());
+
+        let flags = match PropertyFlags::from_bits(u32::from_ne_bytes(
+            self.data[self.pos + 4..self.pos + 8].try_into().unwrap(),
+        )) {
+            Some(f) => f,
+            None => return Err(Error::Invalid),
+        };
+
+        self.pos += 8;
+
+        let data = RawPod::wrap(&self.data[self.pos..])?;
+
+        self.pos += data.total_size();
+
+        Ok(Some((key, flags, data)))
+    }
+}
+
+impl<'a> Iterator for ObjectParserRaw<'a> {
+    type Item = (u32, PropertyFlags, RawPod<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.pop_property() {
