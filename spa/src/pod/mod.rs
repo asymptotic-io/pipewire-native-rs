@@ -13,7 +13,7 @@ use types::{Choice, Fd, Fraction, Id, Pointer, Property, PropertyFlags, Rectangl
 
 #[derive(Debug)]
 pub enum Error {
-    Invalid,
+    Invalid(String),
     NoSpace,
 }
 
@@ -131,7 +131,7 @@ impl<'a> RawPod<'a> {
         }
 
         let type_ = Type::try_from(u32::from_ne_bytes(data[4..8].try_into().unwrap()))
-            .map_err(|_| Error::Invalid)?;
+            .map_err(|e| Error::Invalid(format!("Could not decode pod type: {e:?}")))?;
 
         Ok(RawPod {
             size,
@@ -174,7 +174,7 @@ impl RawPodOwned {
         }
 
         let type_ = Type::try_from(u32::from_ne_bytes(data[4..8].try_into().unwrap()))
-            .map_err(|_| Error::Invalid)?;
+            .map_err(|e| Error::Invalid(format!("Could not decode pod type: {e:?}")))?;
 
         Ok(RawPodOwned { size, type_, data })
     }
@@ -277,17 +277,25 @@ where
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
         if data.len() < 16 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for primitive".to_string()));
         }
 
         let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         if size != Self::pod_size() {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Mismatched pod size: {} != {}",
+                size,
+                Self::pod_size()
+            )));
         }
 
         let t = u32::from_ne_bytes(data[4..8].try_into().unwrap());
         if t != Self::pod_type() as u32 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Type {} is not {:?}",
+                t,
+                Self::pod_type()
+            )));
         }
 
         let val = Self::decode_body(&data[8..])?;
@@ -356,7 +364,7 @@ where
         if let Ok(val) = raw_val.try_into() {
             Ok(Id(val))
         } else {
-            Err(Error::Invalid)
+            Err(Error::Invalid(format!("Could not decode Id({raw_val})")))
         }
     }
 }
@@ -534,17 +542,20 @@ impl Pod for &str {
         let padding = pad_8(len);
 
         if data.len() < 8 + len {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for string".to_string()));
         }
 
         if data[4..8] != (Type::String as u32).to_ne_bytes() {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Type {} is not string",
+                u32::from_ne_bytes(data[4..8].try_into().unwrap())
+            )));
         }
 
         let s = String::from_utf8_lossy(&data[8..8 + len - 1]).to_string();
         // Null terminator
         if data[8 + len - 1] != 0 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for string".to_string()));
         }
 
         Ok((s, 8 + len + padding))
@@ -589,11 +600,14 @@ impl Pod for &[u8] {
         let padding = pad_8(len);
 
         if data.len() < 8 + len {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for byte array".to_string()));
         }
 
         if data[4..8] != (Type::Bytes as u32).to_ne_bytes() {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Type {} is not bytes",
+                u32::from_ne_bytes(data[4..8].try_into().unwrap())
+            )));
         }
 
         Ok((data[8..8 + len].to_vec(), 8 + len + padding))
@@ -661,16 +675,19 @@ impl Pod for Pointer {
         let padding = 8 - ptr_size;
 
         if data.len() < 24 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for pointer".to_string()));
         }
 
         if data[4..8] != (Type::Pointer as u32).to_ne_bytes() {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Type {} is not pointer",
+                u32::from_ne_bytes(data[4..8].try_into().unwrap())
+            )));
         }
 
         let type_ = match u32::from_ne_bytes(data[8..12].try_into().unwrap()).try_into() {
             Ok(t) => t,
-            Err(_) => return Err(Error::Invalid),
+            Err(e) => return Err(Error::Invalid(format!("Could not decode type: {e:?}"))),
         };
         let ptr = if ptr_size == 8 {
             u64::from_ne_bytes(data[16..24].try_into().unwrap()) as *const c_void
@@ -731,23 +748,27 @@ where
         let mut res = Vec::new();
 
         if data.len() < 16 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for array".to_string()));
         }
 
         let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         let padding = pad_8(size);
 
         if data.len() < 8 + size + padding {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for array".to_string()));
         }
 
         if Ok(Type::Array) != u32::from_ne_bytes(data[4..8].try_into().unwrap()).try_into() {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Type {} is not array",
+                u32::from_ne_bytes(data[4..8].try_into().unwrap())
+            )));
         }
 
         let child_size = u32::from_ne_bytes(data[8..12].try_into().unwrap()) as usize;
-        if Ok(T::pod_type()) != u32::from_ne_bytes(data[12..16].try_into().unwrap()).try_into() {
-            return Err(Error::Invalid);
+        let type_ = u32::from_ne_bytes(data[12..16].try_into().unwrap()).try_into();
+        if Ok(T::pod_type()) != type_ {
+            return Err(Error::Invalid(format!("Invalid array type {type_:?}")));
         }
 
         for i in 0..(size - 8) / child_size {
@@ -877,29 +898,32 @@ where
 
     fn decode(data: &[u8]) -> Result<(Choice<T>, usize), Error> {
         if data.len() < 24 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for choice".to_string()));
         }
 
         let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
         let padding = pad_8(size);
 
         if data.len() < 8 + size + padding {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for choice".to_string()));
         }
 
         if u32::from_ne_bytes(data[4..8].try_into().unwrap()) != Type::Choice as u32 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Type {} is not choice",
+                u32::from_ne_bytes(data[4..8].try_into().unwrap())
+            )));
         }
 
         let choice_type = u32::from_ne_bytes(data[8..12].try_into().unwrap());
         // flags is unused, so we don't decode it at [12..16]
         let child_size = u32::from_ne_bytes(data[16..20].try_into().unwrap()) as usize;
         if child_size != T::pod_size() {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for choice".to_string()));
         }
         let child_type = u32::from_ne_bytes(data[20..24].try_into().unwrap());
         if child_type != T::pod_type() as u32 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!("Invalid child type {child_type}")));
         }
 
         let choice = match choice_type {
@@ -909,7 +933,9 @@ where
             }
             1 => {
                 if size != 16 + child_size * 3 {
-                    return Err(Error::Invalid);
+                    return Err(Error::Invalid(
+                        "Not enough data for choice range".to_string(),
+                    ));
                 }
 
                 let default = T::decode_body(&data[24..])?;
@@ -920,7 +946,9 @@ where
             }
             2 => {
                 if size != 16 + child_size * 4 {
-                    return Err(Error::Invalid);
+                    return Err(Error::Invalid(
+                        "Not enough data for choice step".to_string(),
+                    ));
                 }
 
                 let default = T::decode_body(&data[24..])?;
@@ -950,7 +978,9 @@ where
             }
             4 => {
                 if size != 16 + child_size * 2 {
-                    return Err(Error::Invalid);
+                    return Err(Error::Invalid(
+                        "Not enough data for choice flags".to_string(),
+                    ));
                 }
 
                 let default = T::decode_body(&data[24..])?;
@@ -958,7 +988,7 @@ where
 
                 Choice::Flags { default, flags }
             }
-            _ => return Err(Error::Invalid),
+            t => return Err(Error::Invalid(format!("Invalid choice type {t}"))),
         };
 
         Ok((choice, 8 + size + padding))
@@ -987,18 +1017,20 @@ where
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
         if data.len() < 8 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for property".to_string()));
         }
 
         let key = match T::try_from(u32::from_ne_bytes(data[0..4].try_into().unwrap())) {
             Ok(k) => k,
-            Err(_) => return Err(Error::Invalid),
+            Err(_) => return Err(Error::Invalid("Invalid property key".to_string())),
         };
 
         let flags =
             match PropertyFlags::from_bits(u32::from_ne_bytes(data[4..8].try_into().unwrap())) {
                 Some(f) => f,
-                None => return Err(Error::Invalid),
+                None => {
+                    return Err(Error::Invalid("Invalid property flags".to_string()));
+                }
             };
 
         let (value, size) = U::decode(&data[8..])?;

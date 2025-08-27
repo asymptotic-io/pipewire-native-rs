@@ -103,18 +103,18 @@ impl<'a> Parser<'a> {
         F: FnOnce(&mut Parser) -> Result<T, Error>,
     {
         if self.available() < 8 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for struct".to_string()));
         }
 
         let size =
             u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
         if self.available() < 8 + size {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for struct".to_string()));
         }
 
         let t = u32::from_ne_bytes(self.data[self.pos + 4..self.pos + 8].try_into().unwrap());
         if t != Type::Struct as u32 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!("Type {t} is not struct")));
         }
 
         let mut struct_parser = Parser::new(&self.data[self.pos + 8..self.pos + 8 + size]);
@@ -135,36 +135,42 @@ impl<'a> Parser<'a> {
         I: TryFrom<u32>,
     {
         if self.available() < 16 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for object".to_string()));
         }
 
         let size =
             u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
         if self.available() < 8 + size {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for object".to_string()));
         }
 
         let t = u32::from_ne_bytes(self.data[self.pos + 4..self.pos + 8].try_into().unwrap());
         if t != Type::Object as u32 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!("Type {t} is not object")));
         }
 
         let object_type = match ObjectType::try_from(u32::from_ne_bytes(
             self.data[self.pos + 8..self.pos + 12].try_into().unwrap(),
         )) {
             Ok(ot) => ot,
-            Err(_) => return Err(Error::Invalid),
+            Err(e) => {
+                return Err(Error::Invalid(format!(
+                    "Could not decode object type: {e:?}"
+                )))
+            }
         };
 
         let id = match I::try_from(u32::from_ne_bytes(
             self.data[self.pos + 12..self.pos + 16].try_into().unwrap(),
         )) {
             Ok(id) => id,
-            Err(_) => return Err(Error::Invalid),
+            Err(_) => return Err(Error::Invalid("Could not decode id".to_string())),
         };
 
         if object_type != K::TYPE {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!(
+                "Unexpected object type {object_type:?}"
+            )));
         }
 
         self.pos += 16;
@@ -188,32 +194,36 @@ impl<'a> Parser<'a> {
         I: TryFrom<u32>,
     {
         if self.available() < 16 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for object".to_string()));
         }
 
         let size =
             u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
         if self.available() < 8 + size {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid("Not enough data for object".to_string()));
         }
 
         let t = u32::from_ne_bytes(self.data[self.pos + 4..self.pos + 8].try_into().unwrap());
         if t != Type::Object as u32 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(format!("Type {t} is not object")));
         }
 
         let object_type = match ObjectType::try_from(u32::from_ne_bytes(
             self.data[self.pos + 8..self.pos + 12].try_into().unwrap(),
         )) {
             Ok(ot) => ot,
-            Err(_) => return Err(Error::Invalid),
+            Err(e) => {
+                return Err(Error::Invalid(format!(
+                    "Could not decode object type: {e:?}"
+                )))
+            }
         };
 
         let id = match I::try_from(u32::from_ne_bytes(
             self.data[self.pos + 12..self.pos + 16].try_into().unwrap(),
         )) {
             Ok(id) => id,
-            Err(_) => return Err(Error::Invalid),
+            Err(_) => return Err(Error::Invalid("Could not decode id".to_string())),
         };
 
         self.pos += 16;
@@ -258,21 +268,23 @@ impl<'a, K> ObjectParser<'a, K> {
         }
 
         if self.available() < 16 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(
+                "Not enough data for object property".to_string(),
+            ));
         }
 
         let key = match K::try_from(u32::from_ne_bytes(
             self.data[self.pos..self.pos + 4].try_into().unwrap(),
         )) {
             Ok(k) => k,
-            Err(_) => return Err(Error::Invalid),
+            Err(_) => return Err(Error::Invalid("Could not decode key".to_string())),
         };
 
         let flags = match PropertyFlags::from_bits(u32::from_ne_bytes(
             self.data[self.pos + 4..self.pos + 8].try_into().unwrap(),
         )) {
             Some(f) => f,
-            None => return Err(Error::Invalid),
+            None => return Err(Error::Invalid("Could not decode flags".to_string())),
         };
 
         self.pos += 8;
@@ -317,7 +329,9 @@ impl<'a> ObjectParserRaw<'a> {
         }
 
         if self.available() < 16 {
-            return Err(Error::Invalid);
+            return Err(Error::Invalid(
+                "Not enough data for object property".to_string(),
+            ));
         }
 
         let key = u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap());
@@ -326,7 +340,7 @@ impl<'a> ObjectParserRaw<'a> {
             self.data[self.pos + 4..self.pos + 8].try_into().unwrap(),
         )) {
             Some(f) => f,
-            None => return Err(Error::Invalid),
+            None => return Err(Error::Invalid("Could not decode flags".to_string())),
         };
 
         self.pos += 8;

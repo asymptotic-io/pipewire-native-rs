@@ -78,7 +78,9 @@ pub fn derive_marshallable(input: TokenStream) -> TokenStream {
                     }
                 )*
 
-                Err(pipewire_native_spa::pod::Error::Invalid)
+                Err(pipewire_native_spa::pod::Error::Invalid(
+                        format!("Could not decode opcode {opcode}")
+                ))
             }
         }
     }

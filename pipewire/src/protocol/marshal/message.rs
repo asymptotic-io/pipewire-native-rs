@@ -51,7 +51,9 @@ impl<T: Marshallable, F: spa::pod::Pod<DecodesTo = F>> spa::pod::Pod for Message
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
         if data.len() < HEADER_LEN {
-            return Err(spa::pod::Error::Invalid);
+            return Err(spa::pod::Error::Invalid(
+                "Not enough data for header".to_string(),
+            ));
         }
 
         let (header, header_size) = Header::decode(data)?;
@@ -76,7 +78,11 @@ impl<T: Marshallable, F: spa::pod::Pod<DecodesTo = F>> spa::pod::Pod for Message
             ))
         } else {
             // We should not have leftover data
-            Err(spa::pod::Error::Invalid)
+            Err(spa::pod::Error::Invalid(format!(
+                "Data left over in message: {} != {}",
+                size,
+                header_size + payload_size + footer_size
+            )))
         }
     }
 }
@@ -100,7 +106,9 @@ impl spa::pod::Pod for Header {
 
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), spa::pod::Error> {
         if data.len() < 16 {
-            return Err(spa::pod::Error::Invalid);
+            return Err(spa::pod::Error::Invalid(
+                "Insufficent data for header".to_string(),
+            ));
         }
 
         let id = u32::from_ne_bytes(data[0..4].try_into().unwrap());
@@ -205,7 +213,11 @@ impl spa::pod::Pod for CoreFooter {
                         let g = sp.pop_pod::<CoreGeneration>()?;
                         CoreFooterPayload::Generation(g)
                     }
-                    _ => return Err(spa::pod::Error::Invalid),
+                    opcode => {
+                        return Err(spa::pod::Error::Invalid(format!(
+                            "Invalid footer opcode {opcode}"
+                        )))
+                    }
                 };
 
                 footer.payloads.push(payload);
@@ -252,7 +264,11 @@ impl spa::pod::Pod for ClientFooter {
                         let g = sp.pop_pod::<ClientGeneration>()?;
                         ClientFooterPayload::Generation(g)
                     }
-                    _ => return Err(spa::pod::Error::Invalid),
+                    opcode => {
+                        return Err(spa::pod::Error::Invalid(format!(
+                            "Invalid footer opcode {opcode}"
+                        )))
+                    }
                 };
 
                 footer.payloads.push(payload);
