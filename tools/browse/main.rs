@@ -14,7 +14,7 @@ use std::{
 };
 
 use tuirealm::{
-    props::{Color, TableBuilder, TextSpan},
+    props::{Alignment, Color, TableBuilder, TextSpan},
     ratatui::{layout, widgets::Clear},
     terminal::{CrosstermTerminalAdapter, TerminalBridge},
     Application, AttrValue, Attribute, EventListenerCfg, NoUserEvent, PollStrategy, Update,
@@ -236,6 +236,60 @@ impl Model {
         if params.is_empty() {
             return false;
         }
+
+        let mut table = TableBuilder::default();
+
+        for (param_id, param) in params {
+            let mut first = true;
+            for pod in param.pods.iter() {
+                let mut parser = spa::pod::parser::Parser::new(pod.data());
+                parser
+                    .pop_object_raw::<spa::param::ParamType, _>(
+                        |object_parser, object_type, _id| {
+                            assert!(param_id.object_type() == Some(object_type));
+
+                            for (id, _, pod) in object_parser {
+                                if first {
+                                    table.add_col(TextSpan::from(format!("{:?}", param_id)).bold());
+                                    first = false;
+                                } else {
+                                    table.add_col(TextSpan::from(""));
+                                }
+
+                                table
+                                    .add_col(TextSpan::from(
+                                        param_id
+                                            .key_to_string(id)
+                                            .unwrap_or(format!("unknown key {id}")),
+                                    ))
+                                    .add_col(TextSpan::from(format!("{pod}")))
+                                    .add_row();
+                            }
+
+                            // Add a separating space between objects
+                            table.add_row();
+
+                            Ok(())
+                        },
+                    )
+                    .unwrap();
+            }
+        }
+
+        self.app
+            .attr(
+                &ComponentId::Popup,
+                Attribute::Title,
+                AttrValue::Title(("Params".into(), Alignment::Left)),
+            )
+            .unwrap();
+        self.app
+            .attr(
+                &ComponentId::Popup,
+                Attribute::Content,
+                AttrValue::Table(table.build()),
+            )
+            .unwrap();
 
         true
     }

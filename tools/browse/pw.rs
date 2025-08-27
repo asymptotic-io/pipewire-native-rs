@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -30,6 +30,31 @@ use pipewire::{
 };
 
 #[derive(Clone)]
+pub struct Params {
+    seq: u32,
+    pub pods: Vec<spa::pod::RawPodOwned>,
+}
+
+impl Params {
+    fn new() -> Self {
+        Params {
+            seq: 0,
+            pods: vec![],
+        }
+    }
+
+    fn add(&mut self, seq: u32, pod: spa::pod::RawPodOwned) {
+        if self.seq == seq {
+            self.pods.push(pod)
+        } else {
+            self.pods.clear();
+            self.seq = seq;
+            self.pods.push(pod);
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct ClientDetails {
     pub client: proxy::client::Client,
     pub props: Properties,
@@ -42,7 +67,7 @@ unsafe impl Sync for ClientDetails {}
 pub struct DeviceDetails {
     pub device: proxy::device::Device,
     pub props: Properties,
-    pub params: Vec<(spa::param::ParamType, spa::pod::RawPodOwned)>,
+    pub params: HashMap<spa::param::ParamType, Params>,
 }
 
 unsafe impl Send for DeviceDetails {}
@@ -171,8 +196,8 @@ impl State {
                     info: some_closure!([^(state)] info, {
                         state.device_info(info);
                     }),
-                    param: some_closure!([device ^(state)] _seq, param_type, _index, _next, param_pod, {
-                        state.device_param(&device, param_type, param_pod);
+                    param: some_closure!([device ^(state)] seq, param_id, _index, _next, param_pod, {
+                        state.device_param(&device, seq, param_id, param_pod);
                     }),
                 });
 
@@ -184,7 +209,7 @@ impl State {
                             DeviceDetails {
                                 device,
                                 props: props.clone(),
-                                params: vec![],
+                                params: HashMap::new(),
                             },
                         );
                     }),
@@ -264,15 +289,23 @@ impl State {
     fn device_param(
         &self,
         device: &proxy::device::Device,
-        param_type: spa::param::ParamType,
-        param_pod: &spa::pod::RawPodOwned,
+        seq: u32,
+        param_id: spa::param::ParamType,
+        pod: &spa::pod::RawPodOwned,
     ) {
         let mut devices = self.devices.lock().unwrap();
         if let Some((_, entry)) = devices
             .iter_mut()
             .find(|(_, e)| e.device.proxy().bound_id() == Some(device.proxy().bound_id().unwrap()))
         {
-            entry.params.push((param_type, param_pod.clone()));
+            match entry.params.get_mut(&param_id) {
+                Some(p) => p.add(seq, pod.clone()),
+                None => {
+                    let mut p = Params::new();
+                    p.add(seq, pod.clone());
+                    entry.params.insert(param_id, p);
+                }
+            }
         };
     }
 

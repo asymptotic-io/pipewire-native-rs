@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use tui_realm_stdlib::List;
+use tui_realm_stdlib::Table;
 use tuirealm::{
     command::{Cmd, CmdResult, Direction, Position},
     event::{Key, KeyEvent},
@@ -14,18 +14,18 @@ use crate::Msg;
 
 #[derive(MockComponent)]
 pub struct Popup {
-    component: List,
+    component: Table,
 }
 
 impl Default for Popup {
     fn default() -> Self {
         Self {
-            component: List::default()
+            component: Table::default()
                 .inactive(Style::default().fg(Color::Magenta))
                 .scroll(true)
                 .rewind(true)
                 .highlighted_str(" ")
-                .rows(TableBuilder::default().build()),
+                .table(TableBuilder::default().build()),
         }
     }
 }
