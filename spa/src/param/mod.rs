@@ -36,6 +36,60 @@ pub enum ParamType {
     Tag,
 }
 
+impl ParamType {
+    pub fn object_type(&self) -> Option<ObjectType> {
+        match self {
+            Self::Invalid => None,
+            Self::PropInfo => Some(ObjectType::PropInfo),
+            Self::Props => Some(ObjectType::Props),
+            Self::EnumFormat => Some(ObjectType::Format),
+            Self::Format => Some(ObjectType::Format),
+            Self::Buffers => Some(ObjectType::ParamBuffers),
+            Self::Meta => Some(ObjectType::ParamMeta),
+            Self::IO => Some(ObjectType::ParamIo),
+            Self::EnumProfile => Some(ObjectType::ParamProfile),
+            Self::Profile => Some(ObjectType::ParamProfile),
+            Self::EnumPortConfig => Some(ObjectType::ParamPortConfig),
+            Self::PortConfig => Some(ObjectType::ParamPortConfig),
+            Self::EnumRoute => Some(ObjectType::ParamRoute),
+            Self::Route => Some(ObjectType::ParamRoute),
+            Self::Control => None, // Sequence
+            Self::Latency => Some(ObjectType::ParamLatency),
+            Self::ProcessLatency => Some(ObjectType::ParamProcessLatency),
+            Self::Tag => Some(ObjectType::ParamTag),
+        }
+    }
+
+    pub fn key_to_string(&self, id: u32) -> Option<String> {
+        match self {
+            Self::Invalid => None,
+            Self::PropInfo => props::PropInfo::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::Props => props::Prop::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::EnumFormat => format::Format::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::Format => format::Format::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::Buffers => buffers::Buffers::try_from(id)
+                .ok()
+                .map(|p| format!("{p:?}")),
+            Self::Meta => buffers::Meta::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::IO => None, // TODO
+            Self::EnumProfile => profile::Profile::try_from(id)
+                .ok()
+                .map(|p| format!("{p:?}")),
+            Self::Profile => profile::Profile::try_from(id)
+                .ok()
+                .map(|p| format!("{p:?}")),
+            Self::EnumPortConfig => None, // TODO
+            Self::PortConfig => None,     // TODO
+            Self::EnumRoute => route::Route::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::Route => route::Route::try_from(id).ok().map(|p| format!("{p:?}")),
+            Self::Control => None,        // Sequence
+            Self::Latency => None,        // TODO
+            Self::ProcessLatency => None, // TODO
+            Self::Tag => None,            // TODO
+        }
+    }
+}
+
 bitflags! {
     #[repr(C)]
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,6 +101,6 @@ bitflags! {
     }
 }
 
-pub trait ParamObject {
+pub trait ParamObject: std::fmt::Debug {
     const TYPE: ObjectType;
 }
