@@ -14,7 +14,7 @@ pub mod props;
 pub mod route;
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, EnumU32)]
 pub enum ParamType {
     Invalid,
     PropInfo,
