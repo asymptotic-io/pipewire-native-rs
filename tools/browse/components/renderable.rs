@@ -6,7 +6,7 @@ use tuirealm::props::TextSpan;
 
 use pipewire::{keys, properties::Properties, proxy::HasProxy};
 
-use crate::pw::{ClientDetails, DeviceDetails, ModuleDetails};
+use crate::pw::{ClientDetails, DeviceDetails, ModuleDetails, NodeDetails};
 
 // Enough to render PW objects in a list view or detail view
 pub trait Renderable {
@@ -69,6 +69,28 @@ impl Renderable for ModuleDetails {
                 .bound_id()
                 .unwrap_or(self.module.proxy().id()),
             self.props.get("module.name").unwrap_or("unknown"),
+        ))
+    }
+}
+
+impl Renderable for NodeDetails {
+    fn props(&self) -> &Properties {
+        &self.props
+    }
+
+    fn params(&self) -> Vec<(&spa::param::ParamType, &crate::pw::Params)> {
+        self.params.iter().collect()
+    }
+
+    fn title(&self) -> TextSpan {
+        TextSpan::from(format!(
+            "#{}: {} ({})",
+            self.node
+                .proxy()
+                .bound_id()
+                .unwrap_or(self.node.proxy().id()),
+            self.props.get("node.name").unwrap_or("unknown"),
+            self.props.get("node.description").unwrap_or("unknown"),
         ))
     }
 }

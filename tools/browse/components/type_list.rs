@@ -17,6 +17,7 @@ pub enum TypeSelection {
     Clients,
     Devices,
     Modules,
+    Nodes,
 }
 
 impl TryFrom<usize> for TypeSelection {
@@ -26,6 +27,7 @@ impl TryFrom<usize> for TypeSelection {
             0 => Ok(TypeSelection::Clients),
             1 => Ok(TypeSelection::Devices),
             2 => Ok(TypeSelection::Modules),
+            3 => Ok(TypeSelection::Nodes),
             _ => Err(()),
         }
     }
@@ -53,6 +55,8 @@ impl Default for TypeList {
                         .add_col(TextSpan::from("Devices"))
                         .add_row()
                         .add_col(TextSpan::from("Modules"))
+                        .add_row()
+                        .add_col(TextSpan::from("Nodes"))
                         .build(),
                 ),
         }

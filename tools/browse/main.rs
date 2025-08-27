@@ -145,6 +145,13 @@ impl Model {
                     objects.push(Box::new(module.clone()));
                 }
             }
+            TypeSelection::Nodes => {
+                let nodes = self.pw_state.nodes.lock().unwrap();
+
+                for node in nodes.values() {
+                    objects.push(Box::new(node.clone()));
+                }
+            }
         }
 
         let mut table = TableBuilder::default();
@@ -186,6 +193,13 @@ impl Model {
             TypeSelection::Modules => {
                 let modules = self.pw_state.modules.lock().unwrap();
                 let entries = modules.iter().collect::<Vec<_>>();
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
+            }
+            TypeSelection::Nodes => {
+                let nodes = self.pw_state.nodes.lock().unwrap();
+                let entries = nodes.iter().collect::<Vec<_>>();
                 entries
                     .get(self.object_selection)
                     .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)

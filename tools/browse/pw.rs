@@ -21,6 +21,7 @@ use pipewire::{
         client::{ClientEvents, ClientInfo},
         device::{DeviceEvents, DeviceInfo},
         module::{ModuleEvents, ModuleInfo},
+        node::{NodeEvents, NodeInfo},
         registry::{Registry, RegistryEvents},
         HasProxy, ProxyEvents,
     },
@@ -82,6 +83,16 @@ pub struct ModuleDetails {
 unsafe impl Send for ModuleDetails {}
 unsafe impl Sync for ModuleDetails {}
 
+#[derive(Clone)]
+pub struct NodeDetails {
+    pub node: proxy::node::Node,
+    pub props: Properties,
+    pub params: HashMap<spa::param::ParamType, Params>,
+}
+
+unsafe impl Send for NodeDetails {}
+unsafe impl Sync for NodeDetails {}
+
 pub struct State {
     pub main_loop: ThreadLoop,
     ui_update: Arc<AtomicBool>,
@@ -91,6 +102,7 @@ pub struct State {
     pub clients: Arc<Mutex<BTreeMap<Id, ClientDetails>>>,
     pub devices: Arc<Mutex<BTreeMap<Id, DeviceDetails>>>,
     pub modules: Arc<Mutex<BTreeMap<Id, ModuleDetails>>>,
+    pub nodes: Arc<Mutex<BTreeMap<Id, NodeDetails>>>,
 }
 
 unsafe impl Send for State {}
@@ -116,6 +128,7 @@ impl State {
             clients: Arc::new(Mutex::new(BTreeMap::new())),
             devices: Arc::new(Mutex::new(BTreeMap::new())),
             modules: Arc::new(Mutex::new(BTreeMap::new())),
+            nodes: Arc::new(Mutex::new(BTreeMap::new())),
         });
 
         let pw_state = state.clone();
@@ -245,6 +258,46 @@ impl State {
                     ..Default::default()
                 });
             }
+            types::interface::NODE => {
+                let node = object.downcast::<proxy::node::Node>().unwrap();
+
+                node.subscribe_params(&[
+                    spa::param::ParamType::PropInfo,
+                    spa::param::ParamType::Props,
+                    spa::param::ParamType::EnumFormat,
+                    spa::param::ParamType::Format,
+                    spa::param::ParamType::Buffers,
+                    spa::param::ParamType::Meta,
+                ])
+                .unwrap();
+
+                node.add_listener(NodeEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.node_info(info);
+                    }),
+                    param: some_closure!([node ^(state)] seq, param_id, _index, _next, param_pod, {
+                        state.node_param(&node, seq, param_id, param_pod);
+                    }),
+                });
+
+                let nodes = &self.nodes;
+                node.proxy().add_listener(ProxyEvents {
+                    bound_props: some_closure!([node ^(nodes)] bound_id, props, {
+                        nodes.lock().unwrap().insert(
+                            bound_id,
+                            NodeDetails {
+                                node,
+                                props: props.clone(),
+                                params: HashMap::new(),
+                            },
+                        );
+                    }),
+                    removed: some_closure!([node ^(state)] {
+                        state.node_removed(node);
+                    }),
+                    ..Default::default()
+                });
+            }
             _ => {}
         }
 
@@ -337,6 +390,51 @@ impl State {
             .lock()
             .unwrap()
             .remove(&module.proxy().bound_id().unwrap());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
+    fn node_info(&self, info: &NodeInfo) {
+        if let Some((_, entry)) = self
+            .nodes
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|(_, e)| e.node.proxy().bound_id() == Some(info.id))
+        {
+            entry.props = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn node_param(
+        &self,
+        node: &proxy::node::Node,
+        seq: u32,
+        param_id: spa::param::ParamType,
+        pod: &spa::pod::RawPodOwned,
+    ) {
+        let mut nodes = self.nodes.lock().unwrap();
+        if let Some((_, entry)) = nodes
+            .iter_mut()
+            .find(|(_, e)| e.node.proxy().bound_id() == Some(node.proxy().bound_id().unwrap()))
+        {
+            match entry.params.get_mut(&param_id) {
+                Some(p) => p.add(seq, pod.clone()),
+                None => {
+                    let mut p = Params::new();
+                    p.add(seq, pod.clone());
+                    entry.params.insert(param_id, p);
+                }
+            }
+        };
+    }
+
+    fn node_removed(&self, node: proxy::node::Node) {
+        let _ = self
+            .nodes
+            .lock()
+            .unwrap()
+            .remove(&node.proxy().bound_id().unwrap());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 }
