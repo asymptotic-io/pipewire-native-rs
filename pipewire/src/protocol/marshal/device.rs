@@ -53,11 +53,6 @@ pub(crate) struct SetParam {
     param: spa::pod::RawPodOwned,
 }
 
-#[derive(Debug, macros::PodStruct)]
-pub(crate) struct UpdatePermissions {
-    permissions: PairList<i32, i32>,
-}
-
 impl Methods {
     pub(crate) fn marshal(connection: Connection) -> DeviceMethods<Device> {
         DeviceMethods {
