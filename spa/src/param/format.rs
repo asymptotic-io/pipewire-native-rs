@@ -75,6 +75,8 @@ pub enum MediaSubtype {
     Control,
 }
 
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
 pub enum Format {
     Start,
 
