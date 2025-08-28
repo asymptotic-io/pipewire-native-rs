@@ -138,6 +138,27 @@ impl Model {
                     objects.push(Box::new(device.clone()));
                 }
             }
+            TypeSelection::Factories => {
+                let factories = self.pw_state.factories.lock().unwrap();
+
+                for factory in factories.values() {
+                    objects.push(Box::new(factory.clone()));
+                }
+            }
+            TypeSelection::Links => {
+                let links = self.pw_state.links.lock().unwrap();
+
+                for link in links.values() {
+                    objects.push(Box::new(link.clone()));
+                }
+            }
+            TypeSelection::Metadata => {
+                let metadata = self.pw_state.metadata.lock().unwrap();
+
+                for metadata in metadata.values() {
+                    objects.push(Box::new(metadata.clone()));
+                }
+            }
             TypeSelection::Modules => {
                 let modules = self.pw_state.modules.lock().unwrap();
 
@@ -150,6 +171,13 @@ impl Model {
 
                 for node in nodes.values() {
                     objects.push(Box::new(node.clone()));
+                }
+            }
+            TypeSelection::Ports => {
+                let ports = self.pw_state.ports.lock().unwrap();
+
+                for port in ports.values() {
+                    objects.push(Box::new(port.clone()));
                 }
             }
         }
@@ -190,6 +218,27 @@ impl Model {
                     .get(self.object_selection)
                     .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
             }
+            TypeSelection::Links => {
+                let links = self.pw_state.links.lock().unwrap();
+                let entries = links.iter().collect::<Vec<_>>();
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
+            }
+            TypeSelection::Factories => {
+                let factories = self.pw_state.factories.lock().unwrap();
+                let entries = factories.iter().collect::<Vec<_>>();
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
+            }
+            TypeSelection::Metadata => {
+                let metadata = self.pw_state.metadata.lock().unwrap();
+                let entries = metadata.iter().collect::<Vec<_>>();
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
+            }
             TypeSelection::Modules => {
                 let modules = self.pw_state.modules.lock().unwrap();
                 let entries = modules.iter().collect::<Vec<_>>();
@@ -200,6 +249,13 @@ impl Model {
             TypeSelection::Nodes => {
                 let nodes = self.pw_state.nodes.lock().unwrap();
                 let entries = nodes.iter().collect::<Vec<_>>();
+                entries
+                    .get(self.object_selection)
+                    .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)
+            }
+            TypeSelection::Ports => {
+                let ports = self.pw_state.ports.lock().unwrap();
+                let entries = ports.iter().collect::<Vec<_>>();
                 entries
                     .get(self.object_selection)
                     .map(|e| Box::new(e.1.clone()) as Box<dyn Renderable>)

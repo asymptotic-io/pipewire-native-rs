@@ -16,8 +16,12 @@ use crate::{ComponentId, Msg};
 pub enum TypeSelection {
     Clients,
     Devices,
+    Factories,
+    Links,
+    Metadata,
     Modules,
     Nodes,
+    Ports,
 }
 
 impl TryFrom<usize> for TypeSelection {
@@ -26,8 +30,12 @@ impl TryFrom<usize> for TypeSelection {
         match value {
             0 => Ok(TypeSelection::Clients),
             1 => Ok(TypeSelection::Devices),
-            2 => Ok(TypeSelection::Modules),
-            3 => Ok(TypeSelection::Nodes),
+            2 => Ok(TypeSelection::Factories),
+            3 => Ok(TypeSelection::Links),
+            4 => Ok(TypeSelection::Metadata),
+            5 => Ok(TypeSelection::Modules),
+            6 => Ok(TypeSelection::Nodes),
+            7 => Ok(TypeSelection::Ports),
             _ => Err(()),
         }
     }
@@ -54,9 +62,17 @@ impl Default for TypeList {
                         .add_row()
                         .add_col(TextSpan::from("Devices"))
                         .add_row()
+                        .add_col(TextSpan::from("Factories"))
+                        .add_row()
+                        .add_col(TextSpan::from("Links"))
+                        .add_row()
+                        .add_col(TextSpan::from("Metadata"))
+                        .add_row()
                         .add_col(TextSpan::from("Modules"))
                         .add_row()
                         .add_col(TextSpan::from("Nodes"))
+                        .add_row()
+                        .add_col(TextSpan::from("Ports"))
                         .build(),
                 ),
         }

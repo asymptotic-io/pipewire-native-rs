@@ -20,8 +20,12 @@ use pipewire::{
         self,
         client::{ClientEvents, ClientInfo},
         device::{DeviceEvents, DeviceInfo},
+        factory::{FactoryEvents, FactoryInfo},
+        link::{LinkEvents, LinkInfo},
+        metadata::MetadataEvents,
         module::{ModuleEvents, ModuleInfo},
         node::{NodeEvents, NodeInfo},
+        port::{PortEvents, PortInfo},
         registry::{Registry, RegistryEvents},
         HasProxy, ProxyEvents,
     },
@@ -75,6 +79,33 @@ unsafe impl Send for DeviceDetails {}
 unsafe impl Sync for DeviceDetails {}
 
 #[derive(Clone)]
+pub struct FactoryDetails {
+    pub factory: proxy::factory::Factory,
+    pub props: Properties,
+}
+
+unsafe impl Send for FactoryDetails {}
+unsafe impl Sync for FactoryDetails {}
+
+#[derive(Clone)]
+pub struct LinkDetails {
+    pub link: proxy::link::Link,
+    pub props: Properties,
+}
+
+unsafe impl Send for LinkDetails {}
+unsafe impl Sync for LinkDetails {}
+
+#[derive(Clone)]
+pub struct MetadataDetails {
+    pub metadata: proxy::metadata::Metadata,
+    pub props: Properties,
+}
+
+unsafe impl Send for MetadataDetails {}
+unsafe impl Sync for MetadataDetails {}
+
+#[derive(Clone)]
 pub struct ModuleDetails {
     pub module: proxy::module::Module,
     pub props: Properties,
@@ -93,6 +124,16 @@ pub struct NodeDetails {
 unsafe impl Send for NodeDetails {}
 unsafe impl Sync for NodeDetails {}
 
+#[derive(Clone)]
+pub struct PortDetails {
+    pub port: proxy::port::Port,
+    pub props: Properties,
+    pub params: HashMap<spa::param::ParamType, Params>,
+}
+
+unsafe impl Send for PortDetails {}
+unsafe impl Sync for PortDetails {}
+
 pub struct State {
     pub main_loop: ThreadLoop,
     ui_update: Arc<AtomicBool>,
@@ -101,8 +142,12 @@ pub struct State {
     registry: Registry,
     pub clients: Arc<Mutex<BTreeMap<Id, ClientDetails>>>,
     pub devices: Arc<Mutex<BTreeMap<Id, DeviceDetails>>>,
+    pub factories: Arc<Mutex<BTreeMap<Id, FactoryDetails>>>,
+    pub links: Arc<Mutex<BTreeMap<Id, LinkDetails>>>,
+    pub metadata: Arc<Mutex<BTreeMap<Id, MetadataDetails>>>,
     pub modules: Arc<Mutex<BTreeMap<Id, ModuleDetails>>>,
     pub nodes: Arc<Mutex<BTreeMap<Id, NodeDetails>>>,
+    pub ports: Arc<Mutex<BTreeMap<Id, PortDetails>>>,
 }
 
 unsafe impl Send for State {}
@@ -127,8 +172,12 @@ impl State {
             registry,
             clients: Arc::new(Mutex::new(BTreeMap::new())),
             devices: Arc::new(Mutex::new(BTreeMap::new())),
+            factories: Arc::new(Mutex::new(BTreeMap::new())),
+            links: Arc::new(Mutex::new(BTreeMap::new())),
+            metadata: Arc::new(Mutex::new(BTreeMap::new())),
             modules: Arc::new(Mutex::new(BTreeMap::new())),
             nodes: Arc::new(Mutex::new(BTreeMap::new())),
+            ports: Arc::new(Mutex::new(BTreeMap::new())),
         });
 
         let pw_state = state.clone();
@@ -232,6 +281,84 @@ impl State {
                     ..Default::default()
                 });
             }
+            types::interface::FACTORY => {
+                let factory = object.downcast::<proxy::factory::Factory>().unwrap();
+
+                factory.add_listener(FactoryEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.factory_info(info);
+                    }),
+                });
+
+                let factories = &self.factories;
+                factory.proxy().add_listener(ProxyEvents {
+                    bound_props: some_closure!([factory ^(factories)] bound_id, props, {
+                        factories.lock().unwrap().insert(
+                            bound_id,
+                            FactoryDetails {
+                                factory,
+                                props: props.clone(),
+                            },
+                        );
+                    }),
+                    removed: some_closure!([factory ^(state)] {
+                        state.factory_removed(factory);
+                    }),
+                    ..Default::default()
+                });
+            }
+            types::interface::LINK => {
+                let link = object.downcast::<proxy::link::Link>().unwrap();
+
+                link.add_listener(LinkEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.link_info(info);
+                    }),
+                });
+
+                let links = &self.links;
+                link.proxy().add_listener(ProxyEvents {
+                    bound_props: some_closure!([link ^(links)] bound_id, props, {
+                        links.lock().unwrap().insert(
+                            bound_id,
+                            LinkDetails {
+                                link,
+                                props: props.clone(),
+                            },
+                        );
+                    }),
+                    removed: some_closure!([link ^(state)] {
+                        state.link_removed(link);
+                    }),
+                    ..Default::default()
+                });
+            }
+            types::interface::METADATA => {
+                let metadata = object.downcast::<proxy::metadata::Metadata>().unwrap();
+
+                metadata.add_listener(MetadataEvents {
+                    property: some_closure!([^(state)] subject, key, type_, value, {
+                        state.metadata_property(subject, key, type_, value);
+                    }),
+                });
+
+                let metadatas = &self.metadata;
+                metadata.proxy().add_listener(ProxyEvents {
+                    bound_props: some_closure!([metadata ^(metadatas)] bound_id, props, {
+                        metadatas.lock().unwrap().insert(
+                            bound_id,
+                            MetadataDetails {
+                                metadata,
+                                props: props.clone(),
+                            },
+                        );
+                    }),
+                    removed: some_closure!([metadata ^(state)] {
+                        state.metadata_removed(metadata);
+                    }),
+                    ..Default::default()
+                });
+            }
             types::interface::MODULE => {
                 let module = object.downcast::<proxy::module::Module>().unwrap();
 
@@ -268,6 +395,7 @@ impl State {
                     spa::param::ParamType::Format,
                     spa::param::ParamType::Buffers,
                     spa::param::ParamType::Meta,
+                    // TODO: IO-related metadata
                 ])
                 .unwrap();
 
@@ -294,6 +422,45 @@ impl State {
                     }),
                     removed: some_closure!([node ^(state)] {
                         state.node_removed(node);
+                    }),
+                    ..Default::default()
+                });
+            }
+            types::interface::PORT => {
+                let port = object.downcast::<proxy::port::Port>().unwrap();
+
+                port.subscribe_params(&[
+                    spa::param::ParamType::EnumFormat,
+                    spa::param::ParamType::Format,
+                    spa::param::ParamType::Buffers,
+                    spa::param::ParamType::Meta,
+                    // TODO: IO-related metadata and Latency
+                ])
+                .unwrap();
+
+                port.add_listener(PortEvents {
+                    info: some_closure!([^(state)] info, {
+                        state.port_info(info);
+                    }),
+                    param: some_closure!([port ^(state)] seq, param_id, _index, _next, param_pod, {
+                        state.port_param(&port, seq, param_id, param_pod);
+                    }),
+                });
+
+                let ports = &self.ports;
+                port.proxy().add_listener(ProxyEvents {
+                    bound_props: some_closure!([port ^(ports)] bound_id, props, {
+                        ports.lock().unwrap().insert(
+                            bound_id,
+                            PortDetails {
+                                port,
+                                props: props.clone(),
+                                params: HashMap::new(),
+                            },
+                        );
+                    }),
+                    removed: some_closure!([port ^(state)] {
+                        state.port_removed(port);
                     }),
                     ..Default::default()
                 });
@@ -371,6 +538,50 @@ impl State {
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
+    fn factory_info(&self, info: &FactoryInfo) {
+        if let Some((_, entry)) = self
+            .factories
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|(_, e)| e.factory.proxy().bound_id() == Some(info.id))
+        {
+            entry.props = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn factory_removed(&self, factory: proxy::factory::Factory) {
+        let _ = self
+            .factories
+            .lock()
+            .unwrap()
+            .remove(&factory.proxy().bound_id().unwrap());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
+    fn link_info(&self, info: &LinkInfo) {
+        if let Some((_, entry)) = self
+            .links
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|(_, e)| e.link.proxy().bound_id() == Some(info.id))
+        {
+            entry.props = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn link_removed(&self, link: proxy::link::Link) {
+        let _ = self
+            .links
+            .lock()
+            .unwrap()
+            .remove(&link.proxy().bound_id().unwrap());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
     fn module_info(&self, info: &ModuleInfo) {
         if let Some((_, entry)) = self
             .modules
@@ -390,6 +601,67 @@ impl State {
             .lock()
             .unwrap()
             .remove(&module.proxy().bound_id().unwrap());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
+    fn metadata_property(
+        &self,
+        subject: Id,
+        key: Option<&str>,
+        type_: Option<&str>,
+        value: Option<&str>,
+    ) {
+        if let Some((_, entry)) = self
+            .metadata
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|(_, e)| e.metadata.proxy().bound_id() == Some(subject))
+        {
+            if let Some(key) = key {
+                let key = format!("{subject}/{key}");
+
+                if let Some(value) = value {
+                    // (key, value) was set on subject
+                    entry
+                        .props
+                        .set(key.as_str(), format!("{value} ({type_:?})"));
+                } else {
+                    // (key, value) was unset on subject
+                    entry.props.unset(key.as_str());
+                }
+            } else {
+                // All keys were removed on subject
+                let key_prefix = format!("{subject}/");
+                let keys: Vec<String> = entry
+                    .props
+                    .iter()
+                    .filter_map(|(k, _)| {
+                        if k.starts_with(key_prefix.as_str()) {
+                            Some(k.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                for key in keys {
+                    if key.starts_with(key_prefix.as_str()) {
+                        entry.props.unset(key.as_str());
+                    }
+                }
+            }
+
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn metadata_removed(&self, metadata: proxy::metadata::Metadata) {
+        let _ = self
+            .metadata
+            .lock()
+            .unwrap()
+            .remove(&metadata.proxy().bound_id().unwrap());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -435,6 +707,51 @@ impl State {
             .lock()
             .unwrap()
             .remove(&node.proxy().bound_id().unwrap());
+        self.ui_update.store(true, Ordering::Relaxed);
+    }
+
+    fn port_info(&self, info: &PortInfo) {
+        if let Some((_, entry)) = self
+            .ports
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|(_, e)| e.port.proxy().bound_id() == Some(info.id))
+        {
+            entry.props = info.props.clone();
+            self.ui_update.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn port_param(
+        &self,
+        port: &proxy::port::Port,
+        seq: u32,
+        param_id: spa::param::ParamType,
+        pod: &spa::pod::RawPodOwned,
+    ) {
+        let mut ports = self.ports.lock().unwrap();
+        if let Some((_, entry)) = ports
+            .iter_mut()
+            .find(|(_, e)| e.port.proxy().bound_id() == Some(port.proxy().bound_id().unwrap()))
+        {
+            match entry.params.get_mut(&param_id) {
+                Some(p) => p.add(seq, pod.clone()),
+                None => {
+                    let mut p = Params::new();
+                    p.add(seq, pod.clone());
+                    entry.params.insert(param_id, p);
+                }
+            }
+        };
+    }
+
+    fn port_removed(&self, port: proxy::port::Port) {
+        let _ = self
+            .ports
+            .lock()
+            .unwrap()
+            .remove(&port.proxy().bound_id().unwrap());
         self.ui_update.store(true, Ordering::Relaxed);
     }
 }
