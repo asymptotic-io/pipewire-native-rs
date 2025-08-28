@@ -15,6 +15,8 @@ use crate::{types::ObjectType, Id};
 pub mod client;
 /// A proxy representing device objects.
 pub mod device;
+/// A proxy for representing factory objects.
+pub mod factory;
 /// A proxy representing a link between two ports.
 pub mod link;
 /// A proxy representing modules loaded in the server.
@@ -212,6 +214,9 @@ macro_rules! hasproxy_method_call {
             } else if $object.type_() == $crate::types::interface::DEVICE {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::device::Device>().unwrap();
                 _proxy.$method($($($args),*)?)
+            } else if $object.type_() == $crate::types::interface::FACTORY {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::factory::Factory>().unwrap();
+                _proxy.$method($($($args),*)?)
             } else if $object.type_() == $crate::types::interface::LINK {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::link::Link>().unwrap();
                 _proxy.$method($($($args),*)?)
@@ -246,6 +251,9 @@ macro_rules! hasproxy_notify {
             spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
         } else if $object.type_() == $crate::types::interface::DEVICE {
             let _proxy = $object.downcast_proxy::<$crate::proxy::device::Device>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
+        } else if $object.type_() == $crate::types::interface::FACTORY {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::factory::Factory>().unwrap();
             spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
         } else if $object.type_() == $crate::types::interface::LINK {
             let _proxy = $object.downcast_proxy::<$crate::proxy::link::Link>().unwrap();
