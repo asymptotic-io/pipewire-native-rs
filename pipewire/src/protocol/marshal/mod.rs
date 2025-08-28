@@ -8,6 +8,7 @@ pub(crate) mod device;
 pub(crate) mod message;
 pub(crate) mod module;
 pub(crate) mod node;
+pub(crate) mod port;
 pub(crate) mod registry;
 
 use pipewire_native_spa::{self as spa, pod::Pod};
