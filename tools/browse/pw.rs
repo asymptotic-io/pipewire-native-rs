@@ -213,6 +213,22 @@ impl State {
         self.core.disconnect();
     }
 
+    fn node_name(&self, id: Id) -> Option<String> {
+        self.nodes
+            .lock()
+            .unwrap()
+            .get(&id)
+            .map(|n| n.props.get("node.name").unwrap_or("unknown").to_string())
+    }
+
+    fn port_name(&self, id: Id) -> Option<String> {
+        self.ports
+            .lock()
+            .unwrap()
+            .get(&id)
+            .map(|n| n.props.get("port.name").unwrap_or("unknown").to_string())
+    }
+
     fn new_object(&self, state: &Arc<Self>, object: Box<dyn proxy::HasProxy>) {
         match object.type_() {
             types::interface::CLIENT => {
@@ -542,6 +558,21 @@ impl State {
     fn link_info(&self, info: &LinkInfo) {
         if let Some(entry) = self.links.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
+
+            // Add a couple of props to make names look nicer
+            if let Some(name) = self.node_name(info.output_node_id) {
+                entry.props.set("pw-browse.output-node", name);
+            }
+            if let Some(name) = self.port_name(info.output_port_id) {
+                entry.props.set("pw-browse.output-port", name);
+            }
+            if let Some(name) = self.node_name(info.input_node_id) {
+                entry.props.set("pw-browse.input-node", name);
+            }
+            if let Some(name) = self.port_name(info.input_port_id) {
+                entry.props.set("pw-browse.input-port", name);
+            }
+
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -665,6 +696,15 @@ impl State {
     fn port_info(&self, info: &PortInfo) {
         if let Some(entry) = self.ports.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
+
+            if let Some(name) = entry
+                .props
+                .get_u32("node.id")
+                .and_then(|node_id| self.node_name(node_id))
+            {
+                entry.props.set("pw-browse.node", name);
+            }
+
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }

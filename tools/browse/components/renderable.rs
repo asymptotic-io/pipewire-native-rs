@@ -88,9 +88,9 @@ impl Renderable for LinkDetails {
                 .proxy()
                 .bound_id()
                 .unwrap_or(self.link.proxy().id()),
-            self.props.get("link.output.node").unwrap_or("unknown"),
+            self.props.get("pw-browse.output-node").unwrap_or("unknown"),
             self.props.get("link.output.port").unwrap_or("unknown"),
-            self.props.get("link.input.node").unwrap_or("unknown"),
+            self.props.get("pw-browse.input-node").unwrap_or("unknown"),
             self.props.get("link.input.port").unwrap_or("unknown"),
         ))
     }
@@ -163,12 +163,13 @@ impl Renderable for PortDetails {
 
     fn title(&self) -> TextSpan {
         TextSpan::from(format!(
-            "#{}: {}",
+            "#{}: {}/{}",
             self.port
                 .proxy()
                 .bound_id()
                 .unwrap_or(self.port.proxy().id()),
-            self.props.get("port.alias").unwrap_or("unknown"),
+            self.props.get("pw-browse.node").unwrap_or("unknown"),
+            self.props.get("port.name").unwrap_or("unknown"),
         ))
     }
 }
