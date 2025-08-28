@@ -472,13 +472,7 @@ impl State {
     }
 
     fn client_info(&self, info: &ClientInfo) {
-        if let Some((_, entry)) = self
-            .clients
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.client.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.clients.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -494,13 +488,7 @@ impl State {
     }
 
     fn device_info(&self, info: &DeviceInfo) {
-        if let Some((_, entry)) = self
-            .devices
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.device.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.devices.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -514,10 +502,7 @@ impl State {
         pod: &spa::pod::RawPodOwned,
     ) {
         let mut devices = self.devices.lock().unwrap();
-        if let Some((_, entry)) = devices
-            .iter_mut()
-            .find(|(_, e)| e.device.proxy().bound_id() == Some(device.proxy().bound_id().unwrap()))
-        {
+        if let Some(entry) = devices.get_mut(&device.proxy().bound_id().unwrap()) {
             match entry.params.get_mut(&param_id) {
                 Some(p) => p.add(seq, pod.clone()),
                 None => {
@@ -539,13 +524,7 @@ impl State {
     }
 
     fn factory_info(&self, info: &FactoryInfo) {
-        if let Some((_, entry)) = self
-            .factories
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.factory.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.factories.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -561,13 +540,7 @@ impl State {
     }
 
     fn link_info(&self, info: &LinkInfo) {
-        if let Some((_, entry)) = self
-            .links
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.link.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.links.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -583,13 +556,7 @@ impl State {
     }
 
     fn module_info(&self, info: &ModuleInfo) {
-        if let Some((_, entry)) = self
-            .modules
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.module.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.modules.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -611,13 +578,7 @@ impl State {
         type_: Option<&str>,
         value: Option<&str>,
     ) {
-        if let Some((_, entry)) = self
-            .metadata
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.metadata.proxy().bound_id() == Some(subject))
-        {
+        if let Some(entry) = self.metadata.lock().unwrap().get_mut(&subject) {
             if let Some(key) = key {
                 let key = format!("{subject}/{key}");
 
@@ -666,13 +627,7 @@ impl State {
     }
 
     fn node_info(&self, info: &NodeInfo) {
-        if let Some((_, entry)) = self
-            .nodes
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.node.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.nodes.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -686,10 +641,7 @@ impl State {
         pod: &spa::pod::RawPodOwned,
     ) {
         let mut nodes = self.nodes.lock().unwrap();
-        if let Some((_, entry)) = nodes
-            .iter_mut()
-            .find(|(_, e)| e.node.proxy().bound_id() == Some(node.proxy().bound_id().unwrap()))
-        {
+        if let Some(entry) = nodes.get_mut(&node.proxy().bound_id().unwrap()) {
             match entry.params.get_mut(&param_id) {
                 Some(p) => p.add(seq, pod.clone()),
                 None => {
@@ -711,13 +663,7 @@ impl State {
     }
 
     fn port_info(&self, info: &PortInfo) {
-        if let Some((_, entry)) = self
-            .ports
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .find(|(_, e)| e.port.proxy().bound_id() == Some(info.id))
-        {
+        if let Some(entry) = self.ports.lock().unwrap().get_mut(&info.id) {
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -731,10 +677,7 @@ impl State {
         pod: &spa::pod::RawPodOwned,
     ) {
         let mut ports = self.ports.lock().unwrap();
-        if let Some((_, entry)) = ports
-            .iter_mut()
-            .find(|(_, e)| e.port.proxy().bound_id() == Some(port.proxy().bound_id().unwrap()))
-        {
+        if let Some(entry) = ports.get_mut(&port.proxy().bound_id().unwrap()) {
             match entry.params.get_mut(&param_id) {
                 Some(p) => p.add(seq, pod.clone()),
                 None => {
