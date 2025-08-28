@@ -241,6 +241,10 @@ impl Client {
                 let proxy = core.find_proxy::<proxy::device::Device>(header.id).unwrap();
                 super::marshal::device::Events::demarshal(&self.inner.connection, &header, proxy)?;
             }
+            types::interface::LINK => {
+                let proxy = core.find_proxy::<proxy::link::Link>(header.id).unwrap();
+                super::marshal::link::Events::demarshal(&self.inner.connection, &header, proxy)?;
+            }
             types::interface::MODULE => {
                 let proxy = core.find_proxy::<proxy::module::Module>(header.id).unwrap();
                 super::marshal::module::Events::demarshal(&self.inner.connection, &header, proxy)?;

@@ -122,6 +122,19 @@ fn test_lib() {
 
                     device
                 }
+                types::interface::LINK => {
+                    let link = registry.bind(id, type_, version).unwrap();
+                    let proxy = link.downcast_proxy::<Link>().unwrap();
+
+                    proxy.add_listener(ProxyEvents {
+                        removed: some_closure!([proxy ^(objects)] {
+                            objects.map.write().unwrap().remove(&proxy.id());
+                        }),
+                        ..Default::default()
+                    });
+
+                    link
+                }
                 types::interface::MODULE => {
                     let module = registry.bind(id, type_, version).unwrap();
                     let proxy = module.downcast_proxy::<Module>().unwrap();

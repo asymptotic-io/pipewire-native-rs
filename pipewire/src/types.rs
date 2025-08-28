@@ -13,6 +13,8 @@ pub mod interface {
     pub const CORE: &str = "PipeWire:Interface:Core";
     /// The Device interface
     pub const DEVICE: &str = "PipeWire:Interface:Device";
+    /// The Link interface
+    pub const LINK: &str = "PipeWire:Interface:Link";
     /// The Module interface
     pub const MODULE: &str = "PipeWire:Interface:Module";
     /// The Node interface
