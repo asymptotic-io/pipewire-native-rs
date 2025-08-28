@@ -13,8 +13,8 @@ use pipewire_native::{
     main_loop::MainLoop,
     properties::Properties,
     proxy::{
-        client::Client, device::Device, factory::Factory, link::Link, module::Module, node::Node,
-        port::Port, registry::RegistryEvents, HasProxy, ProxyEvents,
+        client::Client, device::Device, factory::Factory, link::Link, metadata::Metadata,
+        module::Module, node::Node, port::Port, registry::RegistryEvents, HasProxy, ProxyEvents,
     },
     some_closure, types, Id,
 };
@@ -147,6 +147,19 @@ fn test_lib() {
                     });
 
                     link
+                }
+                types::interface::METADATA => {
+                    let metadata = registry.bind(id, type_, version).unwrap();
+                    let proxy = metadata.downcast_proxy::<Metadata>().unwrap();
+
+                    proxy.add_listener(ProxyEvents {
+                        removed: some_closure!([proxy ^(objects)] {
+                            objects.map.write().unwrap().remove(&proxy.id());
+                        }),
+                        ..Default::default()
+                    });
+
+                    metadata
                 }
                 types::interface::MODULE => {
                     let module = registry.bind(id, type_, version).unwrap();

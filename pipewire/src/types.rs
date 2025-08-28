@@ -17,6 +17,8 @@ pub mod interface {
     pub const FACTORY: &str = "PipeWire:Interface:Factory";
     /// The Link interface
     pub const LINK: &str = "PipeWire:Interface:Link";
+    /// The Metadata interface
+    pub const METADATA: &str = "PipeWire:Interface:Metadata";
     /// The Module interface
     pub const MODULE: &str = "PipeWire:Interface:Module";
     /// The Node interface

@@ -19,6 +19,8 @@ pub mod device;
 pub mod factory;
 /// A proxy representing a link between two ports.
 pub mod link;
+/// A proxy for global metadata objects.
+pub mod metadata;
 /// A proxy representing modules loaded in the server.
 pub mod module;
 /// A proxy representing nodes.
@@ -220,6 +222,9 @@ macro_rules! hasproxy_method_call {
             } else if $object.type_() == $crate::types::interface::LINK {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::link::Link>().unwrap();
                 _proxy.$method($($($args),*)?)
+            } else if $object.type_() == $crate::types::interface::METADATA {
+                let _proxy = $object.downcast_proxy::<$crate::proxy::metadata::Metadata>().unwrap();
+                _proxy.$method($($($args),*)?)
             } else if $object.type_() == $crate::types::interface::MODULE {
                 let _proxy = $object.downcast_proxy::<$crate::proxy::module::Module>().unwrap();
                 _proxy.$method($($($args),*)?)
@@ -257,6 +262,9 @@ macro_rules! hasproxy_notify {
             spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
         } else if $object.type_() == $crate::types::interface::LINK {
             let _proxy = $object.downcast_proxy::<$crate::proxy::link::Link>().unwrap();
+            spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
+        } else if $object.type_() == $crate::types::interface::METADATA {
+            let _proxy = $object.downcast_proxy::<$crate::proxy::metadata::Metadata>().unwrap();
             spa::emit_hook!(_proxy.events(), $event $(, $($args),*)?)
         } else if $object.type_() == $crate::types::interface::MODULE {
             let _proxy = $object.downcast_proxy::<$crate::proxy::module::Module>().unwrap();

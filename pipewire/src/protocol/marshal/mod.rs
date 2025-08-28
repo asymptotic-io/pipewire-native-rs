@@ -8,6 +8,7 @@ pub(crate) mod device;
 pub(crate) mod factory;
 pub(crate) mod link;
 pub(crate) mod message;
+pub(crate) mod metadata;
 pub(crate) mod module;
 pub(crate) mod node;
 pub(crate) mod port;

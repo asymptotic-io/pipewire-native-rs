@@ -54,6 +54,7 @@ impl Methods {
                     types::interface::DEVICE => Box::new(proxy::device::Device::new(&core)),
                     types::interface::FACTORY => Box::new(proxy::factory::Factory::new(&core)),
                     types::interface::LINK => Box::new(proxy::link::Link::new(&core)),
+                    types::interface::METADATA => Box::new(proxy::metadata::Metadata::new(&core)),
                     types::interface::MODULE => Box::new(proxy::module::Module::new(&core)),
                     types::interface::NODE => Box::new(proxy::node::Node::new(&core)),
                     types::interface::PORT => Box::new(proxy::port::Port::new(&core)),
