@@ -479,7 +479,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.client.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -501,7 +501,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.device.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -546,7 +546,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.factory.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -568,7 +568,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.link.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -590,7 +590,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.module.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -673,7 +673,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.node.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
@@ -718,7 +718,7 @@ impl State {
             .iter_mut()
             .find(|(_, e)| e.port.proxy().bound_id() == Some(info.id))
         {
-            entry.props = info.props.clone();
+            entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
     }
