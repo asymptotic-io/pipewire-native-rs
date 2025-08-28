@@ -67,6 +67,13 @@ impl Properties {
         self.map.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 
+    /// Update properties from given set of key/value pairs.
+    pub fn merge(&mut self, new: &Properties) {
+        for (k, v) in new.iter() {
+            self.set(k, v.to_string());
+        }
+    }
+
     pub(crate) fn dict(&self) -> Dict {
         Dict::new(
             self.map
