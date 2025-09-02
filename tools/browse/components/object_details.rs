@@ -25,7 +25,7 @@ impl Default for ObjectDetails {
                 .scroll(true)
                 .rewind(true)
                 .title("Details", Alignment::Left)
-                .highlighted_str(" ")
+                .highlighted_str(" ⋄ ")
                 .rows(TableBuilder::default().build()),
         }
     }
@@ -44,9 +44,9 @@ impl Component<Msg, NoUserEvent> for ObjectDetails {
             }
             Event::Keyboard(KeyEvent {
                 code: Key::Down, ..
-            }) => self.perform(Cmd::Scroll(Direction::Down)),
+            }) => self.perform(Cmd::Move(Direction::Down)),
             Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
-                self.perform(Cmd::Scroll(Direction::Up))
+                self.perform(Cmd::Move(Direction::Up))
             }
             Event::Keyboard(KeyEvent {
                 code: Key::PageDown,

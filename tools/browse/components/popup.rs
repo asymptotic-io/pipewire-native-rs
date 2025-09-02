@@ -24,7 +24,7 @@ impl Default for Popup {
                 .inactive(Style::default().fg(Color::Magenta))
                 .scroll(true)
                 .rewind(true)
-                .highlighted_str(" ")
+                .highlighted_str(" ⋄ ")
                 .table(TableBuilder::default().build()),
         }
     }
