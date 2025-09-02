@@ -44,7 +44,7 @@ impl std::fmt::Debug for dyn Interface {
     }
 }
 
-type ArcRefcountedPinBox<T> = Arc<Pin<Box<T>>>;
+type ArcPinBox<T> = Arc<Pin<Box<T>>>;
 
 impl dyn Interface {
     pub fn is<T>(&self) -> bool
@@ -65,9 +65,7 @@ impl dyn Interface {
         }
     }
 
-    pub fn downcast_arc_pin_box<T>(
-        self: ArcRefcountedPinBox<Self>,
-    ) -> Result<ArcRefcountedPinBox<T>, ArcRefcountedPinBox<Self>>
+    pub fn downcast_arc_pin_box<T>(self: ArcPinBox<Self>) -> Result<ArcPinBox<T>, ArcPinBox<Self>>
     where
         T: 'static,
     {
