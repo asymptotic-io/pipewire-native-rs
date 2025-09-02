@@ -91,11 +91,157 @@ impl<'a> Parser<'a> {
         self.pop_pod::<&[T]>()
     }
 
+    pub fn pop_array_raw<F>(&mut self, mut parse_item: F) -> Result<usize, Error>
+    where
+        F: FnMut(Type, &[u8]) -> Result<(), Error>,
+    {
+        if self.available() < 16 {
+            return Err(Error::Invalid("Not enough data for array".to_string()));
+        }
+
+        let size =
+            u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
+        let total_size = 8 + size + super::pad_8(size);
+
+        if self.available() < total_size {
+            return Err(Error::Invalid("Not enough data for struct".to_string()));
+        }
+
+        let t = u32::from_ne_bytes(self.data[self.pos + 4..self.pos + 8].try_into().unwrap());
+        if t != Type::Array as u32 {
+            return Err(Error::Invalid(format!("Type {t} is not array")));
+        }
+
+        let child_size =
+            u32::from_ne_bytes(self.data[self.pos + 8..self.pos + 12].try_into().unwrap()) as usize;
+        let child_type =
+            match u32::from_ne_bytes(self.data[self.pos + 12..self.pos + 16].try_into().unwrap())
+                .try_into()
+            {
+                Ok(t) => t,
+                Err(_) => return Err(Error::Invalid("Could noy parse child_type".to_string())),
+            };
+
+        let mut pos = self.pos + 16;
+
+        while pos + child_size < total_size {
+            parse_item(child_type, &self.data[pos..pos + child_size])?;
+            pos += child_size;
+        }
+
+        self.pos += total_size;
+
+        Ok(total_size)
+    }
+
     pub fn pop_choice<T>(&mut self) -> Result<Choice<T>, Error>
     where
         T: Pod + Primitive,
     {
         self.pop_pod::<Choice<T>>()
+    }
+
+    pub fn pop_choice_raw<F>(&mut self, parse_choice: F) -> Result<usize, Error>
+    where
+        F: FnOnce(Type, Choice<&[u8]>) -> Result<(), Error>,
+    {
+        let data = &self.data[self.pos..];
+
+        if data.len() < 24 {
+            return Err(Error::Invalid("Not enough data for choice".to_string()));
+        }
+
+        let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
+        let padding = super::pad_8(size);
+
+        if data.len() < 8 + size + padding {
+            return Err(Error::Invalid("Not enough data for choice".to_string()));
+        }
+
+        if u32::from_ne_bytes(data[4..8].try_into().unwrap()) != Type::Choice as u32 {
+            return Err(Error::Invalid(format!(
+                "Type {} is not choice",
+                u32::from_ne_bytes(data[4..8].try_into().unwrap())
+            )));
+        }
+
+        let choice_type = u32::from_ne_bytes(data[8..12].try_into().unwrap());
+        // flags is unused, so we don't decode it at [12..16]
+        let child_size = u32::from_ne_bytes(data[16..20].try_into().unwrap()) as usize;
+        let child_type = u32::from_ne_bytes(data[20..24].try_into().unwrap())
+            .try_into()
+            .map_err(|_| Error::Invalid("Invalid child type in choice".to_string()))?;
+
+        let child_1 = 24..24 + child_size;
+        let child_2 = 24 + child_size..24 + child_size * 2;
+        let child_3 = 24 + child_size * 2..24 + child_size * 3;
+        let child_4 = 24 + child_size * 3..24 + child_size * 4;
+
+        let choice = match choice_type {
+            0 => Choice::None(&data[child_1]),
+            1 => {
+                if size != 16 + child_size * 3 {
+                    return Err(Error::Invalid(
+                        "Not enough data for choice range".to_string(),
+                    ));
+                }
+
+                let default = &data[child_1];
+                let min = &data[child_2];
+                let max = &data[child_3];
+
+                Choice::Range { default, min, max }
+            }
+            2 => {
+                if size != 16 + child_size * 4 {
+                    return Err(Error::Invalid(
+                        "Not enough data for choice step".to_string(),
+                    ));
+                }
+
+                let default = &data[child_1];
+                let min = &data[child_2];
+                let max = &data[child_3];
+                let step = &data[child_4];
+
+                Choice::Step {
+                    default,
+                    min,
+                    max,
+                    step,
+                }
+            }
+            3 => {
+                let default = &data[child_1];
+                let mut alternatives = Vec::new();
+
+                for i in 1..(size - 16) / child_size {
+                    alternatives.push(&data[24 + child_size * i..24 + child_size * (i + 1)]);
+                }
+
+                Choice::Enum {
+                    default,
+                    alternatives,
+                }
+            }
+            4 => {
+                if size != 16 + child_size * 2 {
+                    return Err(Error::Invalid(
+                        "Not enough data for choice flags".to_string(),
+                    ));
+                }
+
+                let default = &data[child_1];
+                let flags = &data[child_2];
+
+                Choice::Flags { default, flags }
+            }
+            t => return Err(Error::Invalid(format!("Invalid choice type {t}"))),
+        };
+
+        parse_choice(child_type, choice)?;
+
+        Ok(8 + size + padding)
     }
 
     pub fn pop_struct<F, T>(&mut self, parse_struct: F) -> Result<(T, usize), Error>
@@ -237,6 +383,14 @@ impl<'a> Parser<'a> {
         self.pos += size - 8;
 
         Ok((ret, size + 8))
+    }
+
+    pub fn pop_raw_pod(&mut self) -> Result<RawPod<'a>, Error> {
+        let res = RawPod::wrap(&self.data[self.pos..])?;
+
+        self.pos += res.size;
+
+        Ok(res)
     }
 }
 
