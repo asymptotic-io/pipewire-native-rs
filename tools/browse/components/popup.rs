@@ -25,6 +25,7 @@ impl Default for Popup {
                 .scroll(true)
                 .rewind(true)
                 .highlighted_str(" ⋄ ")
+                .widths(&[20, 80])
                 .table(TableBuilder::default().build()),
         }
     }

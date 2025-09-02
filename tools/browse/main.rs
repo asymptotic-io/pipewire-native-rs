@@ -109,10 +109,10 @@ impl Model {
             if self.show_params {
                 let area = frame.area();
                 let popup_area = layout::Rect {
-                    x: area.width / 6,
-                    y: area.height / 6,
-                    width: area.width * 4 / 6,
-                    height: area.height * 4 / 6,
+                    x: area.width / 8,
+                    y: area.height / 8,
+                    width: area.width * 6 / 8,
+                    height: area.height * 6 / 8,
                 };
                 frame.render_widget(Clear, popup_area);
                 self.app.view(&ComponentId::Popup, frame, popup_area);
@@ -320,10 +320,15 @@ impl Model {
 
                             for (id, _, pod) in object_parser {
                                 if first {
-                                    table.add_col(TextSpan::from(format!("{:?}", param_id)).bold());
+                                    table
+                                        .add_col(
+                                            TextSpan::from(format!("{:?}", param_id))
+                                                .bold()
+                                                .underlined(),
+                                        )
+                                        .add_row()
+                                        .add_row();
                                     first = false;
-                                } else {
-                                    table.add_col(TextSpan::from(""));
                                 }
 
                                 table
