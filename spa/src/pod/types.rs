@@ -35,6 +35,24 @@ pub enum Type {
     Pod,
 }
 
+impl Type {
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self,
+            Type::None
+                | Type::Bool
+                | Type::Id
+                | Type::Int
+                | Type::Long
+                | Type::Float
+                | Type::Double
+                | Type::Rectangle
+                | Type::Fraction
+                | Type::Fd
+        )
+    }
+}
+
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
 pub enum ObjectType {
