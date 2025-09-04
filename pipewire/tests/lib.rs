@@ -4,12 +4,16 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc, RwLock,
+    },
 };
 
 use pipewire_native::{
     self as pipewire, closure,
     context::Context,
+    core::Core,
     main_loop::MainLoop,
     properties::Properties,
     proxy::{
@@ -43,9 +47,128 @@ fn start_pipewire() -> TestContext {
 #[derive(Clone)]
 struct Objects {
     map: Arc<RwLock<HashMap<Id, Box<dyn HasProxy>>>>,
+    seq: Arc<AtomicU32>,
+    input_node: Arc<RwLock<Option<Box<dyn HasProxy>>>>,
+    output_node: Arc<RwLock<Option<Box<dyn HasProxy>>>>,
+    link: Arc<RwLock<Option<Box<dyn HasProxy>>>>,
+}
+
+impl Objects {
+    fn input_id(&self) -> Option<u32> {
+        self.input_node
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|n| n.downcast_proxy::<Node>())
+            .and_then(|p| p.bound_id())
+    }
+
+    fn output_id(&self) -> Option<u32> {
+        self.output_node
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|n| n.downcast_proxy::<Node>())
+            .and_then(|p| p.bound_id())
+    }
 }
 
 unsafe impl Send for Objects {}
+
+fn create_nodes(core: &Core, objects: &Objects) {
+    if objects.output_node.read().unwrap().is_none() {
+        let mut props = Properties::new();
+
+        props.set(
+            "library.name",
+            "audiotestsrc/libspa-audiotestsrc".to_string(),
+        );
+        props.set("factory.name", "audiotestsrc".to_string());
+        props.set("node.name", "testsrc".to_string());
+
+        let object = core
+            .create_object("spa-node-factory", types::interface::NODE, 3, &props)
+            .unwrap();
+
+        let proxy = object.downcast_proxy::<Node>().unwrap();
+
+        proxy.add_listener(ProxyEvents {
+            bound_props: some_closure!([core ^(objects)] _id, _props, {
+                create_link(&core, objects);
+            }),
+            ..Default::default()
+        });
+
+        objects.output_node.write().unwrap().replace(object);
+
+        let _ = core.sync();
+    }
+
+    if objects.input_node.read().unwrap().is_none() {
+        let mut props = Properties::new();
+
+        props.set("library.name", "support/libspa-support".to_string());
+        props.set("factory.name", "support.null-audio-sink".to_string());
+        props.set("node.name", "nullsink".to_string());
+
+        let object = core
+            .create_object("spa-node-factory", types::interface::NODE, 3, &props)
+            .unwrap();
+
+        let proxy = object.downcast_proxy::<Node>().unwrap();
+
+        proxy.add_listener(ProxyEvents {
+            bound_props: some_closure!([core ^(objects)] _id, _props, {
+                create_link(&core, objects);
+            }),
+            ..Default::default()
+        });
+
+        objects.input_node.write().unwrap().replace(object);
+
+        let _ = core.sync();
+    }
+}
+
+fn create_link(core: &Core, objects: &Objects) {
+    if objects.link.read().unwrap().is_some() {
+        return;
+    }
+
+    let (input_node_id, output_node_id) = match (objects.input_id(), objects.output_id()) {
+        (Some(i), Some(o)) => (i, o),
+        _ => return,
+    };
+
+    println!("We can create link");
+
+    let mut props = Properties::new();
+
+    props.set("factory.name", "support.null-audio-sink".to_string());
+    props.set("link.input.node", format!("{}", input_node_id));
+    props.set("link.output.node", format!("{}", output_node_id));
+
+    objects.link.write().unwrap().replace(
+        core.create_object("link-factory", types::interface::LINK, 3, &props)
+            .unwrap(),
+    );
+
+    let _ = core.sync();
+}
+
+fn destroy_nodes(core: &Core, objects: &Objects) {
+    let input_node = objects.input_node.write().unwrap().take().unwrap();
+    let output_node = objects.output_node.write().unwrap().take().unwrap();
+    let link = objects.link.write().unwrap().take();
+
+    if let Some(link) = link {
+        // Link creation might fail if the PipeWire install doesn't have audiotestsrc, so don't
+        // make this fatal.
+        let _ = core.destroy(link.as_ref());
+    };
+    let _ = core.destroy(input_node.as_ref());
+    let _ = core.destroy(output_node.as_ref());
+}
 
 #[test]
 fn test_lib() {
@@ -55,6 +178,10 @@ fn test_lib() {
 
     let objects = Objects {
         map: Arc::new(RwLock::new(HashMap::new())),
+        seq: Arc::new(AtomicU32::new(0)),
+        input_node: Arc::new(RwLock::new(None)),
+        output_node: Arc::new(RwLock::new(None)),
+        link: Arc::new(RwLock::new(None)),
     };
 
     let v = vec![("loop.name".to_string(), "pw-main-loop".to_string())];
@@ -66,6 +193,14 @@ fn test_lib() {
     let core = context.connect(None).unwrap();
 
     core.proxy().add_listener(ProxyEvents {
+        done: some_closure!([core ^(objects)] seq, {
+            if seq == objects.seq.load(Ordering::Relaxed) {
+                create_nodes(&core, objects);
+            }
+        }),
+        error: some_closure!([] seq, res, msg, {
+            unreachable!("Error: {seq} {res} {msg}");
+        }),
         destroy: some_closure!([^(objects)] {
             println!("core destroyed, clearing objects");
             objects.map.write().unwrap().clear();
@@ -75,6 +210,7 @@ fn test_lib() {
 
     let mut timer_src = main_loop
         .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
+            destroy_nodes(&core, objects);
             assert!(objects.map.read().unwrap().len() > 1);
             core.disconnect();
             assert_eq!(objects.map.read().unwrap().len(), 0);
@@ -175,6 +311,13 @@ fn test_lib() {
                     module
                 }
                 types::interface::NODE => {
+                    match props.get("node.name") {
+                        // We already have proxies for these
+                        Some("testsrc") => return,
+                        Some("nullsink") => return,
+                        _ => (),
+                    };
+
                     let node = registry.bind(id, type_, version).unwrap();
                     let proxy = node.downcast_proxy::<Node>().unwrap();
 
@@ -211,7 +354,12 @@ fn test_lib() {
         }),
     });
 
+    let seq = core.sync().unwrap();
+    objects.seq.store(seq, Ordering::Relaxed);
+
     main_loop.run();
 
     assert_eq!(objects.map.read().unwrap().len(), 0);
+    assert!(objects.input_node.read().unwrap().is_none());
+    assert!(objects.output_node.read().unwrap().is_none());
 }
