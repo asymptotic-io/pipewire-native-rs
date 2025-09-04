@@ -12,7 +12,7 @@ use pipewire_native_spa as spa;
 
 use crate::{
     context::{Context, WeakContext},
-    debug, default_topic, hasproxy_method_call, hasproxy_notify,
+    debug, default_topic, hasproxy_method_call, hasproxy_notify, hasproxy_notify_unlocked,
     id_map::IdMap,
     keys, log, new_refcounted,
     properties::Properties,
@@ -131,7 +131,7 @@ impl Core {
                 let proxies = core.inner.objects.read().unwrap();
 
                 if let Some(object) = proxies.get(id) {
-                    hasproxy_notify!(object, done, seq);
+                    hasproxy_notify_unlocked!(object, proxies, done, seq);
                 }
             }),
             error: some_closure!([core_proxy] id, seq, res, message, {
@@ -140,7 +140,7 @@ impl Core {
                 let proxies = core.inner.objects.read().unwrap();
 
                 if let Some(object) = proxies.get(id) {
-                    hasproxy_notify!(object, error, seq, res, message);
+                    hasproxy_notify_unlocked!(object, proxies, error, seq, res, message);
                 }
             }),
             ping: some_closure!([core_proxy] id, seq, {
