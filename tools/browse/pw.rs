@@ -22,7 +22,7 @@ use pipewire::{
         device::{DeviceEvents, DeviceInfo},
         factory::{FactoryEvents, FactoryInfo},
         link::{LinkEvents, LinkInfo},
-        metadata::MetadataEvents,
+        metadata::{Metadata, MetadataEvents},
         module::{ModuleEvents, ModuleInfo},
         node::{NodeEvents, NodeInfo},
         port::{PortEvents, PortInfo},
@@ -353,8 +353,8 @@ impl State {
                 let metadata = object.downcast::<proxy::metadata::Metadata>().unwrap();
 
                 metadata.add_listener(MetadataEvents {
-                    property: some_closure!([^(state)] subject, key, type_, value, {
-                        state.metadata_property(subject, key, type_, value);
+                    property: some_closure!([metadata ^(state)] subject, key, type_, value, {
+                        state.metadata_property(&metadata, subject, key, type_, value);
                     }),
                 });
 
@@ -604,20 +604,24 @@ impl State {
 
     fn metadata_property(
         &self,
+        metadata: &Metadata,
         subject: Id,
         key: Option<&str>,
-        type_: Option<&str>,
+        _type_: Option<&str>,
         value: Option<&str>,
     ) {
-        if let Some(entry) = self.metadata.lock().unwrap().get_mut(&subject) {
+        if let Some(entry) = self
+            .metadata
+            .lock()
+            .unwrap()
+            .get_mut(&metadata.proxy().bound_id().unwrap())
+        {
             if let Some(key) = key {
-                let key = format!("{subject}/{key}");
+                let key = format!("{subject}: {key}");
 
                 if let Some(value) = value {
                     // (key, value) was set on subject
-                    entry
-                        .props
-                        .set(key.as_str(), format!("{value} ({type_:?})"));
+                    entry.props.set(key.as_str(), value.to_string());
                 } else {
                     // (key, value) was unset on subject
                     entry.props.unset(key.as_str());
