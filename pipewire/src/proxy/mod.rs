@@ -144,7 +144,7 @@ impl<T: HasProxy + Refcounted> InnerProxy<T> {
 
 /// This trait is implemented by all specific types of proxies. See the [Proxy] documentation for
 /// more details.
-pub trait HasProxy: Any {
+pub trait HasProxy: Any + Send + Sync {
     // See the invoke! and notify! macros below
     // type Methods;
     // type Events;
