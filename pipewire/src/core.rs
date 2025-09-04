@@ -214,6 +214,27 @@ impl Core {
         self.inner.client.connection()
     }
 
+    pub(crate) fn new_object(&self, type_: &str) -> std::io::Result<Box<dyn HasProxy>> {
+        let new_object: Box<dyn HasProxy> = match type_ {
+            types::interface::CLIENT => Box::new(proxy::client::Client::new(self)),
+            types::interface::DEVICE => Box::new(proxy::device::Device::new(self)),
+            types::interface::FACTORY => Box::new(proxy::factory::Factory::new(self)),
+            types::interface::LINK => Box::new(proxy::link::Link::new(self)),
+            types::interface::METADATA => Box::new(proxy::metadata::Metadata::new(self)),
+            types::interface::MODULE => Box::new(proxy::module::Module::new(self)),
+            types::interface::NODE => Box::new(proxy::node::Node::new(self)),
+            types::interface::PORT => Box::new(proxy::port::Port::new(self)),
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    format!("Unsupported proxy type {type_}"),
+                ))
+            }
+        };
+
+        Ok(new_object)
+    }
+
     pub(crate) fn next_proxy_id(&self) -> Id {
         self.inner.objects.write().unwrap().reserve()
     }
@@ -260,6 +281,24 @@ impl Core {
     pub fn registry(&self) -> std::io::Result<proxy::registry::Registry> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, get_registry)
+    }
+
+    /// Create an object of the given factory type on the server.
+    pub fn create_object(
+        &self,
+        factory_name: &str,
+        type_: &str,
+        version: u32,
+        props: &Properties,
+    ) -> std::io::Result<Box<dyn HasProxy>> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, create_object, factory_name, type_, version, props)
+    }
+
+    /// Destroy an object on the server.
+    pub fn destroy(&self, object: &dyn HasProxy) -> std::io::Result<()> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, destroy, object)
     }
 
     pub(crate) fn methods(&self) -> Arc<Mutex<CoreMethods<Core>>> {
@@ -330,11 +369,10 @@ pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
     pub(crate) get_registry:
         Box<dyn FnMut(&Proxy<T>) -> std::io::Result<proxy::registry::Registry>>,
-    #[allow(unused)]
-    pub(crate) create_object:
-        Box<dyn FnMut(&Proxy<T>, &str, &str, u32, &Properties) -> std::io::Result<()>>,
-    #[allow(unused)]
-    pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, Box<dyn HasProxy>) -> std::io::Result<()>>,
+    pub(crate) create_object: Box<
+        dyn FnMut(&Proxy<T>, &str, &str, u32, &Properties) -> std::io::Result<Box<dyn HasProxy>>,
+    >,
+    pub(crate) destroy: Box<dyn FnMut(&Proxy<T>, &dyn HasProxy) -> std::io::Result<()>>,
 }
 
 /// Events that may be emitted by a [Core] proxy object.

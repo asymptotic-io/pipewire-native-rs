@@ -68,6 +68,7 @@ pub(crate) struct CreateObject {
     type_: String,
     version: i32,
     props: PairList<String, String>,
+    new_id: i32,
 }
 
 #[derive(Debug, macros::PodStruct)]
@@ -131,6 +132,9 @@ impl Methods {
                 Ok(registry)
             }),
             create_object: closure!([connection] proxy, factory_name, type_, version, props, {
+                let core = proxy.object().unwrap();
+                let new_object = core.new_object(type_)?;
+
                 connection.push(
                     proxy.id(),
                     Methods::CreateObject(CreateObject {
@@ -143,8 +147,11 @@ impl Methods {
                                 .map(|(k, v)| (k.to_string(), v.to_string()))
                                 .collect(),
                         ),
+                        new_id: hasproxy_method_call!(new_object, id) as i32,
                     }),
-                )
+                )?;
+
+                Ok(new_object)
             }),
             destroy: closure!([connection] proxy, object, {
                 connection.push(

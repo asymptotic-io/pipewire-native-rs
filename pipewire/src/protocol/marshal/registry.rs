@@ -11,11 +11,10 @@ use crate::{
     properties::Properties,
     protocol::connection::Connection,
     proxy::{
-        self,
         registry::{Registry, RegistryMethods},
-        HasProxy, Proxy,
+        Proxy,
     },
-    proxy_object_notify, trace, types, Id,
+    proxy_object_notify, trace, Id,
 };
 
 use super::PairList;
@@ -49,22 +48,7 @@ impl Methods {
                 let registry = proxy.object().unwrap();
                 let core = registry.core();
 
-                let new_object: Box<dyn HasProxy> = match type_ {
-                    types::interface::CLIENT => Box::new(proxy::client::Client::new(&core)),
-                    types::interface::DEVICE => Box::new(proxy::device::Device::new(&core)),
-                    types::interface::FACTORY => Box::new(proxy::factory::Factory::new(&core)),
-                    types::interface::LINK => Box::new(proxy::link::Link::new(&core)),
-                    types::interface::METADATA => Box::new(proxy::metadata::Metadata::new(&core)),
-                    types::interface::MODULE => Box::new(proxy::module::Module::new(&core)),
-                    types::interface::NODE => Box::new(proxy::node::Node::new(&core)),
-                    types::interface::PORT => Box::new(proxy::port::Port::new(&core)),
-                    _ => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Unsupported,
-                            format!("Unsupported proxy type {type_}"),
-                        ))
-                    }
-                };
+                let new_object = core.new_object(type_)?;
 
                 connection.push(
                     proxy.id(),
