@@ -95,7 +95,8 @@ impl Methods {
                         id: id as i32,
                         seq: seq as i32,
                     }),
-                )
+                )?;
+                Ok(seq)
             }),
             pong: closure!([connection] proxy, id, seq, {
                 connection.push(

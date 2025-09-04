@@ -271,7 +271,7 @@ impl Core {
     }
 
     /// Trigger a `sync` message to the server, flushing all pending messages.
-    pub fn sync(&self) -> std::io::Result<()> {
+    pub fn sync(&self) -> std::io::Result<u32> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, sync, 0)
     }
@@ -363,7 +363,7 @@ pub struct CoreInfo<'a> {
 #[allow(clippy::type_complexity)]
 pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
     pub(crate) hello: Box<dyn FnMut(&Proxy<T>, u32) -> std::io::Result<()>>,
-    pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
+    pub(crate) sync: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<u32>>,
     pub(crate) pong: Box<dyn FnMut(&Proxy<T>, Id, u32) -> std::io::Result<()>>,
     #[allow(unused)]
     pub(crate) error: Box<dyn FnMut(&Proxy<T>, u32, u32, &str) -> std::io::Result<()>>,
