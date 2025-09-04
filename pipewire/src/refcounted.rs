@@ -85,9 +85,9 @@ macro_rules! refcounted {
                 inner: std::sync::Arc<[<Inner $name>] $(<$($generic),*>)?>,
             }
 
-            // We implement Send to allow usage with our main loop, and expect the user to
-            // explicitly ensure single-thread access
+            // We expect implementors to ensure safety in their implementation
             unsafe impl $(<$($generic $(: $bound)?),*>)? Send for $name $(<$($generic),*>)? {}
+            unsafe impl $(<$($generic $(: $bound)?),*>)? Sync for $name $(<$($generic),*>)? {}
 
             #[derive(Clone)]
             /// A weak reference to $name
@@ -95,9 +95,9 @@ macro_rules! refcounted {
                 inner: std::sync::Weak<[<Inner $name>] $(<$($generic>)?),*>,
             }
 
-            // We implement Send to allow usage with our main loop, and expect the user to
-            // explicitly ensure single-thread access
+            // We expect implementors to ensure safety in their implementation
             unsafe impl $(<$($generic $(: $bound)?),*>)? Send for [<Weak $name>] $(<$($generic),*>)? {}
+            unsafe impl $(<$($generic $(: $bound)?),*>)? Sync for [<Weak $name>] $(<$($generic),*>)? {}
 
             impl $(<$($generic $(: $bound)?),*>)? $name $(<$($generic),*>)? {
                 #[doc(hidden)]
