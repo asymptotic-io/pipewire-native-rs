@@ -21,7 +21,7 @@ use tuirealm::{
 };
 
 use components::{
-    object_details::ObjectDetails, object_list::ObjectList, param_pane::ParamPane,
+    help::Help, object_details::ObjectDetails, object_list::ObjectList, param_pane::ParamPane,
     renderable::Renderable, type_list::TypeList, type_list::TypeSelection,
 };
 
@@ -31,6 +31,7 @@ enum Msg {
     TypeChanged(TypeSelection),
     ObjectChanged(usize),
     ShowParams(bool),
+    ShowHelp(bool),
     Quit,
     None,
 }
@@ -41,6 +42,7 @@ enum ComponentId {
     Objects,
     Details,
     Params,
+    Help,
 }
 
 struct Model {
@@ -50,6 +52,7 @@ struct Model {
     type_selection: TypeSelection,
     object_selection: usize,
     show_params: bool,
+    show_help: bool,
     quit: bool,
     redraw: bool,
 }
@@ -76,6 +79,8 @@ impl Model {
         .unwrap();
         app.mount(ComponentId::Params, Box::new(ParamPane::default()), vec![])
             .unwrap();
+        app.mount(ComponentId::Help, Box::new(Help::default()), vec![])
+            .unwrap();
 
         app.active(&ComponentId::Types).unwrap();
 
@@ -86,6 +91,7 @@ impl Model {
             type_selection: TypeSelection::Clients,
             object_selection: 0,
             show_params: false,
+            show_help: false,
             quit: false,
             redraw: true,
         }
@@ -116,6 +122,18 @@ impl Model {
                 };
                 frame.render_widget(Clear, popup_area);
                 self.app.view(&ComponentId::Params, frame, popup_area);
+            }
+
+            if self.show_help {
+                let area = frame.area();
+                let popup_area = layout::Rect {
+                    x: area.width / 4,
+                    y: area.height / 4,
+                    width: area.width * 2 / 4,
+                    height: area.height * 2 / 4,
+                };
+                frame.render_widget(Clear, popup_area);
+                self.app.view(&ComponentId::Help, frame, popup_area);
             }
         });
     }
@@ -398,6 +416,18 @@ impl Update<Msg> for Model {
                     self.show_params = show_params;
                     if self.show_params {
                         self.app.active(&ComponentId::Params).unwrap();
+                    } else {
+                        self.app.active(&self.component_selection).unwrap();
+                    }
+                }
+
+                None
+            }
+            Msg::ShowHelp(show_help) => {
+                if show_help != self.show_help {
+                    self.show_help = show_help;
+                    if self.show_help {
+                        self.app.active(&ComponentId::Help).unwrap();
                     } else {
                         self.app.active(&self.component_selection).unwrap();
                     }

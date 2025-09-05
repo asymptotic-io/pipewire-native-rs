@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+pub mod help;
 pub mod object_details;
 pub mod object_list;
 pub mod param_pane;

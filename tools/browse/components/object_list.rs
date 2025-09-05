@@ -74,6 +74,10 @@ impl Component<Msg, NoUserEvent> for ObjectList {
                 code: Key::Char('p'),
                 ..
             }) => return Some(Msg::ShowParams(true)),
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('h'),
+                ..
+            }) => return Some(Msg::ShowHelp(true)),
             _ => CmdResult::None,
         };
 
