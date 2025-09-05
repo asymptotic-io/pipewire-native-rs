@@ -547,11 +547,9 @@ impl State {
     }
 
     fn client_removed(&self, client: proxy::client::Client) {
-        let _ = self
-            .clients
-            .lock()
-            .unwrap()
-            .remove(&client.proxy().bound_id().unwrap());
+        if let Some(id) = client.proxy().bound_id() {
+            let _ = self.clients.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -583,11 +581,9 @@ impl State {
     }
 
     fn device_removed(&self, device: proxy::device::Device) {
-        let _ = self
-            .devices
-            .lock()
-            .unwrap()
-            .remove(&device.proxy().bound_id().unwrap());
+        if let Some(id) = device.proxy().bound_id() {
+            let _ = self.devices.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -599,11 +595,9 @@ impl State {
     }
 
     fn factory_removed(&self, factory: proxy::factory::Factory) {
-        let _ = self
-            .factories
-            .lock()
-            .unwrap()
-            .remove(&factory.proxy().bound_id().unwrap());
+        if let Some(id) = factory.proxy().bound_id() {
+            let _ = self.factories.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -630,11 +624,9 @@ impl State {
     }
 
     fn link_removed(&self, link: proxy::link::Link) {
-        let _ = self
-            .links
-            .lock()
-            .unwrap()
-            .remove(&link.proxy().bound_id().unwrap());
+        if let Some(id) = link.proxy().bound_id() {
+            let _ = self.links.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -646,11 +638,9 @@ impl State {
     }
 
     fn module_removed(&self, module: proxy::module::Module) {
-        let _ = self
-            .modules
-            .lock()
-            .unwrap()
-            .remove(&module.proxy().bound_id().unwrap());
+        if let Some(id) = module.proxy().bound_id() {
+            let _ = self.modules.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -705,11 +695,9 @@ impl State {
     }
 
     fn metadata_removed(&self, metadata: proxy::metadata::Metadata) {
-        let _ = self
-            .metadata
-            .lock()
-            .unwrap()
-            .remove(&metadata.proxy().bound_id().unwrap());
+        if let Some(id) = metadata.proxy().bound_id() {
+            let _ = self.metadata.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -743,11 +731,9 @@ impl State {
     }
 
     fn node_removed(&self, node: proxy::node::Node) {
-        let _ = self
-            .nodes
-            .lock()
-            .unwrap()
-            .remove(&node.proxy().bound_id().unwrap());
+        if let Some(id) = node.proxy().bound_id() {
+            let _ = self.nodes.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 
@@ -789,11 +775,9 @@ impl State {
     }
 
     fn port_removed(&self, port: proxy::port::Port) {
-        let _ = self
-            .ports
-            .lock()
-            .unwrap()
-            .remove(&port.proxy().bound_id().unwrap());
+        if let Some(id) = port.proxy().bound_id() {
+            let _ = self.ports.lock().unwrap().remove(&id);
+        }
         self.ui_update.store(true, Ordering::Relaxed);
     }
 }
