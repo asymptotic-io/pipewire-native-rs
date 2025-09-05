@@ -54,6 +54,11 @@ impl Default for Help {
                         .add_col(TextSpan::from(""))
                         .add_col(TextSpan::from("d").italic())
                         .add_col(TextSpan::from("Delete an object (only works for links)"))
+                        .add_row()
+                        .add_row()
+                        .add_col(TextSpan::from(""))
+                        .add_col(TextSpan::from("l").italic())
+                        .add_col(TextSpan::from("Mark node/port for linking"))
                         .build(),
                 ),
         }

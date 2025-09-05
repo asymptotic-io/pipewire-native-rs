@@ -25,7 +25,7 @@ use pipewire::{
         metadata::{Metadata, MetadataEvents},
         module::{ModuleEvents, ModuleInfo},
         node::{NodeEvents, NodeInfo},
-        port::{PortEvents, PortInfo},
+        port::{PortDirection, PortEvents, PortInfo},
         registry::{Registry, RegistryEvents},
         HasProxy, ProxyEvents,
     },
@@ -117,6 +117,8 @@ unsafe impl Sync for ModuleDetails {}
 #[derive(Clone)]
 pub struct NodeDetails {
     pub node: proxy::node::Node,
+    pub max_input_ports: u32,
+    pub max_output_ports: u32,
     pub props: Properties,
     pub params: HashMap<spa::param::ParamType, Params>,
 }
@@ -127,6 +129,7 @@ unsafe impl Sync for NodeDetails {}
 #[derive(Clone)]
 pub struct PortDetails {
     pub port: proxy::port::Port,
+    pub direction: proxy::port::PortDirection,
     pub props: Properties,
     pub params: HashMap<spa::param::ParamType, Params>,
 }
@@ -138,7 +141,7 @@ pub struct State {
     pub main_loop: ThreadLoop,
     ui_update: Arc<AtomicBool>,
     _context: Context,
-    core: Core,
+    pub core: Core,
     pub registry: Registry,
     pub clients: Arc<Mutex<BTreeMap<Id, ClientDetails>>>,
     pub devices: Arc<Mutex<BTreeMap<Id, DeviceDetails>>>,
@@ -211,6 +214,52 @@ impl State {
     pub fn stop(&self) {
         self.main_loop.quit();
         self.core.disconnect();
+    }
+
+    pub fn link_nodes(&self, node1: &NodeDetails, node2: &NodeDetails) {
+        let (output_node, input_node) = if node1.max_output_ports > 0 {
+            (node1, node2)
+        } else {
+            (node2, node1)
+        };
+
+        let mut props = Properties::new();
+
+        props.set(
+            keys::LINK_INPUT_NODE,
+            format!("{}", input_node.node.proxy().bound_id().unwrap()),
+        );
+        props.set(
+            keys::LINK_OUTPUT_NODE,
+            format!("{}", output_node.node.proxy().bound_id().unwrap()),
+        );
+
+        self.core
+            .create_object("link-factory", types::interface::LINK, 3, &props)
+            .unwrap();
+    }
+
+    pub fn link_ports(&self, port1: &PortDetails, port2: &PortDetails) {
+        let (output_port, input_port) = if port1.direction == PortDirection::Output {
+            (port1, port2)
+        } else {
+            (port2, port1)
+        };
+
+        let mut props = Properties::new();
+
+        props.set(
+            keys::LINK_INPUT_PORT,
+            format!("{}", input_port.port.proxy().bound_id().unwrap()),
+        );
+        props.set(
+            keys::LINK_OUTPUT_PORT,
+            format!("{}", output_port.port.proxy().bound_id().unwrap()),
+        );
+
+        self.core
+            .create_object("link-factory", types::interface::LINK, 3, &props)
+            .unwrap();
     }
 
     fn node_name(&self, id: Id) -> Option<String> {
@@ -431,6 +480,8 @@ impl State {
                             bound_id,
                             NodeDetails {
                                 node,
+                                max_input_ports: 0,
+                                max_output_ports: 0,
                                 props: props.clone(),
                                 params: HashMap::new(),
                             },
@@ -470,6 +521,7 @@ impl State {
                             bound_id,
                             PortDetails {
                                 port,
+                                direction: proxy::port::PortDirection::Input,
                                 props: props.clone(),
                                 params: HashMap::new(),
                             },
@@ -663,6 +715,8 @@ impl State {
 
     fn node_info(&self, info: &NodeInfo) {
         if let Some(entry) = self.nodes.lock().unwrap().get_mut(&info.id) {
+            entry.max_input_ports = info.max_input_ports;
+            entry.max_output_ports = info.max_output_ports;
             entry.props.merge(info.props);
             self.ui_update.store(true, Ordering::Relaxed);
         }
@@ -699,6 +753,7 @@ impl State {
 
     fn port_info(&self, info: &PortInfo) {
         if let Some(entry) = self.ports.lock().unwrap().get_mut(&info.id) {
+            entry.direction = info.direction;
             entry.props.merge(info.props);
 
             if let Some(name) = entry

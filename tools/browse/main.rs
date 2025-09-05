@@ -33,6 +33,7 @@ enum Msg {
     FocusChanged(ComponentId),
     TypeChanged(TypeSelection),
     ObjectChanged(usize),
+    SelectObject,
     DestroyObject,
     ShowParams(bool),
     ShowHelp(bool),
@@ -55,6 +56,7 @@ struct Model {
     component_selection: ComponentId,
     type_selection: TypeSelection,
     object_selection: usize,
+    other_object_selection: Option<usize>,
     show_params: bool,
     show_help: bool,
     quit: bool,
@@ -94,6 +96,7 @@ impl Model {
             component_selection: ComponentId::Types,
             type_selection: TypeSelection::Clients,
             object_selection: 0,
+            other_object_selection: None,
             show_params: false,
             show_help: false,
             quit: false,
@@ -207,7 +210,13 @@ impl Model {
         let mut table = TableBuilder::default();
 
         for (idx, object) in objects.iter().enumerate() {
-            table.add_col(object.title());
+            let mut span = object.title();
+
+            if Some(idx) == self.other_object_selection {
+                span = span.bold();
+            }
+
+            table.add_col(span);
 
             if idx < objects.len() - 1 {
                 table.add_row();
@@ -391,6 +400,52 @@ impl Model {
         true
     }
 
+    fn link_objects(&mut self) {
+        let other_object_selection = self.other_object_selection.unwrap();
+
+        if self.object_selection == other_object_selection {
+            return;
+        }
+
+        if self.type_selection == TypeSelection::Nodes {
+            let nodes = self.pw_state.nodes.lock().unwrap();
+            let nodes_vec = nodes.iter().collect::<Vec<_>>();
+
+            let (_, node1) = match nodes_vec.get(self.object_selection) {
+                Some(n) => n,
+                None => return,
+            };
+
+            let (_, node2) = match nodes_vec.get(other_object_selection) {
+                Some(n) => n,
+                None => return,
+            };
+
+            self.pw_state.link_nodes(node1, node2);
+        }
+
+        if self.type_selection == TypeSelection::Ports {
+            let ports = self.pw_state.ports.lock().unwrap();
+            let ports_vec = ports.iter().collect::<Vec<_>>();
+
+            let (_, port1) = match ports_vec.get(self.object_selection) {
+                Some(n) => n,
+                None => return,
+            };
+
+            let (_, port2) = match ports_vec.get(other_object_selection) {
+                Some(n) => n,
+                None => return,
+            };
+
+            if port1.direction == port2.direction {
+                return;
+            }
+
+            self.pw_state.link_ports(port1, port2);
+        }
+    }
+
     fn destroy_current_object(&mut self) {
         if self.type_selection != TypeSelection::Links {
             // We only support deleting links for now
@@ -427,12 +482,28 @@ impl Update<Msg> for Model {
             }
             Msg::TypeChanged(type_selection) => {
                 self.type_selection = type_selection;
+                self.other_object_selection = None;
                 self.update_object_list();
                 None
             }
             Msg::ObjectChanged(idx) => {
                 self.object_selection = idx;
                 self.update_object_details();
+                None
+            }
+            Msg::SelectObject => {
+                if self.type_selection == TypeSelection::Nodes
+                    || self.type_selection == TypeSelection::Ports
+                {
+                    if self.other_object_selection.is_none() {
+                        self.other_object_selection = Some(self.object_selection);
+                    } else {
+                        self.link_objects();
+                        self.other_object_selection = None;
+                    }
+                    self.update_object_list();
+                }
+
                 None
             }
             Msg::DestroyObject => {
@@ -508,6 +579,14 @@ fn global_keybindings(ev: Event<NoUserEvent>) -> Option<Msg> {
             code: Key::Char('H'),
             ..
         }) => Some(Msg::ShowHelp(true)),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('l'),
+            ..
+        }) => Some(Msg::SelectObject),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('L'),
+            ..
+        }) => Some(Msg::SelectObject),
         Event::Keyboard(KeyEvent {
             code: Key::Char('d'),
             ..
