@@ -70,6 +70,10 @@ impl Component<Msg, NoUserEvent> for ObjectList {
                 self.perform(Cmd::GoTo(Position::End))
             }
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('p'),
+                ..
+            }) => return Some(Msg::ShowParams(true)),
             _ => CmdResult::None,
         };
 
