@@ -407,6 +407,7 @@ impl Model {
             return;
         }
 
+        // This path isn't actually used
         if self.type_selection == TypeSelection::Nodes {
             let nodes = self.pw_state.nodes.lock().unwrap();
             let nodes_vec = nodes.iter().collect::<Vec<_>>();
@@ -492,9 +493,7 @@ impl Update<Msg> for Model {
                 None
             }
             Msg::SelectObject => {
-                if self.type_selection == TypeSelection::Nodes
-                    || self.type_selection == TypeSelection::Ports
-                {
+                if self.type_selection == TypeSelection::Ports {
                     if self.other_object_selection.is_none() {
                         self.other_object_selection = Some(self.object_selection);
                     } else {
