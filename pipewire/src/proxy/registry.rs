@@ -29,7 +29,6 @@ refcounted! {
 #[allow(clippy::type_complexity)]
 pub(crate) struct RegistryMethods<T: HasProxy + Refcounted> {
     pub bind: Box<dyn FnMut(&Proxy<T>, Id, &str, u32) -> std::io::Result<Box<dyn HasProxy>>>,
-    #[allow(unused)]
     pub destroy: Box<dyn FnMut(&Proxy<T>, Id) -> std::io::Result<()>>,
 }
 
@@ -95,6 +94,13 @@ impl Registry {
     pub fn bind(&self, id: Id, type_: &str, version: u32) -> std::io::Result<Box<dyn HasProxy>> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, bind, id, type_, version)
+    }
+
+    /// Try to destroy the global object corresponding to this proxy. This may fail if the client
+    /// does not have sufficient permissions.
+    pub fn destroy(&self, id: Id) -> std::io::Result<()> {
+        let proxy = self.proxy();
+        proxy_object_invoke!(proxy, destroy, id)
     }
 
     pub(crate) fn methods(&self) -> Arc<Mutex<RegistryMethods<Registry>>> {

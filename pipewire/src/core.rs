@@ -295,7 +295,7 @@ impl Core {
         proxy_object_invoke!(proxy, create_object, factory_name, type_, version, props)
     }
 
-    /// Destroy an object on the server.
+    /// Destroy a proxy.
     pub fn destroy(&self, object: &dyn HasProxy) -> std::io::Result<()> {
         let proxy = self.proxy();
         proxy_object_invoke!(proxy, destroy, object)
