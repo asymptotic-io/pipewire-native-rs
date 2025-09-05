@@ -4,6 +4,6 @@
 
 pub mod object_details;
 pub mod object_list;
-pub mod popup;
+pub mod param_pane;
 pub mod renderable;
 pub mod type_list;

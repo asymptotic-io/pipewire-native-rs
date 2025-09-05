@@ -21,8 +21,8 @@ use tuirealm::{
 };
 
 use components::{
-    object_details::ObjectDetails, object_list::ObjectList, popup::Popup, renderable::Renderable,
-    type_list::TypeList, type_list::TypeSelection,
+    object_details::ObjectDetails, object_list::ObjectList, param_pane::ParamPane,
+    renderable::Renderable, type_list::TypeList, type_list::TypeSelection,
 };
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -40,7 +40,7 @@ enum ComponentId {
     Types,
     Objects,
     Details,
-    Popup,
+    Params,
 }
 
 struct Model {
@@ -74,7 +74,7 @@ impl Model {
             vec![],
         )
         .unwrap();
-        app.mount(ComponentId::Popup, Box::new(Popup::default()), vec![])
+        app.mount(ComponentId::Params, Box::new(ParamPane::default()), vec![])
             .unwrap();
 
         app.active(&ComponentId::Types).unwrap();
@@ -115,7 +115,7 @@ impl Model {
                     height: area.height * 6 / 8,
                 };
                 frame.render_widget(Clear, popup_area);
-                self.app.view(&ComponentId::Popup, frame, popup_area);
+                self.app.view(&ComponentId::Params, frame, popup_area);
             }
         });
     }
@@ -353,14 +353,14 @@ impl Model {
 
         self.app
             .attr(
-                &ComponentId::Popup,
+                &ComponentId::Params,
                 Attribute::Title,
                 AttrValue::Title(("Params".into(), Alignment::Left)),
             )
             .unwrap();
         self.app
             .attr(
-                &ComponentId::Popup,
+                &ComponentId::Params,
                 Attribute::Content,
                 AttrValue::Table(table.build()),
             )
@@ -397,7 +397,7 @@ impl Update<Msg> for Model {
                 if show_params != self.show_params {
                     self.show_params = show_params;
                     if self.show_params {
-                        self.app.active(&ComponentId::Popup).unwrap();
+                        self.app.active(&ComponentId::Params).unwrap();
                     } else {
                         self.app.active(&self.component_selection).unwrap();
                     }

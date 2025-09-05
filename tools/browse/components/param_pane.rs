@@ -13,11 +13,11 @@ use tuirealm::{
 use crate::Msg;
 
 #[derive(MockComponent)]
-pub struct Popup {
+pub struct ParamPane {
     component: Table,
 }
 
-impl Default for Popup {
+impl Default for ParamPane {
     fn default() -> Self {
         Self {
             component: Table::default()
@@ -31,7 +31,7 @@ impl Default for Popup {
     }
 }
 
-impl Component<Msg, NoUserEvent> for Popup {
+impl Component<Msg, NoUserEvent> for ParamPane {
     fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
         let _ = match ev {
             Event::Keyboard(KeyEvent {
