@@ -17,8 +17,16 @@ use pipewire_native::{
     main_loop::MainLoop,
     properties::Properties,
     proxy::{
-        client::Client, device::Device, factory::Factory, link::Link, metadata::Metadata,
-        module::Module, node::Node, port::Port, registry::RegistryEvents, HasProxy, ProxyEvents,
+        client::Client,
+        device::Device,
+        factory::Factory,
+        link::Link,
+        metadata::Metadata,
+        module::Module,
+        node::Node,
+        port::Port,
+        registry::{Registry, RegistryEvents},
+        HasProxy, ProxyEvents,
     },
     some_closure, types, Id,
 };
@@ -156,18 +164,28 @@ fn create_link(core: &Core, objects: &Objects) {
     let _ = core.sync();
 }
 
-fn destroy_nodes(core: &Core, objects: &Objects) {
-    let input_node = objects.input_node.write().unwrap().take().unwrap();
-    let output_node = objects.output_node.write().unwrap().take().unwrap();
+fn destroy_nodes(registry: &Registry, objects: &Objects) {
+    let _ = objects.input_node.write().unwrap().take().unwrap();
+    let _ = objects.output_node.write().unwrap().take().unwrap();
     let link = objects.link.write().unwrap().take();
 
     if let Some(link) = link {
         // Link creation might fail if the PipeWire install doesn't have audiotestsrc, so don't
         // make this fatal.
-        let _ = core.destroy(link.as_ref());
+        let _ = registry.destroy(
+            link.downcast_proxy::<Link>()
+                .and_then(|p| p.bound_id())
+                .unwrap(),
+        );
     };
-    let _ = core.destroy(input_node.as_ref());
-    let _ = core.destroy(output_node.as_ref());
+
+    if let Some(id) = objects.input_id() {
+        let _ = registry.destroy(id);
+    }
+
+    if let Some(id) = objects.output_id() {
+        let _ = registry.destroy(id);
+    }
 }
 
 #[test]
@@ -208,14 +226,18 @@ fn test_lib() {
         ..Default::default()
     });
 
+    let registry = core.registry().unwrap();
+
     let mut timer_src = main_loop
-        .add_timer(closure!([main_loop, core ^(objects)] _expirations, {
-            destroy_nodes(&core, objects);
-            assert!(objects.map.read().unwrap().len() > 1);
-            core.disconnect();
-            assert_eq!(objects.map.read().unwrap().len(), 0);
-            main_loop.quit();
-        }))
+        .add_timer(
+            closure!([core, main_loop, registry ^(objects)] _expirations, {
+                destroy_nodes(&registry, objects);
+                assert!(objects.map.read().unwrap().len() > 1);
+                core.disconnect();
+                assert_eq!(objects.map.read().unwrap().len(), 0);
+                main_loop.quit();
+            }),
+        )
         .unwrap();
 
     let timeout = libc::timespec {
@@ -224,8 +246,6 @@ fn test_lib() {
     };
     let res = main_loop.update_timer(&mut timer_src, &timeout, None, false);
     assert!(res.is_ok());
-
-    let registry = core.registry().unwrap();
 
     registry.add_listener(RegistryEvents {
         global: some_closure!([registry ^(objects)] id, perms, type_, version, props, {
