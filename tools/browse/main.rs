@@ -21,6 +21,8 @@ use tuirealm::{
     Application, AttrValue, Attribute, Event, EventListenerCfg, NoUserEvent, PollStrategy, Update,
 };
 
+use pipewire::proxy::HasProxy;
+
 use components::{
     help::Help, object_details::ObjectDetails, object_list::ObjectList, param_pane::ParamPane,
     renderable::Renderable, type_list::TypeList, type_list::TypeSelection,
@@ -31,6 +33,7 @@ enum Msg {
     FocusChanged(ComponentId),
     TypeChanged(TypeSelection),
     ObjectChanged(usize),
+    DestroyObject,
     ShowParams(bool),
     ShowHelp(bool),
     Quit,
@@ -387,6 +390,29 @@ impl Model {
 
         true
     }
+
+    fn destroy_current_object(&mut self) {
+        if self.type_selection != TypeSelection::Links {
+            // We only support deleting links for now
+            return;
+        }
+
+        let links = self.pw_state.links.lock().unwrap();
+        let link = match links
+            .iter()
+            .collect::<Vec<_>>()
+            .get(self.object_selection)
+            .map(|e| e.1.link.clone())
+        {
+            Some(l) => l,
+            None => return,
+        };
+
+        self.pw_state
+            .registry
+            .destroy(link.proxy().bound_id().unwrap())
+            .unwrap();
+    }
 }
 
 impl Update<Msg> for Model {
@@ -407,6 +433,10 @@ impl Update<Msg> for Model {
             Msg::ObjectChanged(idx) => {
                 self.object_selection = idx;
                 self.update_object_details();
+                None
+            }
+            Msg::DestroyObject => {
+                self.destroy_current_object();
                 None
             }
             Msg::ShowParams(show_params) => {
@@ -478,6 +508,14 @@ fn global_keybindings(ev: Event<NoUserEvent>) -> Option<Msg> {
             code: Key::Char('H'),
             ..
         }) => Some(Msg::ShowHelp(true)),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('d'),
+            ..
+        }) => Some(Msg::DestroyObject),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('D'),
+            ..
+        }) => Some(Msg::DestroyObject),
         _ => None,
     }
 }

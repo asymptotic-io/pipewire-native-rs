@@ -139,7 +139,7 @@ pub struct State {
     ui_update: Arc<AtomicBool>,
     _context: Context,
     core: Core,
-    registry: Registry,
+    pub registry: Registry,
     pub clients: Arc<Mutex<BTreeMap<Id, ClientDetails>>>,
     pub devices: Arc<Mutex<BTreeMap<Id, DeviceDetails>>>,
     pub factories: Arc<Mutex<BTreeMap<Id, FactoryDetails>>>,

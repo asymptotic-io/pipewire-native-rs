@@ -50,6 +50,10 @@ impl Default for Help {
                         .add_col(TextSpan::from("p").italic())
                         .add_col(TextSpan::from("Show params for this object, if available"))
                         .add_row()
+                        .add_row()
+                        .add_col(TextSpan::from(""))
+                        .add_col(TextSpan::from("d").italic())
+                        .add_col(TextSpan::from("Delete an object (only works for links)"))
                         .build(),
                 ),
         }
