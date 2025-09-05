@@ -62,3 +62,20 @@ pub const APP_PROCESS_SESSION_ID: &str = "application.process.session-id";
 
 /// X11 display string for the application window.
 pub const WINDOW_X11_DISPLAY: &str = "window.x11.display";
+
+/// Link ID.
+pub const LINK_ID: &str = "link.id";
+/// Input node ID of the link.
+pub const LINK_INPUT_NODE: &str = "link.input.node";
+/// Input port ID of the link.
+pub const LINK_INPUT_PORT: &str = "link.input.port";
+/// Output node ID of the link.
+pub const LINK_OUTPUT_NODE: &str = "link.output.node";
+/// Output port ID of the link.
+pub const LINK_OUTPUT_PORT: &str = "link.output.port";
+/// Link is passive (does not cause the graph to start running).
+pub const LINK_PASSIVE: &str = "link.passive";
+/// Link is for feedback (target receives data for the current cycle in the next cycle).
+pub const LINK_FEEDBACK: &str = "link.feedback";
+/// Link is asynchronous
+pub const LINK_ASYNC: &str = "link.async";
