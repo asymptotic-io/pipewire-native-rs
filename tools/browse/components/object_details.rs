@@ -61,16 +61,10 @@ impl Component<Msg, NoUserEvent> for ObjectDetails {
             Event::Keyboard(KeyEvent { code: Key::End, .. }) => {
                 self.perform(Cmd::GoTo(Position::End))
             }
-            Event::Keyboard(KeyEvent {
-                code: Key::Char('p'),
-                ..
-            }) => return Some(Msg::ShowParams(true)),
-            Event::Keyboard(KeyEvent {
-                code: Key::Char('h'),
-                ..
-            }) => return Some(Msg::ShowHelp(true)),
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => return Some(Msg::Quit),
-            _ => CmdResult::None,
+            _ => match crate::global_keybindings(ev) {
+                Some(msg) => return Some(msg),
+                None => CmdResult::None,
+            },
         };
 
         if focus_changed {

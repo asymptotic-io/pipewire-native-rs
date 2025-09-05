@@ -14,10 +14,11 @@ use std::{
 };
 
 use tuirealm::{
+    event::{Key, KeyEvent},
     props::{Alignment, Color, TableBuilder, TextSpan},
     ratatui::{layout, widgets::Clear},
     terminal::{CrosstermTerminalAdapter, TerminalBridge},
-    Application, AttrValue, Attribute, EventListenerCfg, NoUserEvent, PollStrategy, Update,
+    Application, AttrValue, Attribute, Event, EventListenerCfg, NoUserEvent, PollStrategy, Update,
 };
 
 use components::{
@@ -428,6 +429,8 @@ impl Update<Msg> for Model {
                     self.show_help = show_help;
                     if self.show_help {
                         self.app.active(&ComponentId::Help).unwrap();
+                    } else if self.show_params {
+                        self.app.active(&ComponentId::Params).unwrap();
                     } else {
                         self.app.active(&self.component_selection).unwrap();
                     }
@@ -441,6 +444,41 @@ impl Update<Msg> for Model {
             }
             Msg::None => None,
         }
+    }
+}
+
+fn global_keybindings(ev: Event<NoUserEvent>) -> Option<Msg> {
+    match ev {
+        Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::Quit),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('q'),
+            ..
+        }) => Some(Msg::Quit),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('Q'),
+            ..
+        }) => Some(Msg::Quit),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('p'),
+            ..
+        }) => Some(Msg::ShowParams(true)),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('P'),
+            ..
+        }) => Some(Msg::ShowParams(true)),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('?'),
+            ..
+        }) => Some(Msg::ShowHelp(true)),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('h'),
+            ..
+        }) => Some(Msg::ShowHelp(true)),
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('H'),
+            ..
+        }) => Some(Msg::ShowHelp(true)),
+        _ => None,
     }
 }
 
