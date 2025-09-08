@@ -54,7 +54,7 @@ pub struct FactoryInfo<'a> {
 #[derive(Default)]
 pub struct FactoryEvents {
     /// Factory information became available, or changed.
-    pub info: Option<Box<dyn FnMut(&FactoryInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&FactoryInfo<'_>) + Send>>,
 }
 
 impl HasProxy for Factory {

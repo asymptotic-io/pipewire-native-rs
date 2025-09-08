@@ -54,7 +54,7 @@ pub struct ModuleInfo<'a> {
 #[derive(Default)]
 pub struct ModuleEvents {
     /// Module information became available, or changed.
-    pub info: Option<Box<dyn FnMut(&ModuleInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&ModuleInfo<'_>) + Send>>,
 }
 
 impl HasProxy for Module {

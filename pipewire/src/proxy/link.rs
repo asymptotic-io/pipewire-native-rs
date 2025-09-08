@@ -83,7 +83,7 @@ pub struct LinkInfo<'a> {
 #[derive(Default)]
 pub struct LinkEvents {
     /// Link information became available, or changed.
-    pub info: Option<Box<dyn FnMut(&LinkInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&LinkInfo<'_>) + Send>>,
 }
 
 impl HasProxy for Link {

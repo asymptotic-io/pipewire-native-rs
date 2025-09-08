@@ -122,10 +122,11 @@ pub struct NodeInfo<'a> {
 #[derive(Default)]
 pub struct NodeEvents {
     /// Node information became available, or changed.
-    pub info: Option<Box<dyn FnMut(&NodeInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&NodeInfo<'_>) + Send>>,
     /// Node permissions, notified due to a [Node::subscribe_params] or [Node::enum_params]
     /// call.
-    pub param: Option<Box<dyn FnMut(u32, spa::param::ParamType, u32, u32, &spa::pod::RawPodOwned)>>,
+    pub param:
+        Option<Box<dyn FnMut(u32, spa::param::ParamType, u32, u32, &spa::pod::RawPodOwned) + Send>>,
 }
 
 impl HasProxy for Node {

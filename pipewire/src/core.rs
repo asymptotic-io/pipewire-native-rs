@@ -380,19 +380,19 @@ pub(crate) struct CoreMethods<T: HasProxy + Refcounted> {
 #[derive(Default)]
 pub struct CoreEvents {
     /// Information about the core changed.
-    pub info: Option<Box<dyn FnMut(&CoreInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&CoreInfo<'_>) + Send>>,
     /// A core operation was completed.
-    pub done: Option<Box<dyn FnMut(Id, u32)>>,
+    pub done: Option<Box<dyn FnMut(Id, u32) + Send>>,
     /// An error occurred on the core.
-    pub error: Option<Box<dyn FnMut(Id, u32, u32, &str)>>,
-    pub(crate) ping: Option<Box<dyn FnMut(Id, u32)>>,
-    pub(crate) remove_id: Option<Box<dyn FnMut(Id)>>,
-    pub(crate) bound_id: Option<Box<dyn FnMut(Id, Id)>>,
+    pub error: Option<Box<dyn FnMut(Id, u32, u32, &str) + Send>>,
+    pub(crate) ping: Option<Box<dyn FnMut(Id, u32) + Send>>,
+    pub(crate) remove_id: Option<Box<dyn FnMut(Id) + Send>>,
+    pub(crate) bound_id: Option<Box<dyn FnMut(Id, Id) + Send>>,
     #[allow(unused)]
-    pub(crate) add_mem: Option<Box<dyn FnMut(Id, u32, RawFd, u32)>>,
+    pub(crate) add_mem: Option<Box<dyn FnMut(Id, u32, RawFd, u32) + Send>>,
     #[allow(unused)]
-    pub(crate) remove_mem: Option<Box<dyn FnMut(Id)>>,
-    pub(crate) bound_props: Option<Box<dyn FnMut(Id, Id, &Properties)>>,
+    pub(crate) remove_mem: Option<Box<dyn FnMut(Id) + Send>>,
+    pub(crate) bound_props: Option<Box<dyn FnMut(Id, Id, &Properties) + Send>>,
 }
 
 impl InnerCore {

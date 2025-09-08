@@ -75,17 +75,17 @@ refcounted! {
 pub struct ProxyEvents {
     /// The proxy is about to be destroyed (either because it went away, or because we are
     /// disconnecting).
-    pub destroy: Option<Box<dyn FnMut()>>,
+    pub destroy: Option<Box<dyn FnMut() + Send>>,
     /// The proxy was bound to.
-    pub bound: Option<Box<dyn FnMut(Id)>>,
+    pub bound: Option<Box<dyn FnMut(Id) + Send>>,
     /// The proxy was removed (either on the server-side, or we are disconnecting).
-    pub removed: Option<Box<dyn FnMut()>>,
+    pub removed: Option<Box<dyn FnMut() + Send>>,
     /// An asynchronous operation on the proxy was completed.
-    pub done: Option<Box<dyn FnMut(u32)>>,
+    pub done: Option<Box<dyn FnMut(u32) + Send>>,
     /// An error occured on the object.
-    pub error: Option<Box<dyn FnMut(u32, u32, &str)>>,
+    pub error: Option<Box<dyn FnMut(u32, u32, &str) + Send>>,
     /// The proxy was bound to (supercedes [Self::bound]).
-    pub bound_props: Option<Box<dyn FnMut(u32, &Properties)>>,
+    pub bound_props: Option<Box<dyn FnMut(u32, &Properties) + Send>>,
 }
 
 impl<T: HasProxy + Refcounted> Proxy<T> {

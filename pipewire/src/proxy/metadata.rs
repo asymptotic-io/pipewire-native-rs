@@ -35,7 +35,7 @@ pub(crate) struct MetadataMethods<T: HasProxy + Refcounted> {
 #[derive(Default)]
 pub struct MetadataEvents {
     /// Metadata property was added, removed, or changed.
-    pub property: Option<Box<dyn FnMut(Id, Option<&str>, Option<&str>, Option<&str>)>>,
+    pub property: Option<Box<dyn FnMut(Id, Option<&str>, Option<&str>, Option<&str>) + Send>>,
 }
 
 impl HasProxy for Metadata {

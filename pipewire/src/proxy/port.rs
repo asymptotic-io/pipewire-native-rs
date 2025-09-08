@@ -85,10 +85,11 @@ pub struct PortInfo<'a> {
 #[derive(Default)]
 pub struct PortEvents {
     /// Port information became available, or changed.
-    pub info: Option<Box<dyn FnMut(&PortInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&PortInfo<'_>) + Send>>,
     /// Port permissions, notified due to a [Port::subscribe_params] or [Port::enum_params]
     /// call.
-    pub param: Option<Box<dyn FnMut(u32, spa::param::ParamType, u32, u32, &spa::pod::RawPodOwned)>>,
+    pub param:
+        Option<Box<dyn FnMut(u32, spa::param::ParamType, u32, u32, &spa::pod::RawPodOwned) + Send>>,
 }
 
 impl HasProxy for Port {

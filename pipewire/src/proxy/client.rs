@@ -59,9 +59,9 @@ pub struct ClientInfo<'a> {
 #[derive(Default)]
 pub struct ClientEvents {
     /// Client information became available, or changed.
-    pub info: Option<Box<dyn FnMut(&ClientInfo<'_>)>>,
+    pub info: Option<Box<dyn FnMut(&ClientInfo<'_>) + Send>>,
     /// Client permissions, notified due to a [Client::permissions()] call.
-    pub permissions: Option<Box<dyn FnMut(u32, &[permission::Permission])>>,
+    pub permissions: Option<Box<dyn FnMut(u32, &[permission::Permission]) + Send>>,
 }
 
 impl HasProxy for Client {

@@ -38,9 +38,10 @@ pub(crate) struct RegistryMethods<T: HasProxy + Refcounted> {
 pub struct RegistryEvents {
     /// A global object was exported by the server. The object may be tracked using
     /// [Registry::bind()].
-    pub global: Option<Box<dyn FnMut(Id, permission::PermissionBits, &str, u32, &Properties)>>,
+    pub global:
+        Option<Box<dyn FnMut(Id, permission::PermissionBits, &str, u32, &Properties) + Send>>,
     /// A global was removed by the server.
-    pub global_remove: Option<Box<dyn FnMut(Id)>>,
+    pub global_remove: Option<Box<dyn FnMut(Id) + Send>>,
 }
 
 impl HasProxy for Registry {
