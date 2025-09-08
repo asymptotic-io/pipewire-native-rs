@@ -152,7 +152,6 @@ fn create_link(core: &Core, objects: &Objects) {
 
     let mut props = Properties::new();
 
-    props.set("factory.name", "support.null-audio-sink".to_string());
     props.set("link.input.node", format!("{}", input_node_id));
     props.set("link.output.node", format!("{}", output_node_id));
 
