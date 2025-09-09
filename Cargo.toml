@@ -5,6 +5,8 @@ default-members = ["macros", "pipewire", "spa", "tools"]
 
 [workspace.package]
 version = "0.1.0"
+license = "MIT"
+repository = "https://gitlab.freedesktop.org/pipewire/pipewire-native-rs"
 edition = "2021"
 
 [workspace.dependencies]
