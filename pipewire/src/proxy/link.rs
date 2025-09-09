@@ -13,7 +13,7 @@ use crate::{
     new_refcounted,
     properties::Properties,
     proxy::{HasProxy, Proxy},
-    refcounted, types, Id,
+    refcounted, types, HookId, Id,
 };
 
 refcounted! {
@@ -124,8 +124,13 @@ impl Link {
     }
 
     /// Register for notifications of link events.
-    pub fn add_listener(&self, events: LinkEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: LinkEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     pub(crate) fn events(&self) -> Arc<Mutex<spa::hook::HookList<LinkEvents>>> {

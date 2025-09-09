@@ -18,7 +18,7 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{self, HasProxy, Proxy, ProxyEvents},
-    proxy_notify, proxy_object_invoke, refcounted, some_closure, types, Id, Refcounted,
+    proxy_notify, proxy_object_invoke, refcounted, some_closure, types, HookId, Id, Refcounted,
 };
 
 default_topic!(log::topic::CORE);
@@ -266,8 +266,13 @@ impl Core {
     }
 
     /// Listen for events on the core object.
-    pub fn add_listener(&self, events: CoreEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: CoreEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     /// Trigger a `sync` message to the server, flushing all pending messages.

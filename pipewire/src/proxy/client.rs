@@ -13,7 +13,7 @@ use crate::{
     properties::Properties,
     protocol,
     proxy::{HasProxy, Proxy},
-    proxy_object_invoke, refcounted, types, Id, Refcounted,
+    proxy_object_invoke, refcounted, types, HookId, Id, Refcounted,
 };
 
 refcounted! {
@@ -102,8 +102,13 @@ impl Client {
     }
 
     /// Register for notifications of client events.
-    pub fn add_listener(&self, events: ClientEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: ClientEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     /// Signal an error to the client.

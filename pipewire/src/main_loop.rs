@@ -14,8 +14,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use crate::GLOBAL_SUPPORT;
 use crate::{debug, default_topic, log, new_refcounted, properties::Properties, refcounted, trace};
+use crate::{HookId, GLOBAL_SUPPORT};
 
 default_topic!(log::topic::MAIN_LOOP);
 
@@ -175,8 +175,13 @@ impl MainLoop {
     }
 
     /// Add a listener for main loop events.
-    pub fn add_listener(&self, events: MainLoopEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: MainLoopEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     // Loop control methods

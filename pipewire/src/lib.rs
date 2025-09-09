@@ -83,6 +83,9 @@ pub use paste::paste;
 /// Represents an object identifier
 pub type Id = u32;
 
+/// Represents an identifier for hooks added with objects' add_listener() method
+pub type HookId = spa::hook::HookId;
+
 #[allow(unused)]
 pub(crate) const INVALID_ID: Id = Id::MAX;
 pub(crate) const ANY_ID: Id = 0xFFFF_FFFF;

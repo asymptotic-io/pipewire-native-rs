@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use pipewire_native_spa as spa;
 
+use crate::HookId;
 use crate::{new_refcounted, properties::Properties, refcounted, Refcounted};
 
 use crate::{types::ObjectType, Id};
@@ -122,8 +123,13 @@ impl<T: HasProxy + Refcounted> Proxy<T> {
     }
 
     /// Register a listener for proxy events.
-    pub fn add_listener(&self, events: ProxyEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: ProxyEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     pub(crate) fn events(&self) -> Arc<Mutex<spa::hook::HookList<ProxyEvents>>> {

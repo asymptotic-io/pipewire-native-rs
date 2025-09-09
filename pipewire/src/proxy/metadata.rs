@@ -10,7 +10,7 @@ use crate::{
     core::Core,
     new_refcounted, protocol,
     proxy::{HasProxy, Proxy},
-    proxy_object_invoke, refcounted, types, Id, Refcounted,
+    proxy_object_invoke, refcounted, types, HookId, Id, Refcounted,
 };
 
 refcounted! {
@@ -76,8 +76,13 @@ impl Metadata {
     }
 
     /// Register for notifications of metadata events.
-    pub fn add_listener(&self, events: MetadataEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: MetadataEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     /// Set a property on the metadata. A [None] `key` removes all properties on the `subject`. A

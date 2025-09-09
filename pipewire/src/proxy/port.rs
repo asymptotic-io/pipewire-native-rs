@@ -16,7 +16,7 @@ use crate::{
     proxy::{HasProxy, Proxy},
     proxy_object_invoke, refcounted,
     types::{self, params::ParamBuilder},
-    Id, Refcounted,
+    HookId, Id, Refcounted,
 };
 
 refcounted! {
@@ -130,8 +130,13 @@ impl Port {
     }
 
     /// Register for notifications of port events.
-    pub fn add_listener(&self, events: PortEvents) {
-        self.inner.hooks.lock().unwrap().append(events);
+    pub fn add_listener(&self, events: PortEvents) -> HookId {
+        self.inner.hooks.lock().unwrap().append(events)
+    }
+
+    /// Remove a set of event listeners.
+    pub fn remove_listener(&self, hook_id: HookId) {
+        self.inner.hooks.lock().unwrap().remove(hook_id);
     }
 
     /// Register for notifications of the specified param types.
