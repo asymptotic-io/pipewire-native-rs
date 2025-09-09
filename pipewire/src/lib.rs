@@ -8,6 +8,18 @@
 //! This includes a native implementation of the protocol, and FFI wrappers around the lower-level
 //! SPA libraries used by PipeWire itself (which we try not to expose in the public API).
 //!
+//! <div class="warning">
+//! <p>
+//! The API is expected to change. Notably, performing audio/video processing is not yet
+//! implemented, and the mechanism for setting up proxy events and defining closures can definitely
+//! be improved.
+//! </p>
+//!
+//! <p>
+//! We will follow semantic versioning in order to avoid breaking existing API users.
+//! </p>
+//! </div>
+//!
 //! # Usage
 //!
 //! A typical client would use the following steps:
