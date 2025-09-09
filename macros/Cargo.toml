@@ -12,7 +12,7 @@ quote = "*"
 proc-macro2 = "*"
 
 [dev-dependencies]
-pipewire-native-spa.workspace = true
+pipewire-native-spa = { path = "../spa" }
 
 [lib]
 proc-macro = true
