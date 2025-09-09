@@ -1,10 +1,10 @@
 [package]
 name = "pipewire-native-spa"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-pipewire-native-macros = { path = "../macros" }
+pipewire-native-macros.workspace = true
 bitflags = "2.8.0"
 libc = "0.2.172"
 libloading = "0.8.6"

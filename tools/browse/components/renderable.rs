@@ -4,7 +4,8 @@
 
 use tuirealm::props::TextSpan;
 
-use pipewire::{keys, properties::Properties, proxy::HasProxy};
+use pipewire_native::{keys, properties::Properties, proxy::HasProxy};
+use pipewire_native_spa as spa;
 
 use crate::pw::{
     ClientDetails, DeviceDetails, FactoryDetails, LinkDetails, MetadataDetails, ModuleDetails,

@@ -1,7 +1,7 @@
 [package]
 name = "pipewire-native-macros"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 syn = { version = "*", features = ["extra-traits", "full"] }
@@ -9,7 +9,7 @@ quote = "*"
 proc-macro2 = "*"
 
 [dev-dependencies]
-pipewire-native-spa = { path = "../spa" }
+pipewire-native-spa.workspace = true
 
 [lib]
 proc-macro = true

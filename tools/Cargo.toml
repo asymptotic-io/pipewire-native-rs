@@ -1,7 +1,7 @@
 [package]
 name = "pipewire-native-tools"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [[bin]]
 name = "pw-browse"
@@ -9,7 +9,7 @@ path = "browse/main.rs"
 
 [dependencies]
 crossterm = "0.29.0"
-pipewire = { package = "pipewire-native", path = "../pipewire" }
-spa = { package = "pipewire-native-spa", path = "../spa" }
+pipewire-native.workspace = true
+pipewire-native-spa.workspace = true
 tui-realm-stdlib = { version = "3.0.0", features = ["crossterm"] }
 tuirealm = { version = "3.0.1", features = ["derive", "crossterm"] }

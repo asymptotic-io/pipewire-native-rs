@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use pipewire_native as pipewire;
+use pipewire_native_spa as spa;
+
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{
@@ -11,7 +14,6 @@ use std::{
 };
 
 use pipewire::{
-    self,
     context::Context,
     core::Core,
     keys,

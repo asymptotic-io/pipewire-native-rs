@@ -21,7 +21,8 @@ use tuirealm::{
     Application, AttrValue, Attribute, Event, EventListenerCfg, NoUserEvent, PollStrategy, Update,
 };
 
-use pipewire::proxy::HasProxy;
+use pipewire_native::proxy::HasProxy;
+use pipewire_native_spa as spa;
 
 use components::{
     help::Help, object_details::ObjectDetails, object_list::ObjectList, param_pane::ParamPane,
