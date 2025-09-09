@@ -4,11 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-pipewire-native-macros.workspace = true
-bitflags = "2.8.0"
-libc = "0.2.172"
+bitflags.workspace = true
+libc.workspace = true
 libloading = "0.8.6"
 num = "0.4.3"
+pipewire-native-macros.workspace = true
 
 [dev-dependencies]
 # For tests
