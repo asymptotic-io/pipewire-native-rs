@@ -26,17 +26,27 @@ pub struct HookList<T> {
 }
 
 impl<T> HookList<T> {
-    // The return value is an Rc<RefCell<...>> because:
+    // The return value is an Arc<Mutex<...>> for a few reasons.
     //
-    //   1. Rc<> allows us to clone() the hooklist before emission, so that we can mutably borrow
-    //      the list (because the callbacks structure needs to be mutably borrowed, as the callback
-    //      can be an FnMut, which needs to be mutably borrowed when called)
+    // Firstly, the hook list is usually stored in the structure on which the hook is being emitted
+    // -- that is, the structure is usually being captued for the closure that is going into the
+    // hooks. This means that the closure might need to have a mutable borrow of the object itself,
+    // like this example from tests/hook.rs
     //
-    //   2. RefCell<> is then needed inside the Rc, so that we can mutate it at all.
+    // ```
+    //   // The hook list is contained in `this`, and the hook takes an &mut this as the first
+    //   // argument
+    //   emit_hook!(this.hooks, mutie, &mut this, ...);
+    // ```
     //
-    // We might want to explore alternatives that let us push the RefCell<> all the way into the
-    // callbacks structure itself, so each callback can individually be mutably borrowed, so that
-    // one callback can call another callback if needed.
+    // If the hook list was not Clone, then we would need to take a reference to `this` above, and
+    // that would not let us also take a mutable reference for the closure argument.
+    //
+    // Now given we need to be able to clone the hook list, the inner structures need to be mutable
+    // (so we can add and remove hooks), which means a Mutex is necessary.
+    //
+    // A second reason for that mutability is that closure functions might be FnMut, which means
+    // we need to mutably borrow the callbacks list in order to call the function at all.
     pub fn new() -> Arc<Mutex<HookList<T>>> {
         Arc::new(Mutex::new(HookList {
             hooks: LinkedList::new(),
