@@ -4,7 +4,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{BinOp, Data, DeriveInput, Expr, ExprBinary, parse_macro_input, parse_quote};
+use syn::{parse_macro_input, parse_quote, BinOp, Data, DeriveInput, Expr, ExprBinary};
 
 pub fn derive_marshallable(input: TokenStream) -> TokenStream {
     let DeriveInput {
