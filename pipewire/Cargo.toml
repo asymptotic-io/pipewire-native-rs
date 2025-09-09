@@ -1,5 +1,6 @@
 [package]
 name = "pipewire-native"
+description = "A Rust implementation of the PipeWire client library"
 version.workspace = true
 license.workspace = true
 repository.workspace = true

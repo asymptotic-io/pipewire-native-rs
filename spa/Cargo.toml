@@ -1,5 +1,6 @@
 [package]
 name = "pipewire-native-spa"
+description = "A Rust implementation and bindings to the PipeWire SPA library"
 version.workspace = true
 license.workspace = true
 repository.workspace = true

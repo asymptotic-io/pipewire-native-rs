@@ -1,5 +1,6 @@
 [package]
 name = "pipewire-native-tools"
+description = "PipeWire utilities built with the pipewire-native library"
 version.workspace = true
 license.workspace = true
 repository.workspace = true
