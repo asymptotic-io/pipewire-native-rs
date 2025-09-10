@@ -788,7 +788,7 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "pipewire-native"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bitflags",
  "libc",
@@ -804,7 +804,7 @@ dependencies = [
 
 [[package]]
 name = "pipewire-native-macros"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "pipewire-native-spa",
  "proc-macro2",
@@ -814,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "pipewire-native-spa"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bitflags",
  "cc",
@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "pipewire-native-tools"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "crossterm 0.29.0",
  "pipewire-native",
