@@ -142,6 +142,7 @@ unsafe impl Sync for PortDetails {}
 pub struct State {
     pub main_loop: ThreadLoop,
     ui_update: Arc<AtomicBool>,
+    ui_quit: Arc<AtomicBool>,
     _context: Context,
     pub core: Core,
     pub registry: Registry,
@@ -159,7 +160,11 @@ unsafe impl Send for State {}
 unsafe impl Sync for State {}
 
 impl State {
-    pub fn new(name: &str, update: Arc<AtomicBool>) -> std::io::Result<Arc<State>> {
+    pub fn new(
+        name: &str,
+        update: Arc<AtomicBool>,
+        quit: Arc<AtomicBool>,
+    ) -> std::io::Result<Arc<State>> {
         pipewire::init();
         let mut props = Properties::new();
         props.set(keys::APP_NAME, name.to_string());
@@ -171,6 +176,7 @@ impl State {
 
         let state = Arc::new(State {
             ui_update: update,
+            ui_quit: quit,
             main_loop,
             _context: context,
             core,
@@ -187,6 +193,14 @@ impl State {
 
         let pw_state = state.clone();
 
+        state.core.proxy().add_listener(ProxyEvents {
+            error: some_closure!([^(state)] seq, res, msg, {
+                eprintln!("Got a core error: {seq} {res} ({msg})");
+                state.ui_quit.store(true, Ordering::Relaxed);
+            }),
+            ..Default::default()
+        });
+
         let registry = &pw_state.registry;
         registry.add_listener(RegistryEvents {
             global: some_closure!([registry ^(state)] id, _perms, type_, version, _props, {
@@ -198,7 +212,8 @@ impl State {
                     }
                     Err(e) => {
                         if e.kind() != std::io::ErrorKind::Unsupported {
-                            todo!("Send error {e} to UI");
+                            eprintln!("Unsupported object type {type_}");
+                            state.ui_quit.store(true, Ordering::Relaxed);
                         }
                     }
                 }

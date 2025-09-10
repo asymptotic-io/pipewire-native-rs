@@ -605,8 +605,9 @@ fn main() {
     let _ = terminal.enable_raw_mode();
     let _ = terminal.enter_alternate_screen();
 
+    let pw_quit = Arc::new(AtomicBool::new(false));
     let pw_update = Arc::new(AtomicBool::new(false));
-    let pw_state = pw::State::new("pw-browse", pw_update.clone())
+    let pw_state = pw::State::new("pw-browse", pw_update.clone(), pw_quit.clone())
         .expect("PipeWire initialisation should succeed");
     let mut model = Model::new(pw_state);
 
@@ -620,6 +621,11 @@ fn main() {
                 while msg.is_some() {
                     msg = model.update(msg);
                 }
+            }
+
+            // The PipeWire thread asks us to quit
+            if pw_quit.swap(false, Ordering::Relaxed) {
+                break;
             }
 
             // We have an update from PipeWire
