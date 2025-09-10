@@ -28,8 +28,10 @@ const LOOP_TIMEOUT: Duration = Duration::from_secs(5);
 static CALLBACKS: LazyLock<Mutex<HashMap<String, bool>>> = LazyLock::new(|| HashMap::new().into());
 
 fn init_support() -> (interface::Support, ffi::plugin::Plugin) {
-    let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH")
-        .unwrap_or("/usr/lib64/spa-0.2/support/libspa-support.so".to_string());
+    let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH").unwrap_or(format!(
+        "{}/support/libspa-support.so",
+        env!("SPA_DEFAULT_PLUGINDIR")
+    ));
 
     let plugin =
         ffi::plugin::load(&PathBuf::from(plugin_path)).expect("Plugin loading should not fail");

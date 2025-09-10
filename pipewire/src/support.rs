@@ -40,8 +40,7 @@ impl Support {
         let do_dlclose = utils::read_env_bool("PIPEWIRE_DLCLOSE", false);
         let no_color = utils::read_env_bool("NO_COLOR", false);
         let no_config = utils::read_env_bool("PIPEWIRE_NO_CONFIG", false);
-        /* FIXME: unhardcode */
-        let plugin_dir = utils::read_env_string("SPA_PLUGIN_DIR", "/usr/lib64/spa-0.2")
+        let plugin_dir = utils::read_env_string("SPA_PLUGIN_DIR", env!("SPA_DEFAULT_PLUGINDIR"))
             .split(':')
             .map(|s| s.to_string())
             .collect();

@@ -19,3 +19,4 @@ libspa = "0.8.0"
 
 [build-dependencies]
 cc = "1.2.22"
+pkg-config = "0.3.32"

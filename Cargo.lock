@@ -796,6 +796,7 @@ dependencies = [
  "paste",
  "pipewire-native-macros",
  "pipewire-native-spa",
+ "pkg-config",
  "serial_test",
  "tempfile",
  "tinyjson",
@@ -822,6 +823,7 @@ dependencies = [
  "libspa",
  "num",
  "pipewire-native-macros",
+ "pkg-config",
 ]
 
 [[package]]

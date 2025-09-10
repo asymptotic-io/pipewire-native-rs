@@ -19,6 +19,9 @@ tinyjson = "2.5.1"
 serial_test = "3"
 tempfile = "3"
 
+[build-dependencies]
+pkg-config = "0.3.32"
+
 [lints.clippy]
 # API users are responsible for their own synchronisation between main loop and
 # other threads (a common pattern might be separate threads, but mutual
