@@ -224,8 +224,7 @@ impl Connection {
                     .resize(wanted_capacity.max(2 * capacity), 0);
                 self.read()?;
             } else if let Some(header) = header {
-                // We had enough space, and got the header, so we should be good to have the caller
-                // try to decode the message too
+                // We had enough space, and got the header.
                 trace!(
                     "got message id:{} opcode:{} seq:{} size:{}",
                     header.id,
@@ -233,7 +232,16 @@ impl Connection {
                     header.seq,
                     header.size
                 );
-                return Ok(header);
+
+                // Let's make sure we also have the body
+                let available =
+                    *self.inner.in_size.read().unwrap() - *self.inner.in_offset.read().unwrap();
+                if available >= header.size as usize {
+                    return Ok(header);
+                } else {
+                    // We read the header but not the data, so continue reading.
+                    self.read()?;
+                }
             } else {
                 // We had enough space, but don't have the data, let's try to read data into the
                 // buffer
