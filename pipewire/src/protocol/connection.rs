@@ -331,7 +331,7 @@ impl Connection {
         let offset = *self.inner.in_offset.read().unwrap();
 
         if size - offset < marshal::HEADER_LEN {
-            return Ok((marshal::HEADER_LEN, None));
+            return Ok((offset + marshal::HEADER_LEN, None));
         }
 
         trace!("looking for message header from [{offset}..{size}]");
