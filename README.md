@@ -18,7 +18,7 @@ library.
 ## Documentation
 
 Crate documentation can be found on
-[docs.rs](https://docs.rs/pipewire-native/0.1.0/pipewire_native/).
+[docs.rs](https://docs.rs/pipewire-native/latest/pipewire_native/).
 
 ## Issues
 
