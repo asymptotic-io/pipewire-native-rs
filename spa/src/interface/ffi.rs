@@ -45,12 +45,15 @@ pub struct CHookList {
 pub struct CHook {
     pub link: CList,
     pub cb: CCallbacks,
-    pub removed: extern "C" fn(hook: *mut CHook),
+    // Option<> because the function pointer is nullable. Function pointers may not be null in
+    // Rust, and this is the correct way to represent that concept.
+    // https://doc.rust-lang.org/nomicon/ffi.html#the-nullable-pointer-optimization
+    pub removed: Option<extern "C" fn(hook: *mut CHook)>,
     pub priv_: *mut c_void,
 }
 
 impl CHook {
-    pub fn new_uninit() -> Self {
+    pub fn new() -> Self {
         CHook {
             link: CList {
                 next: std::ptr::null_mut(),
@@ -60,13 +63,15 @@ impl CHook {
                 funcs: std::ptr::null_mut(),
                 data: std::ptr::null_mut(),
             },
-            // In C, this function pointer can be NULL, but Rust doesn't allow that, so a couple of
-            // lints and hoops to jump through
-            #[allow(invalid_value)]
-            #[allow(clippy::uninit_assumed_init)]
-            removed: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            removed: None,
             priv_: std::ptr::null_mut(),
         }
+    }
+}
+
+impl Default for CHook {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

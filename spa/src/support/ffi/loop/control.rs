@@ -71,7 +71,7 @@ pub fn new_impl(interface: *mut CInterface) -> LoopControlImpl {
     let inner = Box::pin(Arc::new(RwLock::new(CLoopControlImpl {
         iface: interface as *mut CLoopControlIface,
         hooks: HookList::new(),
-        c_hook: CHook::new_uninit(),
+        c_hook: CHook::new(),
         c_hook_methods: CControlHooks {
             version: 0,
             before: loop_before_trampoline,
@@ -385,7 +385,7 @@ impl ControlMethodsIface {
         // up the removed callback to notify us, and do the cleanup there.
         let hook = unsafe { hook.as_mut().unwrap() };
 
-        hook.removed = Self::hook_removed;
+        hook.removed = Some(Self::hook_removed);
         hook.priv_ = Box::into_raw(Box::new(ControlHookPriv {
             impl_: control_methods_impl,
             id,
