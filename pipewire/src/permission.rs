@@ -35,6 +35,7 @@ bitflags! {
 }
 
 /// Represents permissions on an object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Permission {
     /// The object on which the permissions apply.
     pub id: Id,
