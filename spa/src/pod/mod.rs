@@ -43,7 +43,7 @@ pub trait Primitive {
 }
 
 fn pad_8(size: usize) -> usize {
-    if size % 8 > 0 {
+    if !size.is_multiple_of(8) {
         8 - size % 8
     } else {
         0
