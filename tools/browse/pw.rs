@@ -194,9 +194,10 @@ impl State {
         let pw_state = state.clone();
 
         state.core.proxy().add_listener(ProxyEvents {
-            error: some_closure!([^(state)] seq, res, msg, {
-                eprintln!("Got a core error: {seq} {res} ({msg})");
-                state.ui_quit.store(true, Ordering::Relaxed);
+            error: some_closure!([^(state)] _seq, res, _msg, {
+                if std::io::Error::from_raw_os_error(res as i32).kind() == std::io::ErrorKind::BrokenPipe {
+                    state.ui_quit.store(true, Ordering::Relaxed);
+                }
             }),
             ..Default::default()
         });
